@@ -56,10 +56,14 @@ def _alg(oid: str) -> bytes:
     return der_seq(der_oid(oid), der_null())
 
 
-def build_mock_tsr(digest: bytes, gen_time: datetime, nonce: int | None = None) -> bytes:
-    """A complete, verifiable RFC 3161 TimeStampResp from the mock TSA."""
-    cert = x509.load_pem_x509_certificate((MOCK_TSA_DIR / "mock-tsa.pem").read_bytes())
-    key = serialization.load_pem_private_key((MOCK_TSA_DIR / "mock-tsa-key.pem").read_bytes(), None)
+def build_mock_tsr(
+    digest: bytes, gen_time: datetime, nonce: int | None = None, *, cert: x509.Certificate | None = None, key=None
+) -> bytes:
+    """A complete, verifiable RFC 3161 TimeStampResp from the mock TSA (or from the
+    given certificate and RSA key, e.g. an "attacker" TSA in tamper tests)."""
+    if cert is None or key is None:
+        cert = x509.load_pem_x509_certificate((MOCK_TSA_DIR / "mock-tsa.pem").read_bytes())
+        key = serialization.load_pem_private_key((MOCK_TSA_DIR / "mock-tsa-key.pem").read_bytes(), None)
     cert_der = cert.public_bytes(serialization.Encoding.DER)
     serial = int.from_bytes(digest[:8], "big") >> 1 or 1
     fields = [
