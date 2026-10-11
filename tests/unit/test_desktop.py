@@ -6,6 +6,8 @@ import subprocess
 import sys
 import textwrap
 
+import pytest
+
 from app.desktop import InstanceLock, start_server, stop_server, tray_image
 from tests.conftest import make_ctx
 
@@ -60,3 +62,30 @@ def test_server_starts_on_the_next_free_port_and_stops(tmp_path):
 def test_tray_icon_is_drawn_without_files():
     img = tray_image(32)
     assert img.size == (32, 32) and img.getpixel((16, 2))[3] > 0
+
+
+def test_make_run_refuses_while_another_copy_holds_the_data_folder(tmp_path, monkeypatch):
+    """`make run` and the installed app take the same lock: never two servers on one data folder."""
+    import uvicorn
+
+    from app import main as app_main
+
+    held = InstanceLock(tmp_path)
+    assert held.acquire()
+    held.publish(8799)
+    monkeypatch.setenv("RPROV_HOME", str(tmp_path))
+    monkeypatch.setattr(sys, "argv", ["app"])
+    started = []
+    monkeypatch.setattr(uvicorn, "run", lambda *a, **k: started.append(k["port"]))
+    monkeypatch.setattr(app_main, "app_factory", lambda: object())
+    with pytest.raises(SystemExit) as exc:
+        app_main.main()
+    assert "already running" in str(exc.value.code) and "127.0.0.1:8799" in str(exc.value.code)
+    assert started == []
+    held.release()
+
+    app_main.main()  # free again: it starts, and gives the lock back when the server stops
+    assert len(started) == 1
+    again = InstanceLock(tmp_path)
+    assert again.acquire()
+    again.release()

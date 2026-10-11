@@ -51,7 +51,7 @@
 
 安装包在本仓库的 **Releases** 页面（打版本标签时自动生成草稿，发布后别人才能下载），每次推送代码后也会在 **Actions → Package → Artifacts** 里生成一份（要登录 GitHub，保留 90 天）。Intel 芯片的 Mac 暂时没有安装包，可以先用下面「从源代码运行」的方法。
 
-**用起来：** 双击打开后，程序在后台启动，并自动在浏览器里打开 http://127.0.0.1:8765 （8765 被占用时换下一个端口）。Mac 的菜单栏、Windows 右下角的通知区域里会出现一个蓝色圆形图标：点它可以重新打开页面，或者 **Quit** 退出。关掉浏览器窗口不会退出程序；要再打开页面，点这个图标 → **Open Research History**（Windows 上再双击一次程序也行）。程序不会同时开两份。日志在数据文件夹的 `logs/app.log`。
+**用起来：** 双击打开后，程序在后台启动，并自动在浏览器里打开 http://127.0.0.1:8765 （8765 被占用时换下一个端口）。Mac 的菜单栏、Windows 右下角的通知区域里会出现一个蓝色圆形图标：点它可以重新打开页面，或者 **Quit** 退出。关掉浏览器窗口不会退出程序；要再打开页面，点这个图标 → **Open Research History**（Windows 上再双击一次程序也行）。程序不会同时开两份（安装版和 `make run` 也不会同时用同一个数据文件夹）。日志在数据文件夹的 `logs/app.log`。
 
 **数据放在哪里：** Mac 是 `~/.rprov`，Windows 是 `%USERPROFILE%\.rprov`（和从源代码运行时是同一个位置，两种方式可以互换）。**升级**就是用新版本安装包再装一次；**卸载**（Mac：把程序拖进废纸篓；Windows：设置 → 应用 → Research History → 卸载）都不会删除数据。
 
@@ -184,6 +184,7 @@ make dev              # 后端（自动重载）+ Vite 开发服务器 http://12
 make test             # ruff + 全部测试（单元、接口、篡改、端到端）；联网测试跳过
 make test-network     # 需要真实 FreeTSA / DigiCert / OpenTimestamps / 区块浏览器的测试（含 AC-09），在联网的 Mac 上跑
 make verify-py        # 从核心库重新生成 dist/verify.py
+make tsa-fixture      # 把真实的 FreeTSA / DigiCert 回应存成离线测试用的样本（在联网的 Mac 上跑，存进 tests/fixtures/tsa/ 后提交）
 ```
 
 不联网开发时可以用模拟时间证明：`RPROV_TSA=mock RPROV_BTC=mock make run`（模拟机构签的证明，`verify.py` 默认不信任；只在测试时加 `--tsa-root certs/mock-tsa-root.pem`）。没有钥匙串的 Linux 开发环境另需 `RPROV_KEYSTORE=dev-insecure-file`（明文钥匙文件，只用于开发）。

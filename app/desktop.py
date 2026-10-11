@@ -4,19 +4,16 @@ Starts the same local server as ``make run`` (127.0.0.1 only), opens the browser
 an icon in the macOS menu bar / Windows notification area with "Open Research History"
 and "Quit". There is no console window, so everything is logged to ``<data>/logs/app.log``.
 
-Only one copy runs per data folder: a lock file in the data folder (released by the
-operating system when the process ends, even after a crash) tells a second start that
-the app is already running; it then just opens the browser at the running app's address.
+Only one copy runs per data folder (app.instance; ``make run`` takes the same lock): a
+second start just opens the browser at the running copy's address.
 No network code here: readiness is read from the server object itself.
 """
 
 from __future__ import annotations
 
 import argparse
-import json
 import logging
 import logging.handlers
-import os
 import sys
 import threading
 import time
@@ -24,65 +21,11 @@ import webbrowser
 from pathlib import Path
 
 from app.config import Settings
+from app.instance import InstanceLock
 
 APP_NAME = "Research History"
 log = logging.getLogger("rprov.desktop")
 PORT_TRIES = 10
-
-
-# ---------------------------------------------------------------- one copy per data folder
-
-
-class InstanceLock:
-    """Exclusive, non-blocking lock on ``<data>/app.lock``; held for the life of the process."""
-
-    def __init__(self, data_dir: Path):
-        self.path = data_dir / "app.lock"
-        self.port_file = data_dir / "app.port"
-        self._fh = None
-
-    def acquire(self) -> bool:
-        fh = open(self.path, "a+b")  # noqa: SIM115 - kept open while the app runs
-        try:
-            if sys.platform == "win32":
-                import msvcrt
-
-                fh.seek(0)
-                msvcrt.locking(fh.fileno(), msvcrt.LK_NBLCK, 1)
-            else:
-                import fcntl
-
-                fcntl.flock(fh.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
-        except OSError:
-            fh.close()
-            return False
-        self._fh = fh
-        return True
-
-    def publish(self, port: int) -> None:
-        tmp = self.port_file.with_suffix(".tmp")
-        tmp.write_text(json.dumps({"port": port, "pid": os.getpid()}), encoding="utf-8")
-        os.replace(tmp, self.port_file)
-
-    def running_port(self, wait: float = 10.0) -> int | None:
-        """The port of the copy that holds the lock (it may still be starting)."""
-        deadline = time.monotonic() + wait
-        while True:
-            try:
-                return int(json.loads(self.port_file.read_text(encoding="utf-8"))["port"])
-            except (OSError, ValueError, KeyError):
-                if time.monotonic() > deadline:
-                    return None
-                time.sleep(0.2)
-
-    def release(self) -> None:
-        if self._fh is not None:
-            try:
-                self.port_file.unlink()
-            except OSError:
-                pass
-            self._fh.close()
-            self._fh = None
 
 
 # ---------------------------------------------------------------- server

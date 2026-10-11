@@ -403,7 +403,9 @@ verification rules or what leaves the machine for time proofs.
      providers" still holds. One copy per data folder: an OS file lock in the data folder
      (released even after a crash); a second start just opens the browser at the running
      copy. With no console window, everything goes to `<data>/logs/app.log`, including
-     tracebacks of unexpected server errors.
+     tracebacks of unexpected server errors. `make run` / `python -m app` take the same
+     lock and refuse to start while the installed app (or another `make run`) is using the
+     data folder.
   2. *Bundles.* PyInstaller, one folder, with its own Python, the built interface, the
      report templates, the sample data and the public TSA certificates. The two public
      mock-TSA certificates are included because export compares token issuers with the
@@ -462,7 +464,15 @@ verification rules or what leaves the machine for time proofs.
      both fingerprints under `trusted_tsa_roots`; VERIFY.md gives an `openssl ts -verify`
      command for each authority; verify.py embeds both roots and prints both
      fingerprints. Bundles exported before this change verify exactly as before.
-  6. *"Check stamp services" (Settings menu).* Runs only when the author clicks "Check
+  6. *Certificates in DER order.* DigiCert's tokens list their certificates (responder,
+     intermediate, root) in chain order. DER requires a SET in sorted order, and
+     rfc3161-client refuses such a token (`InvalidSetOrdering`), so the fallback failed on
+     every real response (found on the Mac). The certificates are not covered by the
+     signature, so the app sorts them before reading or storing a token, and the check
+     (app and verify.py) sorts them too. Lengths and everything signed stay the same, and
+     `openssl ts -verify` accepts the result. `make tsa-fixture` saves real responses
+     into `tests/fixtures/tsa/`; an offline test checks every saved one.
+  7. *"Check stamp services" (Settings menu).* Runs only when the author clicks "Check
      now". It asks each authority for a real stamp of a random value (the answer is
      checked like a real one), asks each of the four calendars about a random value
      they have never seen, and asks both block explorers for the current block height.

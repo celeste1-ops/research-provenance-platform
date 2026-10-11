@@ -201,10 +201,39 @@ def _cert_common_name(cert: x509.Certificate | None) -> str:
     return str(names[0].value) if names else cert.subject.rfc4514_string()
 
 
+def canonical_tsr(tsr: bytes) -> bytes:
+    """The same time-stamp response with the certificates in its token in DER order.
+
+    DigiCert lists the certificates of its token (a DER SET) in chain order, which DER
+    does not allow, and strict readers such as rfc3161-client refuse the whole token.
+    The certificates are not covered by the signature, so sorting them changes nothing
+    that is signed, and no length changes. Anything that does not parse is returned
+    unchanged (the full check then reports it). DECISIONS D-045.
+    """
+    try:
+        _, s, e = der_read(tsr)
+        resp = der_children(tsr, s, e)
+        if len(resp) < 2:
+            return tsr
+        ci = der_children(tsr, resp[1][2], resp[1][3])
+        if len(ci) != 2:
+            return tsr
+        (_, _, sds, sde), *_ = der_children(tsr, ci[1][2], ci[1][3])
+        out = bytearray(tsr)
+        for tag, _ts, cs, ce in der_children(tsr, sds, sde):
+            if tag in (0xA0, 0xA1):  # [0] certificates, [1] crls: both SET OF
+                items = [tsr[ts:te] for _t, ts, _c, te in der_children(tsr, cs, ce)]
+                out[cs:ce] = b"".join(sorted(items))
+        return bytes(out)
+    except DerError:
+        return tsr
+
+
 def verify_tsa_proof(record_id: str, tsr: bytes | None, roots: list[x509.Certificate]) -> ProofCheck:
     """V4: signature valid, chain to a built-in root, imprint == record ID."""
     if not tsr:
         return no_proof(TSA_KIND)
+    tsr = canonical_tsr(tsr)
     try:
         resp = decode_timestamp_response(tsr)
         info = resp.tst_info
@@ -259,7 +288,7 @@ def verify_tsa_proof(record_id: str, tsr: bytes | None, roots: list[x509.Certifi
 def tsa_embedded_certificates(tsr: bytes) -> list[x509.Certificate]:
     """Certificates embedded in a time-stamp token (for exporting certs/)."""
     try:
-        resp = decode_timestamp_response(tsr)
+        resp = decode_timestamp_response(canonical_tsr(tsr))
         return [x509.load_der_x509_certificate(bytes(c)) for c in resp.signed_data.certificates]
     except Exception:  # noqa: BLE001
         return []

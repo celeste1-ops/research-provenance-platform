@@ -3,7 +3,7 @@ UV      ?= uv
 PY      := $(UV) run --extra ots --extra desktop python
 PORT    ?= 8765
 
-.PHONY: help install dev run test test-network lint fmt web demo verify-py freetsa-certs clean
+.PHONY: help install dev run test test-network lint fmt web demo verify-py freetsa-certs tsa-fixture clean
 
 help:
 	@echo "make install      install Python (uv), web (npm) and test-browser dependencies"
@@ -14,6 +14,7 @@ help:
 	@echo "make demo         load the FSF sample data into the data directory"
 	@echo "make verify-py    regenerate dist/verify.py from the core library"
 	@echo "make freetsa-certs refresh the FreeTSA certificates and check the DigiCert root"
+	@echo "make tsa-fixture  save real FreeTSA / DigiCert responses as offline test fixtures"
 
 install:
 	$(UV) sync --extra ots --extra desktop
@@ -53,6 +54,9 @@ verify-py:
 
 freetsa-certs:
 	$(PY) tools/update_freetsa_certs.py
+
+tsa-fixture:
+	$(PY) tools/capture_tsa_fixture.py
 
 clean:
 	rm -rf dist web/dist .pytest_cache

@@ -46,6 +46,7 @@ def test_real_freetsa_token_verifies_with_openssl(tmp_path):
 
 def test_real_digicert_token_verifies_with_builtin_root_and_openssl(tmp_path):
     from cryptography.hazmat.primitives import serialization
+    from rfc3161_client import decode_timestamp_response
 
     from app.config import Settings
     from app.services.context import public_tsa
@@ -56,6 +57,8 @@ def test_real_digicert_token_verifies_with_builtin_root_and_openssl(tmp_path):
     manifest_bytes, _, rid = _manifest()
     result = public_tsa(Settings(), "digicert").submit(rid, manifest_bytes)
     assert result.status == "confirmed"
+    # DigiCert lists its certificates in chain order; what is stored must be readable as is.
+    assert len(decode_timestamp_response(result.proof).signed_data.certificates) >= 2
     check = verify_tsa_proof(rid, result.proof, builtin_tsa_roots())
     assert check.verified and "DigiCert" in (check.source or ""), check
     embedded = tsa_embedded_certificates(result.proof)
