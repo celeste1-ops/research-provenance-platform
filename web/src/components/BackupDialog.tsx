@@ -7,6 +7,9 @@ import { dev, keychainName } from "../device";
 // Choose a folder + password once; from then on every change is backed up automatically,
 // fully encrypted. Used in first-run onboarding and in the Backup dialog. The first time,
 // a printable recovery code is shown (D-039).
+// How long the backup form waits for the list of suggested folders before showing without it.
+const SUGGESTIONS_WAIT_MS = 5000;
+
 export function BackupSetup({
   current,
   onDone,
@@ -18,7 +21,9 @@ export function BackupSetup({
   onSkip?: () => void;
   submitLabel?: string;
 }) {
-  const [suggestions, setSuggestions] = useState<BackupSuggestion[]>([]);
+  // null while still looking: the form is shown once the list is known, so nothing moves under
+  // the pointer (on Windows the list can take a few seconds and used to push the button down).
+  const [suggestions, setSuggestions] = useState<BackupSuggestion[] | null>(null);
   const [location, setLocation] = useState(current?.location ?? "");
   const [check, setCheck] = useState<LocationCheck | null>(null);
   const [password, setPassword] = useState("");
@@ -28,15 +33,19 @@ export function BackupSetup({
   const [created, setCreated] = useState<BackupStatus | null>(null);
 
   useEffect(() => {
-    api
-      .backupSuggestions()
-      .then((s) => {
-        setSuggestions(s);
-        // Only fill in an empty field: the list can arrive after the author typed a folder.
-        if (s.length > 0) setLocation((typed) => typed || s[0].path);
-      })
-      .catch(() => setSuggestions([]));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    let settled = false;
+    const settle = (s: BackupSuggestion[]) => {
+      if (settled) return; // a list that arrives after giving up is ignored
+      settled = true;
+      setSuggestions(s);
+      if (s.length > 0) setLocation((typed) => typed || s[0].path);
+    };
+    const giveUp = window.setTimeout(() => settle([]), SUGGESTIONS_WAIT_MS);
+    api.backupSuggestions().then(settle).catch(() => settle([]));
+    return () => {
+      settled = true;
+      window.clearTimeout(giveUp);
+    };
   }, []);
 
   // Say where the chosen folder really is while the author types or picks one.
@@ -84,6 +93,14 @@ export function BackupSetup({
     );
   }
 
+  if (suggestions === null) {
+    return (
+      <p className="muted" data-testid="backup-looking">
+        Looking for good places for backups on this {dev()}…
+      </p>
+    );
+  }
+
   return (
     <form onSubmit={submit} className="backup-setup" data-testid="backup-setup">
       <div className="field">
@@ -105,14 +122,17 @@ export function BackupSetup({
           onChange={(e) => setLocation(e.target.value)}
           placeholder="/Volumes/MyDrive/Research Provenance Backups"
         />
-        {check && (
-          <p className={`small location-check ${check.safe ? "ok" : "warn"}`} data-testid="location-check">
-            {check.safe ? "✓ " : "⚠ "}
-            <b>{check.label}</b>
-            {check.creates && " — the folder will be created"}
-            {check.warning && <span className="block">{check.warning}</span>}
-          </p>
-        )}
+        {/* Space is kept for this line, so the button below does not move when it appears. */}
+        <div className="location-check-slot">
+          {check && (
+            <p className={`small location-check ${check.safe ? "ok" : "warn"}`} data-testid="location-check">
+              {check.safe ? "✓ " : "⚠ "}
+              <b>{check.label}</b>
+              {check.creates && " — the folder will be created"}
+              {check.warning && <span className="block">{check.warning}</span>}
+            </p>
+          )}
+        </div>
         <p className="note">
           Pick a place that is <b>not only on this {dev()}</b>: an external drive, or a folder kept in sync by a service
           you already use (iCloud Drive, Dropbox…). Only the encrypted backup files go there — the app's working data

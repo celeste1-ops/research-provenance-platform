@@ -312,9 +312,11 @@ def test_empty_state_and_help_panels(tmp_path, browser):
         page.close()
 
 
-def test_slow_folder_suggestions_do_not_replace_a_typed_folder(tmp_path, browser, monkeypatch):
-    """Windows looks at every drive, so suggestions can arrive after the author typed a folder;
-    they must not overwrite it (seen on windows-latest)."""
+def test_backup_form_does_not_move_under_the_pointer(tmp_path, browser, monkeypatch):
+    """On Windows the suggested folders arrive a few seconds late (every drive is looked at) and the
+    folder check a moment after typing. Both used to push the "Turn on" button down, so a click
+    could land on a suggestion instead (seen on windows-latest: the recovery sheet never came), and
+    a late list replaced a typed folder. Now the form waits for the list, and the check has room."""
     import time
 
     from app.services import autobackup
@@ -322,23 +324,35 @@ def test_slow_folder_suggestions_do_not_replace_a_typed_folder(tmp_path, browser
     folder = tmp_path / "typed"
     folder.mkdir()
     other = tmp_path / "suggested"
+    real_check = autobackup.check_location
 
     def slow_suggestions(data_dir):
         time.sleep(1.5)
         return [{"path": str(other), "label": "Drive D:", "kind": "external"}]
 
+    def slow_check(*args, **kwargs):
+        time.sleep(1.0)
+        return real_check(*args, **kwargs)
+
     monkeypatch.setattr(autobackup, "suggestions", slow_suggestions)
+    monkeypatch.setattr(autobackup, "check_location", slow_check)
     with LiveServer(tmp_path / "a") as srv:
         srv.ctx.ledger.init_identity("Typist")
         page = browser.new_page(viewport={"width": 1400, "height": 900})
         page.goto(srv.url)
         page.get_by_test_id("backup-pill").click()
-        dlg = page.get_by_test_id("backup-dialog")
+        expect(page.get_by_test_id("backup-looking")).to_be_visible()  # no form to click yet
+        assert page.get_by_test_id("backup-setup").count() == 0
+        dlg = page.get_by_test_id("backup-setup")
+        expect(dlg.get_by_text("Drive D:")).to_be_visible()  # the form comes with the list
         field = dlg.get_by_label("Backup folder")
+        expect(field).to_have_value(str(other))  # an empty field takes the first suggestion
+        button = dlg.get_by_role("button", name="Turn on automatic backup")
         field.fill(str(folder))
-        expect(dlg.get_by_text("Drive D:")).to_be_visible()  # the suggestions have arrived
-        expect(field).to_have_value(str(folder))
+        y = button.bounding_box()["y"]
         expect(dlg.get_by_test_id("location-check")).to_contain_text("This Mac's own disk")
+        assert button.bounding_box()["y"] == y  # the check appeared without moving the button
+        expect(field).to_have_value(str(folder))
         page.close()
 
 

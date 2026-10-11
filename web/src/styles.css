@@ -248,3 +248,7 @@ ul.plain { list-style: none; padding: 0; margin: 0; }
 .service-table { margin: 4px 0; }
 .service-table td:first-child { width: 1%; font-weight: 700; }
 .service-table td:nth-child(2), .service-table td:last-child { width: 1%; white-space: nowrap; }
+
+/* Backup folder check: room for the label and a three-line warning, so nothing jumps */
+.location-check-slot { min-height: 5.2em; display: flow-root; }
+.location-check-slot .location-check { margin: 4px 0; }
