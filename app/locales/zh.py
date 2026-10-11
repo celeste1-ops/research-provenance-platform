@@ -347,7 +347,7 @@ MESSAGES: dict[str, str] = {
     "git took too long to answer": "git 太久没有回应",
     "could not run git ({value})": "无法运行 git（{value}）",
     "not a full commit hash": "不是完整的提交哈希",
-    "git archive failed": "git 打包代码失败",
+    "could not read a file of the commit": "读不出这次提交里的一个文件",
     "there is no such branch": "没有这个分支",
     "this branch has no commits yet": "这个分支还没有提交",
     "this branch of this repository is already being recorded": "这个仓库的这个分支已经在记录了",
