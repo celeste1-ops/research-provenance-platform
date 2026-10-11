@@ -42,7 +42,7 @@
 
 ## 安装（Mac）
 
-需要：[uv](https://docs.astral.sh/uv/)（管理 Python 3.12）、Node.js 22、`make`、OpenSSL 3（手工验证签名用，`brew install openssl@3`）。
+需要：[uv](https://docs.astral.sh/uv/)（自动准备 Python 3.12 或 3.13）、Node.js 22 或更新、`make`、OpenSSL 3（手工验证签名用，`brew install openssl@3`；若系统里还有更新版本的 openssl，请让 3 版排在前面）。
 
 ```bash
 git clone <本仓库地址> research-provenance-platform

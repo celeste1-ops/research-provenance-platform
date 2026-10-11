@@ -10,20 +10,26 @@ DEFAULT_PORT = 8765
 MAX_UPLOAD_BYTES = 50 * 1024 * 1024  # PRD S3
 
 
+def _env(name: str, default: str | None = None):
+    # Read at construction time, not import time, so values set after import
+    # (e.g. `python -m app --port 8766`) take effect.
+    return field(default_factory=lambda: os.environ.get(name, default))
+
+
 @dataclass
 class Settings:
     data_dir: Path = field(default_factory=lambda: Path(os.environ.get("RPROV_HOME", "~/.rprov")).expanduser())
-    port: int = int(os.environ.get("RPROV_PORT", DEFAULT_PORT))
+    port: int = field(default_factory=lambda: int(os.environ.get("RPROV_PORT", DEFAULT_PORT)))
     # Third-party timestamp provider: freetsa | mock | off
-    tsa: str = os.environ.get("RPROV_TSA", "freetsa")
-    tsa_url: str = os.environ.get("RPROV_TSA_URL", "https://freetsa.org/tsr")
+    tsa: str = _env("RPROV_TSA", "freetsa")
+    tsa_url: str = _env("RPROV_TSA_URL", "https://freetsa.org/tsr")
     # Bitcoin anchor provider: ots | mock | off
-    btc: str = os.environ.get("RPROV_BTC", "ots")
+    btc: str = _env("RPROV_BTC", "ots")
     # Optional local Bitcoin node for checking block headers (else: two public block explorers)
-    bitcoin_rpc: str | None = os.environ.get("RPROV_BITCOIN_RPC") or None
+    bitcoin_rpc: str | None = field(default_factory=lambda: os.environ.get("RPROV_BITCOIN_RPC") or None)
     # Signing-key storage: keyring (macOS Keychain) | memory (tests) | dev-insecure-file
-    keystore: str = os.environ.get("RPROV_KEYSTORE", "keyring")
-    dev: bool = os.environ.get("RPROV_DEV", "") == "1"
+    keystore: str = _env("RPROV_KEYSTORE", "keyring")
+    dev: bool = field(default_factory=lambda: os.environ.get("RPROV_DEV", "") == "1")
     web_dist: Path = field(default_factory=lambda: Path(__file__).resolve().parent.parent / "web" / "dist")
     # Extra Host/Origin values allowed (tests); never used to open the server up.
     extra_hosts: tuple[str, ...] = ()

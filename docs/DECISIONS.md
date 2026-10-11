@@ -40,6 +40,13 @@ each section.
   if its fingerprint differs from the one above. The `network` test for AC-09 checks a real
   FreeTSA response against the committed root.
 
+  *Update (2026-10-11, done on the Mac):* `make freetsa-certs` confirmed the root fingerprint
+  and replaced `tsa.crt` with FreeTSA's current TSA certificate (serial `C2E986160DA8E9CD`,
+  valid 2026-02-15 → 2040-02-02, SHA-256
+  `32e841a95cc1164101ffde41298ef2fc75c1c4372ef095e88a6bbd47dfb191fc`), which is directly
+  issued by the pinned root. `make test-network` (AC-09 and the OpenTimestamps /
+  block-explorer checks) passed on the Mac with OpenSSL 3.
+
 ## Records and verification
 
 - **D-005 · Mock third-party timestamps are real RFC 3161 tokens.** `MockProvider("tsa")`
