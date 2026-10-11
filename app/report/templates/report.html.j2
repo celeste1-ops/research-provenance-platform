@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; img-src data:; base-uri 'none'; form-action 'none'">
+<meta name="referrer" content="no-referrer">
+<title>Provenance report — {{ meta.title }}</title>
+<style>
+:root { --ink:#1d2330; --muted:#5d6676; --line:#d9dde5; --bg:#ffffff; --panel:#f6f7f9; --ok:#1f7a4a; --warn:#9a6400; --bad:#b42318; --pend:#6a5acd; --verified:#e8f3ee; --author:#fff6e5; --later:#eef1fb; }
+* { box-sizing: border-box; }
+body { margin: 0; font: 15px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; color: var(--ink); background: var(--bg); }
+main { max-width: 1100px; margin: 0 auto; padding: 28px 22px 80px; }
+h1 { font-size: 26px; margin: 0 0 4px; } h2 { font-size: 19px; margin: 34px 0 10px; border-bottom: 1px solid var(--line); padding-bottom: 6px; }
+h3 { font-size: 15px; margin: 16px 0 6px; }
+.muted { color: var(--muted); } .small { font-size: 13px; } code, .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12.5px; word-break: break-all; }
+.cols { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+.box { border: 1px solid var(--line); border-radius: 8px; padding: 12px 16px; background: var(--panel); }
+.box ul { margin: 6px 0 0; padding-left: 20px; }
+.yes h3 { color: var(--ok); } .no h3 { color: var(--bad); }
+.summary { display: flex; gap: 12px; flex-wrap: wrap; margin: 8px 0; }
+.stat { border: 1px solid var(--line); border-radius: 8px; padding: 8px 14px; min-width: 150px; }
+.stat b { display: block; font-size: 22px; }
+.graph { overflow-x: auto; border: 1px solid var(--line); border-radius: 8px; background: #fff; }
+.graph svg { display: block; }
+table { border-collapse: collapse; width: 100%; font-size: 13px; }
+th, td { border-bottom: 1px solid var(--line); padding: 6px 8px; text-align: left; vertical-align: top; }
+th { background: var(--panel); font-weight: 600; }
+.unverified { color: #8a909c; }
+.st-pass { color: var(--ok); } .st-pass_btc_pending { color: var(--pend); } .st-warning { color: var(--warn); } .st-fail { color: var(--bad); font-weight: 600; }
+.record { border: 1px solid var(--line); border-radius: 10px; margin: 18px 0; overflow: hidden; break-inside: avoid-page; }
+.record > header { padding: 10px 16px; background: var(--panel); border-bottom: 1px solid var(--line); }
+.section { padding: 10px 16px; border-top: 1px solid var(--line); }
+.section:first-of-type { border-top: 0; }
+.section .tag { display: inline-block; font-size: 11px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; padding: 2px 8px; border-radius: 99px; margin-bottom: 6px; }
+.sec-verified { background: var(--verified); } .sec-verified .tag { background: #c6e6d4; color: #14532d; }
+.sec-author { background: var(--author); border-left: 4px dashed #d9a441; } .sec-author .tag { background: #f6deb0; color: #6b4300; }
+.sec-later { background: var(--later); } .sec-later .tag { background: #d3dbf6; color: #1e3a8a; }
+dl { display: grid; grid-template-columns: 210px 1fr; gap: 3px 12px; margin: 4px 0; }
+dt { color: var(--muted); } dd { margin: 0; }
+.body { background: #fff; border: 1px solid var(--line); border-radius: 6px; padding: 4px 14px; margin-top: 8px; }
+.lane0 { fill: #fafbfc; } .lane1 { fill: #f2f4f7; } .lane-label { font-size: 12px; fill: #5d6676; font-weight: 600; }
+.date { font-size: 11px; fill: #5d6676; } .seq { font-size: 10px; fill: #8a909c; }
+.node rect { fill: #fff; stroke: #8c95a6; stroke-width: 1.2; } .node.milestone rect { stroke: #c58b00; stroke-width: 3; fill: #fffaf0; }
+.node.retracted rect { fill: #f3f4f6; stroke-dasharray: 4 3; } .node.retracted .node-title { text-decoration: line-through; fill: #6b7280; }
+.node-title { font-size: 12.5px; font-weight: 600; fill: #1d2330; } .node-sub { font-size: 11px; fill: #5d6676; }
+.edge { fill: none; stroke: #3b4a63; stroke-width: 1.5; } .edge-grey { fill: none; stroke: #b5bac4; stroke-width: 1.3; }
+.arrowhead { fill: #3b4a63; } .arrowhead-grey { fill: #b5bac4; } .edge-label { font-size: 10.5px; fill: #1e3a8a; }
+.ic-on { fill: #1f7a4a; } .ic-pending { fill: #fff; stroke: #6a5acd; stroke-width: 1.5; stroke-dasharray: 2 2; } .ic-off { fill: #fff; stroke: #c3c8d0; stroke-width: 1.2; }
+.ic-t-on { font-size: 9px; fill: #fff; font-weight: 700; } .ic-t { font-size: 9px; fill: #6a5acd; font-weight: 700; } .ic-t-off { font-size: 9px; fill: #b0b6c0; font-weight: 700; }
+.legend { font-size: 12.5px; color: var(--muted); margin: 6px 0 0; }
+.print-footer { display: none; }
+@page { margin: 16mm 14mm 18mm; @bottom-center { content: "This record does not prove authorship or originality."; font-size: 9pt; color: #555; } }
+@media print {
+  main { max-width: none; padding: 0; } .graph { overflow: visible; } .graph svg { max-width: 100%; height: auto; }
+  .print-footer { display: block; position: fixed; bottom: 0; left: 0; right: 0; text-align: center; font-size: 9pt; color: #555; }
+  a { color: inherit; text-decoration: none; }
+}
+@media (max-width: 760px) { .cols { grid-template-columns: 1fr; } dl { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<div class="print-footer">This record does not prove authorship or originality.</div>
+<main>
+
+<header>
+  <h1>Provenance report: {{ meta.title }}</h1>
+  <div class="muted">Author label (self-declared): <b>{{ meta.author_label }}</b></div>
+  <div class="muted">Exported {{ meta.exported_local_time }} <span class="unverified">(local clock, unverified)</span> · format {{ meta.format }}</div>
+</header>
+
+<section id="proves">
+  <h2>What this record proves — and what it does not</h2>
+  <div class="cols">
+    <div class="box yes"><h3>It can show</h3><ul>{% for item in proves %}<li>{{ item }}</li>{% endfor %}</ul></div>
+    <div class="box no"><h3>It cannot show</h3><ul>{% for item in does_not_prove %}<li>{{ item }}</li>{% endfor %}</ul></div>
+  </div>
+  <p class="small muted">{{ source_note }}</p>
+  <p class="small muted">Two kinds of time evidence are kept apart: a <b>third-party timestamp</b> (RFC 3161, from a time-stamping authority; you must trust that authority not to lie, but anyone can check its signature) and a <b>Bitcoin anchor</b> (OpenTimestamps; no authority to trust, anyone can check it against the public Bitcoin blockchain; it takes hours to confirm and its time is approximate).</p>
+</section>
+
+<section id="summary">
+  <h2>Verification summary</h2>
+  <div class="summary">
+    <div class="stat st-pass"><b>{{ counts['pass'] }}</b>pass</div>
+    <div class="stat st-pass_btc_pending"><b>{{ counts['pass_btc_pending'] }}</b>pass (Bitcoin anchor pending)</div>
+    <div class="stat st-warning"><b>{{ counts['warning'] }}</b>warning</div>
+    <div class="stat st-fail"><b>{{ counts['fail'] }}</b>fail</div>
+  </div>
+  <p class="small">This is the result <b>at export time</b> on the exporting computer. Do not rely on it: run <code>verify.py</code> yourself (see the last section).</p>
+  <p class="small muted">Third-party timestamps were checked against: {% for t in trust %}{{ t.name }} (SHA-256 <span class="mono">{{ t.sha256 }}</span>){% if t.mock %} — <b>MOCK test authority, not trustworthy</b>{% endif %}{% if not loop.last %}; {% endif %}{% endfor %}.</p>
+  {% if hidden_count %}<p class="small muted">{{ hidden_count }} record(s) in this bundle are disclosed as “existence only”: only their existence, order and time are shown.</p>{% endif %}
+  {% for issue in report.log_issues %}<p class="st-fail small">{{ issue.code }}: {{ issue.message }}</p>{% endfor %}
+</section>
+
+<section id="graph">
+  <h2>Evolution graph</h2>
+  <div class="graph">{{ graph_svg }}</div>
+  <p class="legend">Left to right in recording order; one row per record type; arrows run from the older record to the newer one. Solid = revises, dashed = derived from, dotted = uses. “added …” marks a relation added later; grey = withdrawn. Gold border / ★ = milestone. Icons: <b>T</b> third-party timestamp, <b>B</b> Bitcoin anchor (filled = confirmed, dashed = pending, empty = none). Relations are author statements. Dates are the earliest verified time of each record.</p>
+</section>
+
+<section id="timeline">
+  <h2>Timeline</h2>
+  <table>
+    <thead><tr><th>#</th><th>Record</th><th>Third-party timestamp</th><th>Bitcoin anchor</th><th>Local time <span class="unverified">(unverified)</span></th><th>Relations <span class="muted">(author)</span></th><th>Check</th></tr></thead>
+    <tbody>
+    {% for row in timeline %}
+      <tr>
+        <td>{{ row.seq }}</td>
+        <td>{{ row.title }}<br><span class="muted small">{{ row.kind }}{% if row.node_type %} · {{ row.node_type }}{% endif %} · {{ row.disclosure }}</span><br><span class="mono muted">{{ row.id|short }}</span></td>
+        <td>{% if row.tsa.verified %}verified<br>{{ row.tsa.time }}{% elif row.tsa.state == 'none' %}<span class="muted">no timestamp yet</span>{% else %}{{ row.tsa.state }}{% endif %}</td>
+        <td>{% if row.btc.verified %}confirmed<br>{{ row.btc.time }}{% elif row.btc.state == 'pending' %}pending{% elif row.btc.state == 'none' %}<span class="muted">none</span>{% else %}{{ row.btc.state }}{% endif %}</td>
+        <td class="unverified">{{ row.local_time or '—' }}</td>
+        <td>{{ row.relations|join(', ') }}</td>
+        <td class="st-{{ row.status_key }}">{{ row.status }}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</section>
+
+<section id="records">
+  <h2>Records</h2>
+  {% for d in details %}
+  <article class="record" id="r-{{ d.id }}">
+    <header><b>#{{ d.seq }} {% if d.title %}{{ d.title }}{% else %}{{ d.kind }} record{% endif %}</b> <span class="muted small">· {{ d.kind }}{% if d.node_type %} · {{ d.node_type }}{% endif %} · disclosure: {{ d.disclosure }}</span> <span class="st-{{ d.res.status }} small">· {{ status_labels[d.res.status] }}</span></header>
+    <div class="section sec-verified">
+      <span class="tag">Verified record</span>
+      <dl>
+        <dt>Record ID</dt><dd class="mono">{{ d.id }}</dd>
+        {% if d.project %}<dt>Project (as recorded)</dt><dd>{{ d.project }}</dd>{% endif %}
+        <dt>Signature</dt><dd>{% if 'SIGNATURE_INVALID' in d.res.failure_codes %}<span class="st-fail">invalid</span>{% else %}valid (Ed25519, same key as the genesis record){% endif %}</dd>
+        <dt>Third-party timestamp</dt><dd>{% if d.res.tsa.verified %}verified — {{ d.res.tsa.time }}{% if d.res.tsa.source %} <span class="muted">({{ d.res.tsa.source }})</span>{% endif %}{% elif d.res.tsa.state == 'none' %}no timestamp yet{% else %}{{ d.res.tsa.state }} {{ d.res.tsa.code or '' }}{% endif %}</dd>
+        <dt>Bitcoin anchor</dt><dd>{% if d.res.btc.verified %}confirmed — {{ d.res.btc.time }} <span class="muted">({{ d.res.btc.source }})</span>{% elif d.res.btc.state == 'pending' %}pending{% elif d.res.btc.state == 'none' %}none{% else %}{{ d.res.btc.state }} {{ d.res.btc.code or '' }}{% endif %}</dd>
+        <dt>Earliest verified time</dt><dd>{% if d.ev %}{{ d.ev[0] }} (from {{ d.ev[1] }}){% else %}none yet{% endif %}</dd>
+        {% for h in d.content_hashes %}<dt>{{ h.name }}</dt><dd><span class="mono">sha256 {{ h.sha256 }}</span> · {{ h.size }} bytes · {{ h.media_type }}</dd>{% endfor %}
+        {% if d.external %}<dt>External reference</dt><dd>{% for k, v in d.external.items() if k != 'note' %}{{ k }}: <span class="mono">{{ v }}</span>{% if not loop.last %}, {% endif %}{% endfor %}<br><span class="muted small">{{ d.external.note }}</span></dd>{% endif %}
+      </dl>
+      {% if d.body_html %}<div class="body">{{ d.body_html }}</div>{% elif d.disclosure == 'structure' and d.content_hashes %}<p class="small muted">Content not disclosed (structure only); its hashes are listed above.</p>{% endif %}
+    </div>
+    <div class="section sec-author">
+      <span class="tag">Author statement</span>
+      <ul class="small">{% for a in d.author %}<li>{{ a.text }} <span class="muted">— {{ a.note }}</span></li>{% endfor %}</ul>
+    </div>
+    {% if d.later %}
+    <div class="section sec-later">
+      <span class="tag">Later additions</span>
+      <ul class="small">{% for l in d.later %}<li><b>{{ l.label }}</b> on {{ l.date }}{% if not l.verified %} <span class="unverified">(unverified date)</span>{% endif %}{% if l.text %}: {{ l.text }}{% endif %} <span class="mono muted">{{ l.id|short }}</span></li>{% endfor %}</ul>
+    </div>
+    {% endif %}
+  </article>
+  {% endfor %}
+</section>
+
+<section id="method">
+  <h2>Method</h2>
+  <p><b>Hashing.</b> Each record is a small manifest plus a payload, both serialized with RFC 8785 (JCS) canonical JSON. The record ID is the SHA-256 of the manifest; the manifest contains the SHA-256 of the payload; the payload contains the SHA-256 of the body and each attachment. Body text is stored as UTF-8 with LF line endings. Each payload contains 32 random bytes so that nobody can confirm a guessed payload from the record ID alone. Changing a single byte anywhere breaks a hash.</p>
+  <p><b>Signature.</b> Every record ID is signed with one Ed25519 key, whose public key is in the first (genesis) record and in <code>identity/public_key.pem</code>. A valid signature shows that the same key signed all records — not who holds the key.</p>
+  <p><b>Third-party timestamp.</b> The record ID is sent to an RFC 3161 time-stamping authority (by default FreeTSA), which signs it together with the time. Checking it requires trusting that authority's key and clock; its signature can be checked by anyone against its root certificate.</p>
+  <p><b>Bitcoin anchor.</b> The record ID is committed through OpenTimestamps into the Bitcoin blockchain. It starts as “pending” and is usually confirmed within hours; the time is approximate (block time). Checking it needs no trusted party, only the public blockchain.</p>
+  <p><b>Append-only.</b> Records are never edited or deleted. Relations, milestones, notes and corrections added later are new records with their own signature and timestamps, so they are visibly later. Records form a chain (each names the previous one), so removing one breaks the chain; this bundle covers records 0 to {{ plan.max_seq }} of this installation's chain.</p>
+  <p><b>Privacy.</b> Only record IDs (hashes) were sent to the timestamp services — never content, titles or notes. The services did see the requesting IP address and the time, and OpenTimestamps notes that proofs submitted close together may be linked to the same person. Completeness is limited to this one chain: an author could keep another installation with a separate chain.</p>
+</section>
+
+<section id="verify">
+  <h2>How to verify this yourself</h2>
+  <p>You do not need this tool or to trust the author. With Python 3.12+ and <code>pip install "cryptography>=44" "rfc3161-client>=1.0.6"</code>, run <code>python3 verify.py .</code> in the unpacked bundle (or on the .zip). <code>VERIFY.md</code> lists the same checks as plain <code>sha256sum</code>, <code>openssl</code> and <code>ots</code> commands.</p>
+</section>
+
+</main>
+</body>
+</html>

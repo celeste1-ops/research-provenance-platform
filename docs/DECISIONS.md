@@ -1,0 +1,369 @@
+# Decisions
+
+Where the PRD and reality disagreed, or the PRD left a choice open, this file records
+what was chosen and why (PRD §7 rule 7). Newest decisions are appended at the end of
+each section.
+
+## Environment
+
+- **D-001 · Cloud build without FreeTSA / OpenTimestamps.** The cloud development
+  environment's egress policy blocks `freetsa.org`, the OpenTimestamps calendars and the
+  public block explorers (HTTP 403 from the proxy). As the PRD's §17 work rules allow,
+  development and tests use `MockProvider`; tests that need the real services are marked
+  `@pytest.mark.network` and only run with `make test-network` (`RPROV_NETWORK_TESTS=1`)
+  on the Mac.
+- **D-002 · Python 3.12 via uv.** The machine's default Python is 3.13; the project pins
+  `requires-python = ">=3.12,<3.14"` and the lockfile is generated with 3.12, the PRD's
+  version.
+- **D-003 · Frontend toolchain versions.** TypeScript 7 (the native port) and Vite 8 had
+  just been released; the UI pins TypeScript 5.9 and Vite 7 for stability. Exact
+  versions are locked in `web/package-lock.json` (PRD S6).
+
+## FreeTSA certificates (PRD §9, S6)
+
+- **D-004 · Where the built-in FreeTSA certificates came from.** `freetsa.org` is not
+  reachable from the cloud environment, so the certificates could not be downloaded from
+  the source. The committed copies are:
+  - `cacert.pem` (FreeTSA Root CA, valid 2016-03-13 → 2041-03-07, SHA-256 fingerprint
+    `A6:37:9E:7C:EC:C0:5F:AA:3C:BF:07:60:13:D7:45:E3:27:BB:BA:A3:8C:0B:9A:F2:24:69:D4:70:1D:18:AA:BC`).
+    Two unrelated npm packages (`parentsplit-verify`, `@truetake/verify-aul`) ship
+    byte-identical copies.
+  - `tsa.crt` (FreeTSA TSA certificate, valid 2016-03-13 → **2026-03-11**, SHA-256
+    `46:94:BE:23:C3:A5:30:04:44:4B:17:05:BF:E5:A7:F5:0A:6D:2A:16:38:19:4F:23:C0:F3:89:B6:8B:D7:8A:75`),
+    from the `rfc3161ng` 2.1.3 sdist on PyPI. Its signature verifies against the root above.
+
+  That TSA certificate expired before today (2026-10-11), so FreeTSA is almost certainly
+  signing with a newer one now. This does not break verification: every request sets
+  `certReq=true`, so each `.tsr` carries the signing certificate, and only the root is a
+  trust anchor. **On the Mac, run `make freetsa-certs` once**: it downloads both files from
+  `https://freetsa.org/files/`, prints their fingerprints, and refuses to overwrite the root
+  if its fingerprint differs from the one above. The `network` test for AC-09 checks a real
+  FreeTSA response against the committed root.
+
+  *Update (2026-10-11, done on the Mac):* `make freetsa-certs` confirmed the root fingerprint
+  and replaced `tsa.crt` with FreeTSA's current TSA certificate (serial `C2E986160DA8E9CD`,
+  valid 2026-02-15 → 2040-02-02, SHA-256
+  `32e841a95cc1164101ffde41298ef2fc75c1c4372ef095e88a6bbd47dfb191fc`), which is directly
+  issued by the pinned root. `make test-network` (AC-09 and the OpenTimestamps /
+  block-explorer checks) passed on the Mac with OpenSSL 3.
+
+## Records and verification
+
+- **D-005 · Mock third-party timestamps are real RFC 3161 tokens.** `MockProvider("tsa")`
+  signs genuine RFC 3161 responses with a throwaway CA committed under
+  `core/provenance_core/providers/mock_tsa/` (private key included on purpose). Tests and
+  cloud development therefore run the exact verification path FreeTSA tokens take, and
+  `openssl ts -verify` accepts them. Nothing trusts the mock root unless asked to:
+  the app trusts it only when `RPROV_TSA=mock`, `verify.py` only with `--tsa-root`.
+  Mock Bitcoin anchors use a clearly marked format and are never shown as confirmed
+  outside test mode.
+- **D-006 · "No timestamp yet" is a warning in verification.** The PRD lists two warning
+  cases (later-verified referenced record; the two proofs more than 24 h apart). A record
+  with no verified proof at all passes every integrity check but has no time; reporting it
+  as a plain "pass" would invite reading a time into it, so it is a warning
+  (`NO_VERIFIED_TIME`) and no time is shown.
+- **D-007 · Genesis payload is always disclosed.** The genesis payload holds the public
+  key every signature is checked against, so evidence bundles always include it, whatever
+  disclosure level the user picks for other records. The export preview says so.
+- **D-008 · Relations must point from newer to older.** AC-12 asks for a 400 on relations
+  pointing at a "later" record. For a new `entry` every existing record is earlier, so the
+  rule bites on `link` records: `to` must have a smaller `seq` than `from` (PRD §8: "新记录
+  rel 旧记录"). The verifier stays lenient (it only checks V7, refs earlier than the
+  referencing record) so bundles from future versions keep verifying.
+- **D-009 · Local clock time is shown with author statements.** The record's `local_time`
+  comes from the author's computer and is unverified, so the detail view lists it under
+  "Author statement" (marked "self-reported, unverified"), never under "Verified record".
+- **D-010 · No-op later additions are refused.** Setting a milestone that is already set,
+  withdrawing a relation that is not active, adding an active relation twice, or retracting
+  an entry twice returns 400 instead of appending a meaningless record.
+
+## Local app
+
+- **D-011 · Key storage outside macOS.** The signing key lives in the macOS Keychain via
+  `keyring` (PRD S5). Linux containers have no keychain, so for development only there is
+  an opt-in `RPROV_KEYSTORE=dev-insecure-file` (a 0600 file in the data directory, with a
+  warning in the log). It is never the default; tests use an in-memory keystore.
+- **D-012 · One process-wide write lock.** All write transactions (records, time proofs,
+  metadata) run under one re-entrant lock and SQLite runs in WAL mode, so there is only
+  ever one writer and readers never block it. Network calls to time-proof services happen
+  outside that lock, after the record is committed.
+- **D-013 · First start.** The UI asks for an author label (self-declared, shown as such)
+  and then creates the key pair and the genesis record (`POST /api/identity`). Renaming a
+  project uses `POST /api/projects/{id}/rename`; projects are local display data, not
+  records.
+- **D-014 · Bitcoin anchor was off until OpenTimestamps landed (P1).** Following PRD §17,
+  `RPROV_BTC` defaulted to `off` while P0 was built; the UI then showed
+  "Bitcoin anchor: not enabled". It now defaults to `ots`. Missing anchors are backfilled
+  for older records; their Bitcoin time is later than the record time, which is expected.
+- **D-015 · Retry policy for time proofs.** Failed submissions are retried with exponential
+  backoff (1 min doubling to a 6 h cap); after 30 attempts the row is marked `failed` but the
+  manual refresh still retries it. Pending Bitcoin anchors are re-checked hourly.
+
+## Evidence bundle and verify.py
+
+- **D-016 · verify.py trusts only what it carries.** The FreeTSA root is embedded in the
+  generated `verify.py` (with its fingerprint asserted); `certs/` in the bundle is for the
+  manual `openssl` commands only and is never used as a trust anchor by `verify.py`. A
+  reader who deliberately trusts another TSA root passes `--tsa-root PEM`.
+- **D-017 · Exit codes.** `verify.py` exits 0 when no record failed (warnings and pending
+  Bitcoin anchors allowed), 1 when any record failed, 2 when the bundle cannot be read.
+- **D-018 · How verify.py is built.** `tools/build_verify.py` concatenates the core modules
+  it needs (der, jcs, ots, proofs, records, signing, chain, verify, bundle, verify_cli),
+  strips the package-relative imports, refuses any import outside the standard library,
+  `cryptography` and `rfc3161-client`, and fails on duplicate top-level names. The Bitcoin
+  `.ots` reader is a standard-library implementation cross-checked against the official
+  `opentimestamps` library in the tests, so `opentimestamps` stays optional.
+- **D-019 · Selection semantics.** An export takes a disclosure level per record plus a
+  default for the rest. The bundle covers seq 0 up to the highest record that is disclosed
+  (or explicitly chosen); every other record in that range is "existence only". Non-entry
+  records cannot be "full" (they have no content) and are downgraded to "structure".
+- **D-020 · Markdown in report.html.** Rendered with markdown-it-py with raw HTML and images
+  disabled (images would trigger network requests); the report also carries a
+  `default-src 'none'` Content-Security-Policy, so it cannot load anything.
+- **D-021 · End-to-end tests use Playwright for Python.** They run inside pytest (`make
+  test`). Where the bundled Playwright browser build is missing (this cloud image), the
+  pre-installed Chromium is used via `executable_path`; CI installs the matching browser.
+
+## User interface
+
+- **D-022 · Graph layout without dagre.** PRD §11 fixes the layout: records left to right by
+  `seq`, one row per node type that occurs. That is a deterministic grid, so the graph
+  computes positions directly instead of running dagre (which the PRD lists as optional
+  and replaceable). React Flow (`@xyflow/react`, MIT) draws it.
+- **D-023 · P0 user interface scope.** The P0 UI has first-start setup, the record form
+  (CodeMirror 6 Markdown editor, file drop, code/publication references, relations, "why",
+  milestone, import options), the evolution graph, a record sidebar split into Verified
+  record / Author statement / Later additions, and the export dialog with preview. The
+  milestones-only view, the timeline view, sidebar actions for later additions, the
+  "Changes" diff section and backup/restore screens follow in P1.
+- **D-024 · The session token is injected by the backend.** The built `index.html` keeps a
+  `__RPROV_SESSION_TOKEN__` placeholder that the local server replaces per launch; the Vite
+  plugin that fills it during `make dev` only runs on the dev server.
+- **D-025 · How Bitcoin anchors are checked.** The app and `verify.py` check a Bitcoin
+  attestation against the block header from a local node (`RPROV_BITCOIN_RPC` /
+  `--bitcoin-node`) or, by default, from two public block explorers (blockstream.info,
+  mempool.space) that must agree; results say "checked via block explorers". Only block
+  heights are sent. `verify.py --offline` makes no requests and reports the attestation as
+  "not checked" (neither verified time nor failure). The app shows "Bitcoin anchor:
+  confirmed" only after that header check succeeds; until then the anchor stays pending.
+- **D-026 · OpenTimestamps details.** As the official client does, a 16-byte random nonce
+  is appended to the record ID and hashed before submission, so calendars only see
+  SHA-256(record ID ‖ nonce). The proof is submitted to the four default calendars and
+  needs at least two answers. Upgrades only contact calendars on the official whitelist.
+  Proofs are built with the official `opentimestamps` library (an install extra); the
+  verifier reads them with its own standard-library reader.
+
+## Sample data
+
+- **D-027 · `make demo` only loads into an empty data directory.** Records cannot be
+  removed, so loading the fictional FSF sample into a directory that already holds records
+  would mix it into a real chain forever; the loader refuses instead. On a clean machine
+  `make demo && make run` works as the PRD's manual check expects (both use `~/.rprov`).
+  Before recording real material, move the demo aside (`mv ~/.rprov ~/.rprov-demo`) or load
+  the demo with `RPROV_HOME=~/.rprov-demo make demo` from the start. The demo uses whatever
+  time-proof providers are configured. All sample text is fictional.
+
+## Backup and restore
+
+- **D-028 · Backup format and restore rules.** A backup is one zip (`rprov.backup/1`): a
+  consistent SQLite snapshot (taken under the write lock with SQLite's backup API), every
+  stored file, the signing key encrypted with the backup password, and an index with the
+  SHA-256 of every member. The database and files are not encrypted (they are the
+  author's own data, kept in a place the author chooses); the key always is (PRD S5).
+  Restore only goes into an installation without records and only inserts rows, so it
+  never edits anything; afterwards the whole chain is re-verified and the key returns to
+  the keychain. S4: only the expected member names are accepted, absolute paths, `..`,
+  backslashes and symbolic links are refused, the total uncompressed size is capped
+  (20 GiB) and every member is read with a size cap and checked against the index.
+- **D-029 · Backup location.** The backup folder is an absolute path typed in the backup
+  dialog (a browser cannot hand a folder path to the local server); it is remembered and
+  the button stays highlighted until one is set. After the first record the app reminds
+  the author to set it (PRD S7).
+
+## Round 2: data durability and first-run experience
+
+Feedback after the first real run: the interface spoke to engineers, and "what if the Mac
+breaks?" had no good answer (a manual backup the author has to remember is not one). These
+decisions change presentation and backup only — not the record format, the chain, the
+verification rules or what leaves the machine for time proofs.
+
+- **D-030 · Automatic encrypted backup (PRD S7, refines D-028/D-029).** The author picks a
+  backup folder and a backup password once (first-run step 2, or later from the top bar).
+  After every change the app writes a new backup there, debounced by 20 seconds; the hourly
+  time-proof job also writes one when a proof was upgraded since the last backup. The
+  newest 10 backups of this installation are kept; older ones are removed. Files are
+  written to a `.partial` name, flushed and then renamed, so a crash never leaves a broken
+  backup under the real name. A failure (drive unplugged, folder gone) is shown in the top
+  bar and retried on the next change or hour; it never stops recording.
+- **D-031 · Backups are now fully encrypted (supersedes the "not encrypted" part of
+  D-028).** A backup file (`.rprovbackup`) is a short magic line, a JSON header (format,
+  KDF parameters, salt, nonce) and the D-028 zip encrypted with AES-256-GCM under a key
+  from scrypt (N = 2^17, r = 8, p = 1) of the backup password; the header is authenticated
+  as associated data, and an implausible N is refused before any work is done. Reason: the
+  folder is now usually a synced one (D-033) and therefore sits on someone else's servers;
+  titles and content must not be readable there. A wrong password and a damaged file give
+  the same error (GCM cannot tell them apart). The inner zip, its member checks (S4) and
+  the separately encrypted signing key are unchanged, and restore still accepts the older
+  unencrypted zips made before this change.
+- **D-032 · The backup password is kept in the system keychain.** Unattended backups need
+  it, and asking for it on every change would defeat "automatic". It is stored next to the
+  signing key (same keychain service family, item `backup-password:<installation>`), never
+  in the database or a file. It is needed again only to restore. After a restore the same
+  password is stored again, so backups to the same folder simply continue on the new Mac.
+- **D-033 · Synced folders and PRD rule 3 ("no cloud sync").** The app still uploads
+  nothing: writing a file into a local folder is a local operation, and the only network
+  traffic remains the time-proof requests (the providers-only network test is unchanged).
+  If the author chooses a folder that their own iCloud Drive, Dropbox, Google Drive or
+  OneDrive client syncs, that client — a service the author already uses and pays for, if
+  at all — moves an encrypted file the provider cannot read. This is the closest fit to the
+  PRD's intent (no accounts, no service of ours, content never readable outside the Mac)
+  while answering S7's "data loss is the most realistic risk". The app offers such folders
+  and external drives (`/Volumes/*` on another device) as suggestions, labels where a
+  folder really is, and warns when the folder is on the same disk as the records, because
+  such a backup does not survive a lost or broken Mac.
+- **D-034 · Plain names in the interface.** "Record" becomes "research step" in the
+  interface ("Add research step", "Save step", "+ Connect to an earlier step", "Mark as a
+  milestone", "This is older material I'm adding now"); "Export" becomes "Share…". The
+  fixed source labels (Verified record / Author statement / Later additions) and the two
+  separate time-proof lines are unchanged (rule 2 and 4), with one plain sentence under each
+  proof saying what it means. Record IDs, hashes and signatures move into a collapsed
+  "Technical details" block; the key-only backup, "Check timestamps now" and installation
+  details move into a "⋯" menu.
+- **D-035 · Step counts leave out the genesis record and later additions.** The top bar
+  counts research steps (entries) in the current project. A fresh install therefore shows
+  "0 research steps" instead of "1 records", which read as a bug. The total record count,
+  including genesis, links, notes, milestones and retractions, is still shown under
+  Technical details; the chain itself is unchanged.
+- **D-036 · First run and empty project.** First run is two steps: name and project, then
+  automatic backup (skippable; skipping keeps a reminder in the top bar, in the empty state
+  and after each save). A third path restores from a backup. An empty project shows what
+  the tool does and one card per kind of step; choosing a card opens the form with that kind
+  selected. The graph legend is shown on request ("How to read the graph"), and "Where is my
+  data?" explains in plain words where data lives, what the timestamp services receive
+  (only a fingerprint, so they cannot give anything back) and how to restore on a new Mac.
+
+## Round 3: plain words, practice space, recovery code
+
+- **D-037 · Plain names for the two stamps in the app (PRD §9 table, rule 4).** The PRD
+  lists the interface text "Third-party timestamp: verified" and "Bitcoin anchor: pending /
+  confirmed". At the author's request the app now says **"Date stamp ✓"** and **"Public
+  stamp: waiting / done"** (also "not yet", "off"), with D and P as the small icons. Rule 4's
+  intent is kept: the two proofs keep separate names, separate lines, separate status and
+  separate columns, and nothing merges them into one "verified time". Every place a stamp
+  is shown has a "?" whose one sentence names the formal term, and the Share dialog and the
+  record's Technical details say which formal name each stamp has. Reports, `VERIFY.md`,
+  `verify.py` and the API's `text` field keep the formal names unchanged, because they are
+  read by third parties and the evidence bundle must not change. Other plain words: "Add a
+  step", "Map", "List", "Key steps only" (milestone), "Share", "Settings" (was "⋯").
+- **D-038 · Practice space and confirmation before saving to the real record.** Records
+  can never be removed (rule 1), so a new user trying the app would leave test steps in
+  their real record forever. The app therefore has a second, completely separate space,
+  **Practice**, one click away in the top bar (and on the first screen). It is its own
+  installation in `<data folder>/practice`: own database, own files, own signing key (a new
+  installation ID, so a separate keychain item), own genesis record labelled "<name>
+  (practice)". Practice steps get the same stamps as real ones (only hashes leave, as
+  always), so practice looks exactly like the real thing; it is never backed up. Practice
+  can be started over or filled with the fictional FSF sample; that deletes the practice
+  folder and its key — the only delete anywhere in the app, never offered for the real
+  record. Each request names its space in a header (or `?space=` on plain links) and goes
+  to the real record otherwise, so a tab always saves where it says it saves. Practice is
+  marked everywhere (orange top bar, striped banner "Practice: nothing here goes into your
+  real record", "Save practice step"). In the real record, saving a step — and every later
+  action (key step, link, note, retraction, withdrawing a link) — first shows exactly what
+  will be saved and that it can't be changed or deleted afterwards ("Save to my record" /
+  "Go back"). Switching from practice to the real record shows that reminder once. This
+  adds no accounts and changes nothing about records, signatures, stamps, verification or
+  the evidence bundle.
+- **D-039 · Printable recovery code (backup format 2) and backup-location checks.** A
+  forgotten backup password used to mean unreadable backups. When automatic backup is
+  turned on, the app now also shows a **recovery code** once (24 characters, 120 random
+  bits, Crockford base32 in four groups) with a Print button, and asks the author to tick
+  that they kept it. The code is never stored: the app keeps only the public half of an
+  X25519 key derived from it (scrypt, N = 2^14, since the code itself is random). Backup
+  format 2 (`RPROV-BACKUP-ENC/2`) encrypts the inner zip with a random backup key and
+  stores that key twice in the authenticated header: wrapped with the password-derived
+  key (scrypt, as in D-031) and wrapped to the recovery public key (ephemeral X25519 +
+  HKDF-SHA256 + AES-GCM). Either one opens the backup. The signing key inside the zip is
+  encrypted with a key derived from the backup key, so a recovery-code restore brings it
+  back too. After such a restore the old password is unknown, so automatic backup asks
+  for a new one; the same recovery code keeps working. A new code can be made at any time
+  (older backups keep opening with the old one). Format 1 and the original unencrypted
+  zips still restore. Location checks: while the author picks a folder the dialog says
+  where it really is ("This Mac's own disk — if this Mac is lost or breaks, this backup
+  is lost with it", a synced service, or another disk); a folder inside the app's data
+  folder is refused; and if the live data folder itself sits inside iCloud Drive, Dropbox
+  or another synced folder the app warns on every page, because syncing can damage a
+  database in use — only the encrypted backup files belong in such a folder.
+- **D-040 · A restored copy never backs up by itself; each copy prunes only its own files.**
+  Found in a restore drill on the author's Mac: a restore copies the backup settings
+  (folder, "automatic on"), and on the same Mac the keychain already holds the backup
+  password for that installation ID, so the drill copy would have written into the real
+  iCloud folder within the hour and pruned the real copy's files together with its own
+  (both used the same file-name prefix). A password restore would also have replaced the
+  keychain's current backup password with the older one from the backup. Now: (1) every
+  restore pauses automatic backup (`backup_auto = 0`, marked "restored"); the top bar says
+  "Backup paused — confirm to resume" and the Backup dialog offers "Resume automatic
+  backup to this folder" or a different folder, with the advice not to resume a test
+  copy or a second Mac sharing the folder. (2) Backup file names carry a short per-copy
+  id (`rprov-backup-<installation>-<copy>-<time>`), reset by every restore, and rotation
+  only removes files with this copy's id. Files named before this change are never
+  removed automatically. (3) A restore never replaces keychain entries that already
+  exist for the installation: the backup password is kept as it is, and the signing key
+  is only written when missing; if the keychain holds a *different* key for that
+  installation the restore stops before changing anything. The recommended drill still
+  uses a separate data folder and `RPROV_KEYSTORE=memory`, so the copy does not touch the
+  keychain at all (README).
+- **D-041 · Two copies backing up into one folder are told about each other.** After a
+  move to a new Mac the old one may keep running. Since D-040 the two copies no longer
+  delete each other's files, but both could keep adding steps under the same identity,
+  and the history would split: a later restore brings back only one branch. Each copy
+  now looks at the backup folder: a file from another copy of the same installation
+  (a different per-copy id), written after this copy's starting point, means a second
+  copy is active. For a restored copy the starting point is the restore, so the files
+  it came from don't count; files named before per-copy ids existed count only for a
+  restored copy (for the original they are its own past). Then the top bar says
+  "Another Mac is backing up here too", a red banner says to use only one Mac to add
+  steps, and the Backup dialog explains why, with "The other copy is gone — stop
+  warning" (it comes back if that copy writes again) or "Choose a different folder".
+  The paused box after a restore shows the same warning before "Resume". Backups
+  continue meanwhile: each copy's own files are complete and kept apart. The app does
+  not try to decide which Mac is "the real one" or merge the two histories; it makes the
+  situation visible so the author can stop one of them.
+- **D-042 · Hardening after an independent review of the backup code.**
+  1. *Copied data folders.* Migration Assistant, a Time Machine restore or `cp -r` copy
+     the database (and on a Mac usually the keychain), so the copy carried the
+     original's per-copy id and the two would have pruned each other's backups without
+     any warning. The copy id is now tied to the data folder on disk (inode and creation
+     time). At start-up a folder whose identity no longer matches is treated like a
+     restore: a new copy id, automatic backup paused until the author confirms ("this
+     data folder was copied from somewhere else"), and the original's files count as
+     another copy's from then on.
+  2. *Per-copy keychain entries.* The backup password is now stored per copy
+     (`backup-password:<installation>:<copy>`). A restore drill on the same Mac can no
+     longer change the original's password, even by choosing another folder and
+     password in the copy. The original install takes over the older entry name once;
+     restored or copied installs never read it.
+  3. *Pause enforced by the server.* While paused, `run`, the manual "Back up now" and
+     "new recovery code" refuse; only "Resume" or setting the folder and password again
+     ends the pause. After a recovery-code restore (no password known), the paused box
+     asks for a new password instead of skipping straight to the setup form.
+  4. *Format 3, in pieces.* AES-GCM in `cryptography` takes at most 2 GiB per message,
+     so a large research folder would have made every backup fail. Format 3
+     (`RPROV-BACKUP-ENC/3`) encrypts the inner zip in 4 MiB pieces under the same random
+     backup key and key slots. Each piece's nonce is a random prefix plus its number,
+     and its associated data is the header, its number and a last-piece flag, so pieces
+     can't be reordered, dropped or cut off. Backups are now built, encrypted, uploaded
+     for restore and decrypted through temporary files in the data folder, so memory
+     use no longer grows with the research. Formats 2 and 1 and plain zips still restore.
+  5. *Bounded key derivation.* A crafted header can no longer ask for more than 256 MiB
+     of scrypt memory (n a power of two, r ≤ 32, p ≤ 4) in any format.
+  6. *Saving never waits for a backup.* Scheduling the next backup and running one use
+     separate locks.
+  7. *Recovery-code restores show the signing key.* The recovery key is public (it sits
+     in every header), so anyone able to write into the backup folder could leave a
+     file that opens with the code. Password restores are not affected. The recovery
+     sheet now prints the first 16 hex digits of the signing public key. After a
+     recovery-code restore the app shows the key it brought back and asks the author to
+     compare the two before opening the app. Sheets printed before this change have no
+     such line; making a new recovery code prints one.
+  8. Recovery codes may be typed with any kind of dash.

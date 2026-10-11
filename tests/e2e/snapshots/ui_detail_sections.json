@@ -1,0 +1,19 @@
+{
+  "section_order": [
+    "VERIFIED RECORD",
+    "AUTHOR STATEMENT",
+    "LATER ADDITIONS",
+    "CHANGES"
+  ],
+  "verified_proof_lines": [
+    "tsa",
+    "btc"
+  ],
+  "author_fields": [
+    "local_time",
+    "why",
+    "claimed_date",
+    "relation",
+    "milestone"
+  ]
+}
