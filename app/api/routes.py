@@ -449,6 +449,67 @@ def verify_all(request: Request):
     return report_json(verify_database(c.ledger, c.anchors))
 
 
+# ---------------------------------------------------------------- recording a git repository (D-047)
+
+
+class GitPathIn(BaseModel):
+    path: str
+
+
+class GitSourceIn(BaseModel):
+    path: str
+    branch: str
+    project_id: str
+    history: bool = False
+    keep_code: bool = False
+
+
+@router.get("/git")
+def git_sources(request: Request):
+    return ctx(request).git.status()
+
+
+@router.post("/git/inspect")
+def git_inspect(body: GitPathIn, request: Request):
+    from app.services.gitrepo import GitError
+
+    try:
+        return ctx(request).git.inspect(body.path)
+    except GitError as exc:
+        raise HTTPException(400, str(exc)) from None
+
+
+@router.post("/git")
+def git_add(body: GitSourceIn, request: Request):
+    """Start recording; the first step(s) are saved in the background (they wait for stamps)."""
+    from app.services.gitrepo import GitError
+
+    c = ctx(request)
+    if not c.ledger.initialized():
+        raise HTTPException(409, "set up the app first")
+    try:
+        c.git.add(body.path, body.branch, body.project_id, history=body.history, keep_code=body.keep_code)
+    except (GitError, LedgerError) as exc:
+        raise HTTPException(400, str(exc)) from None
+    return c.git.status()
+
+
+@router.post("/git/check")
+def git_check(request: Request):
+    c = ctx(request)
+    return {**c.git.check(), **c.git.status()}
+
+
+@router.delete("/git/{source_id}")
+def git_remove(source_id: str, request: Request):
+    c = ctx(request)
+    try:
+        c.git.remove(source_id)
+    except LedgerError as exc:
+        raise HTTPException(404, str(exc)) from None
+    return c.git.status()
+
+
 # ---------------------------------------------------------------- evidence bundle
 
 

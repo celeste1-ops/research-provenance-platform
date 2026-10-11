@@ -514,3 +514,46 @@ verification rules or what leaves the machine for time proofs.
      History" in both languages.
   6. *Developer messages stay English* (wrong `RPROV_*` settings, a missing keystore
      backend), as do the logs.
+
+- **D-047 · Recording with less effort: quick note and local git commits.** The author asked
+  for this in round 5 ("lazy users won't record by hand"). PRD §4 left automatic GitHub
+  import for later because git dates can be changed and a full import would not fit v0.1;
+  this keeps to that reasoning: only *local* repositories, and git's dates never count as
+  verified times.
+  1. *Quick note.* A one-box dialog (top bar, and "Quick note…" in the menu bar / tray menu,
+     which opens the page at `#quick-note`). The first line is the title, the rest the body;
+     it is saved as a `note` entry and stamped like any step. In the real record the box
+     itself says the note is permanent; there is no second confirmation, because the point
+     is to make a note in one go.
+  2. *Recording a git repository.* Settings → "Record from git…": a folder on this computer,
+     a branch and a project. From then on each new commit on that branch (first-parent
+     line) becomes a `code` entry: title = commit subject, body = the rest of the message
+     (the author's own words), `external = {repo_url, commit}`, `revises` the previous
+     commit's entry. A background job looks every minute while the app runs and catches
+     up after a restart; more than 20 new commits at once become one entry listing them.
+     A commit already recorded (same repository address and commit) is never recorded
+     twice, even if the app stopped between saving the step and updating its list.
+  3. *git dates are the author's statement.* A commit made on an earlier day than the day
+     it is recorded, and every history entry, carries `import` = {claimed date, L1}: shown
+     as "older material added now" with the claimed date as an author statement. Commits
+     recorded the same day carry no date of their own; their date stamp is the time.
+  4. *History, once.* Optionally the history before that point is added as a few entries:
+     one per tag, untagged stretches per month (per year when that would make more than 48
+     entries), each listing its commits and pointing at the newest; they `revises` each
+     other in order. They are saved in the background because each waits for its stamps.
+  5. *Code copy is a choice.* "Keep a copy of the code with each step" attaches `git
+     archive` of the commit (zip, up to 50 MB; above that only the reference is kept). Off
+     by default: it stores the whole repository once per commit. Without it the entry is an
+     external reference and the interface says the code content was not saved (AC-16).
+  6. *Only local, read-only git.* The app runs the author's own `git` with rev-parse,
+     symbolic-ref, for-each-ref, log, merge-base, remote get-url and archive — never fetch,
+     pull or push — with `core.fsmonitor` off, no console window on Windows, and arguments
+     checked (full hashes, existing branch names) so nothing can be read as an option.
+     `repo_url` is the `origin` address with any password or token removed, or the folder
+     path when there is no remote; like every entry field it stays local unless the author
+     discloses it in a bundle. Apps started from the Dock or Start menu do not get the
+     shell's PATH, so the usual install places are tried; on a Mac without the developer
+     tools `/usr/bin/git` is not used (it would only offer to install them).
+  7. *Where the list lives.* `<data folder>/git_sources.json`, per space (the practice space
+     has its own). It is not part of backups: folder paths differ between computers, and
+     every recorded step is in the backup anyway.

@@ -44,18 +44,19 @@ def create_app(ctx: AppContext, *, start_jobs: bool = False) -> FastAPI:
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
-        scheduler = None
+        jobs = []
         if start_jobs:
-            from app.jobs.scheduler import AnchorScheduler
+            from app.jobs.scheduler import AnchorScheduler, GitScheduler
 
             # Stamps are checked in both spaces; only the real record is backed up.
-            scheduler = AnchorScheduler(spaces, after=lambda: ctx.autobackup.maybe_run("hourly"))
-            scheduler.start()
+            jobs = [AnchorScheduler(spaces, after=lambda: ctx.autobackup.maybe_run("hourly")), GitScheduler(spaces)]
+            for job in jobs:
+                job.start()
         try:
             yield
         finally:
-            if scheduler is not None:
-                scheduler.stop()
+            for job in jobs:
+                job.stop()
             spaces.close()
 
     app = FastAPI(title="Research provenance (local)", docs_url=None, redoc_url=None, openapi_url=None,

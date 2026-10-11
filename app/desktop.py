@@ -1,8 +1,8 @@
 """Double-click entry point of the packaged app (macOS .app, Windows setup) — DECISIONS D-044.
 
 Starts the same local server as ``make run`` (127.0.0.1 only), opens the browser, and puts
-an icon in the macOS menu bar / Windows notification area with "Open Research History"
-and "Quit" (in Chinese when that is the language chosen in the app, or else the system's —
+an icon in the macOS menu bar / Windows notification area with "Open Research History",
+"Quick note…" and "Quit" (in Chinese when that is the language chosen in the app, or else the system's —
 D-046). There is no console window, so everything is logged to ``<data>/logs/app.log``.
 
 Only one copy runs per data folder (app.instance; ``make run`` takes the same lock): a
@@ -98,9 +98,10 @@ def tray_image(size: int = 64):
 
 
 MENU = {
-    "en": {"open": f"Open {APP_NAME}", "quit": "Quit"},
-    "zh": {"open": f"打开 {APP_NAME}", "quit": "退出"},
+    "en": {"open": f"Open {APP_NAME}", "note": "Quick note…", "quit": "Quit"},
+    "zh": {"open": f"打开 {APP_NAME}", "note": "快速记一笔…", "quit": "退出"},
 }
+QUICK_NOTE = "#quick-note"  # the page opens its quick note box (D-047)
 
 
 def system_language() -> str:
@@ -145,6 +146,8 @@ def run_tray(url: str, on_quit, data_dir: Path) -> bool:
 
     menu = pystray.Menu(
         pystray.MenuItem(lambda _item: MENU[lang[0]]["open"], lambda _icon, _item: open_browser(url), default=True),
+        pystray.MenuItem(lambda _item: MENU[lang[0]]["note"], lambda _icon, _item: open_browser(url + QUICK_NOTE)),
+        pystray.Menu.SEPARATOR,
         pystray.MenuItem(lambda _item: MENU[lang[0]]["quit"], quit_app),
     )
     icon = pystray.Icon("research-history", tray_image(), f"{APP_NAME} — {url}", menu)

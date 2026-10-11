@@ -45,7 +45,9 @@ button.link, .link { background: none; border: 0; padding: 0; color: var(--accen
 
 .app { display: flex; flex-direction: column; height: 100vh; }
 .topbar { display: flex; align-items: center; gap: 10px; padding: 10px 16px; background: var(--panel); border-bottom: 1px solid var(--line); }
-.topbar select { width: auto; min-width: 160px; }
+.topbar select { width: auto; min-width: 120px; max-width: 220px; flex-shrink: 1; }
+.topbar button { white-space: nowrap; }
+.topbar .space-switch, .topbar .with-help, .topbar .menu-wrap { flex-shrink: 0; }
 .brand { font-weight: 700; margin-right: 6px; }
 .spacer { flex: 1; }
 .banner { padding: 6px 16px; background: #fffbe6; border-bottom: 1px solid var(--line); font-size: 13px; cursor: default; }
@@ -257,3 +259,6 @@ ul.plain { list-style: none; padding: 0; margin: 0; }
 .setup-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
 .lang-switch { white-space: nowrap; }
 .row .grow { flex: 1; }
+/* Record from git (D-047) */
+.git-add { border-top: 1px solid var(--line); margin-top: 14px; padding-top: 4px; }
+.git-add fieldset.choices { border: 0; padding: 0; margin: 8px 0; display: grid; gap: 4px; }

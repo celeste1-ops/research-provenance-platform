@@ -341,6 +341,18 @@ MESSAGES: dict[str, str] = {
     "the keychain already holds a different signing key for this installation": "钥匙保管处里已经有这个安装的另一把签名钥匙",
     "body text is larger than 50 MB": "正文超过 50 MB",
     "commit must be a hexadecimal commit hash": "提交必须是十六进制的提交哈希",
+    # recording a git repository (D-047)
+    "git is not installed on this computer": "这台电脑上没有安装 git",
+    "this folder is not a git repository": "这个文件夹不是 git 仓库",
+    "git took too long to answer": "git 太久没有回应",
+    "could not run git ({value})": "无法运行 git（{value}）",
+    "not a full commit hash": "不是完整的提交哈希",
+    "git archive failed": "git 打包代码失败",
+    "there is no such branch": "没有这个分支",
+    "this branch has no commits yet": "这个分支还没有提交",
+    "this branch of this repository is already being recorded": "这个仓库的这个分支已经在记录了",
+    "the repository folder is not there (is the drive connected?)": "找不到仓库文件夹（硬盘接上了吗？）",
+    "the branch is gone or has no commits": "这个分支不见了，或者没有提交",
     "could not delete {path}: some file in it is still in use. Close other programs that may be using it and try again.":
         "删不掉 {path}：里面有文件还在被使用。请关掉可能在用它的其他程序，再试一次。",
 }

@@ -216,3 +216,38 @@ export interface ServiceCheckResult {
   checks: ServiceCheck[];
   in_use: { tsa: string[]; btc: boolean; explorers: boolean };
 }
+
+// A git repository whose commits become steps automatically (DECISIONS D-047).
+export type GitSource = {
+  id: string;
+  path: string;
+  name: string;
+  branch: string;
+  project_id: string;
+  project_title: string;
+  repo_url: string;
+  keep_code: boolean;
+  added: string;
+  last_commit: string | null;
+  last_entry: string | null;
+  recorded: number;
+  checked: string | null;
+  error: string | null;
+  busy: { done: number; total: number | null } | null;
+};
+
+export type GitStatus = { git: boolean; sources: GitSource[] };
+
+export type GitInspect = {
+  path: string;
+  name: string;
+  branches: string[];
+  branch: string | null;
+  remote_url: string | null;
+  commits: number;
+  tags: number;
+  first_date: string | null;
+  last_date: string | null;
+  history_steps: number;
+  already: boolean;
+};

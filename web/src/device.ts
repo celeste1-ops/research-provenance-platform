@@ -25,3 +25,8 @@ export function dev(): string {
 export function keychainName(): string {
   return lang() === "zh" ? (ZH_KEYCHAIN[keychain] ?? keychain) : keychain;
 }
+
+/** For examples such as folder paths. */
+export function isWindows(): boolean {
+  return device === "PC";
+}
