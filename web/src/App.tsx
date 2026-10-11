@@ -55,6 +55,8 @@ export function App() {
   const [selected, setSelected] = useState<string | null>(null);
   const [dialog, setDialog] = useState<Dialog>(null);
   const [formType, setFormType] = useState<string | undefined>(undefined);
+  const [droppedFiles, setDroppedFiles] = useState<File[]>([]);
+  const [fileOver, setFileOver] = useState(false);
   const [version, setVersion] = useState(0);
   const [view, setView] = useState<"graph" | "timeline" | "story">("graph");
   const [milestonesOnly, setMilestonesOnly] = useState(false);
@@ -235,6 +237,39 @@ export function App() {
     return () => window.removeEventListener("hashchange", open);
   }, []);
 
+  // Files dragged from Finder / Explorer: dropped anywhere on the page they open "Add a step" with
+  // the files attached (the form itself takes drops too). A browser would otherwise open the file
+  // in place of the app.
+  const canDropHere = Boolean(status?.initialized) && dialog === null && graph !== null;
+  useEffect(() => {
+    const hasFiles = (e: DragEvent) => Boolean(e.dataTransfer?.types.includes("Files"));
+    const over = (e: DragEvent) => {
+      if (!hasFiles(e)) return;
+      e.preventDefault();
+      if (e.dataTransfer) e.dataTransfer.dropEffect = canDropHere ? "copy" : "none";
+      setFileOver(canDropHere);
+    };
+    const leave = (e: DragEvent) => {
+      if (e.relatedTarget === null) setFileOver(false);  // left the window
+    };
+    const drop = (e: DragEvent) => {
+      if (!hasFiles(e)) return;
+      e.preventDefault();
+      setFileOver(false);
+      const files = Array.from(e.dataTransfer?.files ?? []);
+      if (canDropHere && files.length) openForm(undefined, files);
+    };
+    window.addEventListener("dragover", over);
+    window.addEventListener("dragleave", leave);
+    window.addEventListener("drop", drop);
+    return () => {
+      window.removeEventListener("dragover", over);
+      window.removeEventListener("dragleave", leave);
+      window.removeEventListener("drop", drop);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [canDropHere]);
+
   if (!status) return <div className="loading">{t("Loading…")}</div>;
   if (!status.initialized)
     return <Setup key={uiLang} onDone={reload} onPractice={() => switchSpace("practice")} onLang={changeLang} />;
@@ -264,10 +299,12 @@ export function App() {
     }
   }
 
-  function openForm(type?: string) {
+  function openForm(type?: string, files: File[] = []) {
     setFormType(type);
+    setDroppedFiles(files);
     setDialog("form");
   }
+
 
   async function afterSaved(id: string) {
     setDialog(null);
@@ -499,6 +536,11 @@ export function App() {
           {t("Where is my data?")}
         </button>
       </footer>
+      {fileOver && (
+        <div className="drop-overlay" data-testid="drop-overlay">
+          <div>{t("Drop the files to add them to a new step")}</div>
+        </div>
+      )}
       {dialog === "form" && graph && (
         <div className="modal-backdrop">
           <div className="modal">
@@ -508,6 +550,7 @@ export function App() {
               relationTypes={status.relation_types}
               existing={graph.nodes}
               initialType={formType}
+              initialFiles={droppedFiles}
               space={space}
               onCancel={() => setDialog(null)}
               onCreated={afterSaved}

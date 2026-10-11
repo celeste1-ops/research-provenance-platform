@@ -27,6 +27,8 @@ interface Props {
   onCreated: (id: string) => void;
   onCancel: () => void;
   initialType?: string;
+  /** Files dropped onto the page, which opened this form. */
+  initialFiles?: File[];
   space: Space;
 }
 
@@ -35,13 +37,13 @@ interface Rel {
   rel: string;
 }
 
-export function RecordForm({ projectId, nodeTypes, relationTypes, existing, onCreated, onCancel, initialType, space }: Props) {
+export function RecordForm({ projectId, nodeTypes, relationTypes, existing, onCreated, onCancel, initialType, initialFiles, space }: Props) {
   const practice = space === "practice";
   const [confirming, setConfirming] = useState(false);
   const [nodeType, setNodeType] = useState(initialType ?? "");
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
-  const [files, setFiles] = useState<File[]>([]);
+  const [files, setFiles] = useState<File[]>(initialFiles ?? []);
   const [repoUrl, setRepoUrl] = useState("");
   const [commit, setCommit] = useState("");
   const [pubKind, setPubKind] = useState<"doi" | "url">("doi");
@@ -149,7 +151,24 @@ export function RecordForm({ projectId, nodeTypes, relationTypes, existing, onCr
         onCancel={() => setConfirming(false)}
       />
     )}
-    <form className="record-form" onSubmit={submit} data-testid="record-form" hidden={confirming}>
+    // Files can be dropped anywhere on the form, not only on the attachment box.
+    <form className={`record-form ${dragging ? "dragging" : ""}`} onSubmit={submit} data-testid="record-form" hidden={confirming}
+      onDragOver={(e) => {
+        if (!e.dataTransfer.types.includes("Files")) return;
+        e.preventDefault();
+        e.stopPropagation();
+        setDragging(true);
+      }}
+      onDragLeave={(e) => {
+        if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setDragging(false);
+      }}
+      onDrop={(e) => {
+        if (!e.dataTransfer.files.length) return;
+        e.preventDefault();
+        e.stopPropagation();
+        setDragging(false);
+        addFiles(e.dataTransfer.files);
+      }}>
       <h2>{practice ? t("Add a practice step") : t("Add a step")}</h2>
       {practice && <p className="practice-note">{t("Practice: this does not go into your real record.")}</p>}
       <fieldset className="types">
@@ -175,19 +194,7 @@ export function RecordForm({ projectId, nodeTypes, relationTypes, existing, onCr
         <MarkdownEditor value={body} onChange={setBody} />
       </div>
 
-      <div
-        className={`dropzone ${dragging ? "dragging" : ""}`}
-        onDragOver={(e) => {
-          e.preventDefault();
-          setDragging(true);
-        }}
-        onDragLeave={() => setDragging(false)}
-        onDrop={(e) => {
-          e.preventDefault();
-          setDragging(false);
-          addFiles(e.dataTransfer.files);
-        }}
-      >
+      <div className={`dropzone ${dragging ? "dragging" : ""}`} data-testid="dropzone">
         {t("Attach files: drop them here or")}{" "}
         <label className="link">
           {t("choose files")}

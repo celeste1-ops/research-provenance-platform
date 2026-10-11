@@ -115,3 +115,17 @@ def test_system_language_is_read_from_the_environment(monkeypatch):
     assert desktop.system_language() == "zh"
     monkeypatch.setenv("LC_ALL", "en_GB.UTF-8")
     assert desktop.system_language() == "en"
+
+
+def test_opening_the_app_again_shows_its_page(monkeypatch):
+    """macOS re-activates a running app instead of starting a second one; the app answers by
+    opening its page (before, nothing seemed to happen: the app has no window)."""
+    from app import desktop
+
+    opened = []
+    monkeypatch.setattr(desktop, "open_browser", opened.append)
+    desktop.reopened("http://127.0.0.1:8765/")
+    assert opened == ["http://127.0.0.1:8765/"]
+    if sys.platform != "darwin":
+        desktop.watch_reopen("http://127.0.0.1:8765/")  # nothing to do elsewhere, and no error
+        assert desktop._reopen_delegate == []

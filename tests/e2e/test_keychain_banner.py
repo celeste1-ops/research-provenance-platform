@@ -43,6 +43,7 @@ def test_a_refused_save_shows_the_banner_at_once(tmp_path, browser, chain):  # n
         expect(page.get_by_test_id("keychain-denied")).to_have_count(0)
         chain.refuse = True  # the signing key has not been read yet; the person will click Deny
         srv.ctx.ledger._key = None
+        KeyringKeyStore.forget()  # and the keychain item has not been read in this run either
         page.get_by_test_id("quick-note-open").click()
         page.get_by_test_id("quick-note-text").fill("A thought")
         page.get_by_test_id("quick-note-save").click()
