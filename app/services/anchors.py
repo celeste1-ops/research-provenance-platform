@@ -33,7 +33,8 @@ def _iso(dt: datetime) -> str:
 
 
 def backoff_delay(attempts: int) -> timedelta:
-    return min(BACKOFF_BASE * (2 ** max(0, attempts - 1)), BACKOFF_MAX)
+    exponent = min(max(0, attempts - 1), 20)  # 2**20 minutes is far beyond the cap
+    return min(BACKOFF_BASE * (2**exponent), BACKOFF_MAX)
 
 
 class AnchorService:

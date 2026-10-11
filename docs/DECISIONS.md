@@ -84,3 +84,10 @@ each section.
   and then creates the key pair and the genesis record (`POST /api/identity`). Renaming a
   project uses `POST /api/projects/{id}/rename`; projects are local display data, not
   records.
+- **D-014 · Bitcoin anchor is off until OpenTimestamps lands (P1).** Following PRD §17,
+  `RPROV_BTC` defaults to `off` while P0 is built; the UI then shows
+  "Bitcoin anchor: not enabled". When it is switched on, missing anchors are backfilled for
+  old records; their Bitcoin time is later than the record time, which is expected.
+- **D-015 · Retry policy for time proofs.** Failed submissions are retried with exponential
+  backoff (1 min doubling to a 6 h cap); after 30 attempts the row is marked `failed` but the
+  manual refresh still retries it. Pending Bitcoin anchors are re-checked hourly.
