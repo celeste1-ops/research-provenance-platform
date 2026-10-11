@@ -145,3 +145,13 @@ each section.
   needs at least two answers. Upgrades only contact calendars on the official whitelist.
   Proofs are built with the official `opentimestamps` library (an install extra); the
   verifier reads them with its own standard-library reader.
+
+## Sample data
+
+- **D-027 · `make demo` only loads into an empty data directory.** Records cannot be
+  removed, so loading the fictional FSF sample into a directory that already holds records
+  would mix it into a real chain forever; the loader refuses instead. On a clean machine
+  `make demo && make run` works as the PRD's manual check expects (both use `~/.rprov`).
+  Before recording real material, move the demo aside (`mv ~/.rprov ~/.rprov-demo`) or load
+  the demo with `RPROV_HOME=~/.rprov-demo make demo` from the start. The demo uses whatever
+  time-proof providers are configured. All sample text is fictional.
