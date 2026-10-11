@@ -63,6 +63,9 @@ export function App() {
   const [uiLang, setUiLang] = useState<Lang>(lang);
   const menuRef = useRef<HTMLDivElement>(null);
 
+  // Set when reload() itself picks the project, so that this choice does not load everything again.
+  const pickedByReload = useRef(false);
+
   const reload = useCallback(async () => {
     try {
       const s = await api.status();
@@ -72,11 +75,14 @@ export function App() {
       const ps = await api.projects();
       setProjects(ps);
       const pid = projectId || ps[0]?.id || "";
-      if (pid !== projectId) setProjectId(pid);
-      const [g, t] = await Promise.all([api.graph(pid || undefined), api.timeline(pid || undefined)]);
-      setGraph(g);
-      setTimeline(t);
+      if (pid !== projectId) {
+        pickedByReload.current = true;
+        setProjectId(pid);
+      }
+      // The map first; the list's data is asked for after it, so it never holds the map up.
+      setGraph(await api.graph(pid || undefined));
       setVersion((v) => v + 1);
+      setTimeline(await api.timeline(pid || undefined));
     } catch (e) {
       setNotice({ text: (e as Error).message, kind: "error" });
     }
@@ -84,6 +90,10 @@ export function App() {
   }, [projectId, space]);
 
   useEffect(() => {
+    if (pickedByReload.current) {
+      pickedByReload.current = false;
+      return;
+    }
     reload();
   }, [reload]);
 
