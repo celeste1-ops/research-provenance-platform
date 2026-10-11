@@ -1,5 +1,6 @@
 """In-process background jobs (PRD §13 后台任务 — no Celery or Redis): check time proofs once
-at start-up, then hourly; record new commits of watched git repositories every minute (D-047)."""
+at start-up, then hourly; every minute, record new commits of watched git repositories (D-047)
+and look for new versions in watched folders (D-049)."""
 
 from __future__ import annotations
 
@@ -44,18 +45,18 @@ class AnchorScheduler:
             self._stop.wait(self.interval)
 
 
-GIT_INTERVAL_SECONDS = 60
+SOURCES_INTERVAL_SECONDS = 60
 
 
-class GitScheduler:
-    """Looks for new commits every minute. Reading a local repository is cheap; a step is only
-    saved (and stamped) when a commit is new."""
+class SourcesScheduler:
+    """Looks for new commits and new file versions every minute. Reading a local repository or
+    folder is cheap; a step or an inbox stamp is only made when something is new."""
 
-    def __init__(self, spaces, interval: float = GIT_INTERVAL_SECONDS):
+    def __init__(self, spaces, interval: float = SOURCES_INTERVAL_SECONDS):
         self.spaces = spaces
         self.interval = interval
         self._stop = threading.Event()
-        self._thread = threading.Thread(target=self._run, name="rprov-git", daemon=True)
+        self._thread = threading.Thread(target=self._run, name="rprov-sources", daemon=True)
 
     def start(self) -> None:
         self._thread.start()
@@ -67,8 +68,8 @@ class GitScheduler:
     def _run(self) -> None:
         while not self._stop.wait(self.interval):
             try:
-                recorded = self.spaces.record_git()
-                if recorded:
-                    log.info("recorded %d new commit step(s)", recorded)
+                found = self.spaces.record_sources()
+                if found:
+                    log.info("%d new commit step(s) or inbox version(s)", found)
             except Exception:  # noqa: BLE001 - keep the job alive
-                log.exception("git recording failed")
+                log.exception("recording from git or folders failed")

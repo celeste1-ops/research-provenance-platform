@@ -109,6 +109,8 @@ export interface RecordDetail {
   author: { label: string; source: "author"; items: AuthorItem[] };
   later: { label: string; items: LaterItem[] };
   files: { role: string; name: string; size: number; media_type: string; sha256: string }[];
+  // Date stamps of attached files, taken when they arrived in the inbox (D-049).
+  file_stamps?: { file: string; state: string; time: string | null; source: string | null; code: string | null }[];
 }
 
 export interface TimelineRow {
@@ -170,6 +172,7 @@ export interface BackupSuggestion {
 
 export interface Status {
   initialized: boolean;
+  inbox?: number;
   author_label: string | null;
   installation: string | null;
   entry_count: number;
@@ -264,4 +267,44 @@ export type Narrative = {
   intro: NarrativeSentence[];
   chapters: { heading: string | null; paragraphs: NarrativeSentence[][] }[];
   steps: number;
+};
+
+// Watched folders and the inbox (DECISIONS D-049).
+export type WatchedFolder = {
+  id: string;
+  path: string;
+  name: string;
+  project_id: string;
+  project_title: string;
+  added: string;
+  checked: string | null;
+  error: string | null;
+  files: number;
+  recorded: number;
+};
+export type InboxItem = {
+  id: string;
+  folder_id: string;
+  folder: string;
+  path: string;
+  name: string;
+  sha256: string;
+  size: number;
+  media_type: string;
+  node_type: string;
+  seen: string;
+  stamp: { time: string | null; provider: string } | null;
+  stamp_error: string | null;
+  previous: string | null;
+};
+export type InboxStatus = { folders: WatchedFolder[]; items: InboxItem[] };
+export type FolderInspect = {
+  path: string;
+  name: string;
+  files: number;
+  too_large: number;
+  too_many: boolean;
+  max_files: number;
+  max_existing: number;
+  already: boolean;
 };

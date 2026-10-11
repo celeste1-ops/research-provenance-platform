@@ -56,9 +56,11 @@ def _join(items: list[str]) -> str:
     return tr("{a} and {b}", a=tr(", ").join(items[:-1]), b=items[-1])
 
 
-def build_narrative(records: list[Record], when: When, *, title: str, project_id: str | None = None) -> dict:
+def build_narrative(records: list[Record], when: When, *, title: str, project_id: str | None = None,
+                    file_stamps: dict[str, list[tuple[str, str]]] | None = None) -> dict:
     """``records`` in recording order. With ``project_id`` only that project's steps (and the
-    later additions about them) are told."""
+    later additions about them) are told. ``file_stamps``: record id -> verified (file, time)
+    date stamps of its attached files (D-049)."""
     from provenance_core.replay import replay
 
     state = replay(records)
@@ -96,7 +98,7 @@ def build_narrative(records: list[Record], when: When, *, title: str, project_id
             out.append(sentence(tr("The author's reason at the time: {text}", text=_q(p["author_statement"])),
                                 [rid], "author"))
         ext = p.get("external") or {}
-        files = [f["name"] for f in ((p.get("content") or {}).get("files") or [])]
+        files = [f["name"] for f in ((p.get("content") or {}).get("files") or []) if not f["name"].endswith(".tsr")]
         if ext.get("commit"):
             repo = ext.get("repo_url", "").rstrip("/").rsplit("/", 1)[-1].removesuffix(".git") or ext.get("repo_url", "")
             out.append(sentence(tr("It refers to commit {commit} of {repo}.", commit=ext["commit"][:7], repo=repo), [rid]))
@@ -109,6 +111,9 @@ def build_narrative(records: list[Record], when: When, *, title: str, project_id
             if len(files) > MAX_FILES_NAMED:
                 named.append(tr("{n} more files", n=len(files) - MAX_FILES_NAMED))
             out.append(sentence(tr("It holds {files}.", files=_join(named)), [rid]))
+        for file, time in (file_stamps or {}).get(rid, []):
+            out.append(sentence(tr("The file {file} already existed by {time}, when it arrived in the inbox "
+                                   "(date stamp).", file=file, time=time), [rid]))
         if p.get("milestone"):
             out.append(sentence(tr("The author marked it as a key step."), [rid], "author"))
         return out

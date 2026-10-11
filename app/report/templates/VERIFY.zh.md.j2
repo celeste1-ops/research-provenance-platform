@@ -80,6 +80,21 @@ openssl ts -verify -data manifests/<id>.json -in proofs/<id>.tsr \
 应有的值：FreeTSA `{{ meta.trusted_tsa_roots['freetsa-cacert.pem'] }}`，
 DigiCert Trusted Root G4 `{{ meta.trusted_tsa_roots['digicert-trusted-root-g4.pem'] }}`。
 
+{% if file_stamped %}
+### 3b. 附件文件自己的日期章
+
+有些文件旁边带着 `<name>.tsr`：这是这个文件本身字节的第三方签名时间证明，是文件进入作者收件箱时
+盖的，比记录本身更早。它说明这个文件当时已经存在。核对方法和第 3 步一样，只是数据换成这个文件：
+
+```bash
+openssl ts -verify -data content/<id>/files/<name> -in content/<id>/files/<name>.tsr \
+  -CAfile certs/freetsa-cacert.pem -untrusted certs/freetsa-tsa.crt
+```
+
+如果是 DigiCert 的时间证明（证明里写着签发者，见第 3 步），只用
+`-CAfile certs/digicert-trusted-root-g4.pem` 即可：DigiCert 的证明自带其他证书。
+
+{% endif %}
 ### 4. 比特币时间锚定（OpenTimestamps）
 
 ```bash

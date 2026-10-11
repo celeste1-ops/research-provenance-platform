@@ -10,6 +10,7 @@ import { Help } from "./components/Help";
 import { Legend, TechnicalDetails, WhereIsMyData } from "./components/InfoPanels";
 import { KeyBackupDialog } from "./components/KeyBackupDialog";
 import { GitDialog } from "./components/GitDialog";
+import { FolderDialog, InboxDialog } from "./components/InboxDialogs";
 import { QuickNote } from "./components/QuickNote";
 import { RecordForm } from "./components/RecordForm";
 import { ServiceCheckDialog } from "./components/ServiceCheck";
@@ -22,7 +23,7 @@ import { chosenHere, lang, setLang, t, tn, tx, type Lang } from "./i18n";
 import { LangSwitch } from "./components/LangSwitch";
 
 type Dialog = null | "form" | "export" | "backup" | "key" | "where" | "tech" | "services" | "practice-reset" | "git"
-  | "quick";
+  | "quick" | "folders" | "inbox";
 const QUICK_NOTE_HASH = "#quick-note"; // the menu bar / tray icon opens the page with it (D-047)
 const SPACE_KEY = "rprov-space";
 
@@ -62,6 +63,9 @@ export function App() {
   const [uiLang, setUiLang] = useState<Lang>(lang);
   const menuRef = useRef<HTMLDivElement>(null);
 
+  // Set when reload() itself picks the project, so that this choice does not load everything again.
+  const pickedByReload = useRef(false);
+
   const reload = useCallback(async () => {
     try {
       const s = await api.status();
@@ -71,11 +75,14 @@ export function App() {
       const ps = await api.projects();
       setProjects(ps);
       const pid = projectId || ps[0]?.id || "";
-      if (pid !== projectId) setProjectId(pid);
-      const [g, t] = await Promise.all([api.graph(pid || undefined), api.timeline(pid || undefined)]);
-      setGraph(g);
-      setTimeline(t);
+      if (pid !== projectId) {
+        pickedByReload.current = true;
+        setProjectId(pid);
+      }
+      // The map first; the list's data is asked for after it, so it never holds the map up.
+      setGraph(await api.graph(pid || undefined));
       setVersion((v) => v + 1);
+      setTimeline(await api.timeline(pid || undefined));
     } catch (e) {
       setNotice({ text: (e as Error).message, kind: "error" });
     }
@@ -83,6 +90,10 @@ export function App() {
   }, [projectId, space]);
 
   useEffect(() => {
+    if (pickedByReload.current) {
+      pickedByReload.current = false;
+      return;
+    }
     reload();
   }, [reload]);
 
@@ -283,6 +294,11 @@ export function App() {
           </button>
           <Help id="share" label={t("Share")} align="right">{help("share")}</Help>
         </span>
+        {(status.inbox ?? 0) > 0 && (
+          <button className="pill pill-inbox" onClick={() => setDialog("inbox")} data-testid="inbox-pill">
+            {t("Inbox ({n})", { n: status.inbox ?? 0 })}
+          </button>
+        )}
         <button className="secondary" onClick={() => setDialog("quick")} disabled={!projectId}
           data-testid="quick-note-open">
           {t("Quick note")}
@@ -303,6 +319,9 @@ export function App() {
               <button role="menuitem" onClick={checkProofs}>{t("Check stamps now")}</button>
               <button role="menuitem" onClick={() => openMenuItem("git")} data-testid="menu-git">
                 {t("Record from git…")}
+              </button>
+              <button role="menuitem" onClick={() => openMenuItem("folders")} data-testid="menu-folders">
+                {t("Watch a folder…")}
               </button>
               <button role="menuitem" onClick={() => openMenuItem("services")}>{t("Check stamp services…")}</button>
               {!practice && <button role="menuitem" onClick={() => openMenuItem("backup")}>{t("Backup…")}</button>}
@@ -482,6 +501,17 @@ export function App() {
       {dialog === "services" && <ServiceCheckDialog onClose={() => setDialog(null)} />}
       {dialog === "git" && (
         <GitDialog projects={projects} projectId={projectId} onClose={() => setDialog(null)} onChanged={reload} />
+      )}
+      {dialog === "folders" && (
+        <FolderDialog projects={projects} projectId={projectId} onClose={() => { setDialog(null); void reload(); }} />
+      )}
+      {dialog === "inbox" && (
+        <InboxDialog
+          nodeTypes={status.node_types}
+          onClose={() => setDialog(null)}
+          onRecorded={(id) => { setSelected(id); void reload(); }}
+          onWatch={() => setDialog("folders")}
+        />
       )}
       {dialog === "quick" && projectId && (
         <QuickNote projects={projects} projectId={projectId} onClose={() => setDialog(null)} onSaved={afterSaved} />

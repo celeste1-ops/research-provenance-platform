@@ -46,10 +46,10 @@ def create_app(ctx: AppContext, *, start_jobs: bool = False) -> FastAPI:
     async def lifespan(app: FastAPI):
         jobs = []
         if start_jobs:
-            from app.jobs.scheduler import AnchorScheduler, GitScheduler
+            from app.jobs.scheduler import AnchorScheduler, SourcesScheduler
 
             # Stamps are checked in both spaces; only the real record is backed up.
-            jobs = [AnchorScheduler(spaces, after=lambda: ctx.autobackup.maybe_run("hourly")), GitScheduler(spaces)]
+            jobs = [AnchorScheduler(spaces, after=lambda: ctx.autobackup.maybe_run("hourly")), SourcesScheduler(spaces)]
             for job in jobs:
                 job.start()
         try:

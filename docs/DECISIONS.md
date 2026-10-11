@@ -589,3 +589,34 @@ verification rules or what leaves the machine for time proofs.
      `report.html`. The report builds it only from what the bundle discloses: a record
      disclosed as existence only appears as "record #n is not disclosed here", and nothing
      of its content (a test checks this), exactly like the rest of the report.
+
+- **D-049 · Watched folders and a stamped inbox.** The author asked for new versions of files to
+  be recorded automatically. Recording every save directly would fill an append-only record
+  with versions nobody wants (editors save every minute), so — as proposed and approved —
+  new versions wait in an inbox first.
+  1. *What counts as a new version.* Once a minute the app looks at each watched folder (the
+     same job as the git recording). A file that is new or changed and then stays unchanged
+     for two minutes is a version, if its SHA-256 differs from the last version seen. Hidden
+     files and folders, editor/office lock and temporary files, `.git`, `node_modules` and
+     similar folders, `*.tsr` and files over 50 MB are skipped. A folder with more than 2000
+     files, or one that contains (or is inside) the app's data folder, is refused. Files
+     already there when watching starts are not new, unless the author asks for up to 100 of
+     them to be put into the inbox.
+  2. *Stamped on arrival.* The version's bytes are copied to `<data folder>/inbox/files/` and
+     its SHA-256 is sent to the time-stamping authority at once (the same providers and
+     fallback as for steps; only the hash leaves). If no authority answers, it waits and is
+     retried every minute. The inbox is outside the signed record: a version can be thrown
+     away and nothing of it remains. The inbox is not backed up.
+  3. *Recording keeps the earlier stamp.* "Record as a step" makes an entry (type guessed from
+     the extension, title the file name, both editable; "revises" the step of the file's
+     previous recorded version) that holds the file and, next to it, the inbox timestamp as
+     `<name>.tsr`. No format change: it is an ordinary attachment. By convention an
+     attachment `<name>.tsr` next to `<name>` is a timestamp of that file's bytes;
+     `provenance_core.verify.file_stamps` checks it like any RFC 3161 token (signature, chain
+     to a trusted root, digest = SHA-256 of the file) and reports "file X existed by T". It
+     does not change the record's own result, and the record's own stamp is still the
+     record's time. The app, verify.py (text and `--json`), the report (a row per file and a
+     sentence in the story) and VERIFY.md (an `openssl ts -verify -data <file>` command, only
+     in bundles that hold such a stamp) all show it. A file disclosed as "structure only" has
+     no content in the bundle, so its stamp cannot be checked there and is not shown.
+  4. *Per space.* Each space has its own watched folders (`watched_folders.json`) and inbox.

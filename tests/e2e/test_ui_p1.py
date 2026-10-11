@@ -295,8 +295,8 @@ def test_empty_state_and_help_panels(tmp_path, browser):
         # Technical actions live in the More menu.
         page.get_by_test_id("settings-menu").click()
         items = [i.inner_text() for i in page.get_by_role("menuitem").all()]
-        assert items == ["Check stamps now", "Record from git…", "Check stamp services…", "Backup…", "Where is my data?",
-                         "Technical details", "Back up signing key only…"]
+        assert items == ["Check stamps now", "Record from git…", "Watch a folder…", "Check stamp services…", "Backup…",
+                         "Where is my data?", "Technical details", "Back up signing key only…"]
         page.get_by_role("menuitem", name="Where is my data?").click()
         where = page.get_by_test_id("where-is-my-data")
         text = where.inner_text()

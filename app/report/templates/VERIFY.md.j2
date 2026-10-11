@@ -80,6 +80,22 @@ Before trusting a root, compare its fingerprint
 publishes. Expected values: FreeTSA `{{ meta.trusted_tsa_roots['freetsa-cacert.pem'] }}`,
 DigiCert Trusted Root G4 `{{ meta.trusted_tsa_roots['digicert-trusted-root-g4.pem'] }}`.
 
+{% if file_stamped %}
+### 3b. Date stamp of an attached file
+
+Some files come with `<name>.tsr` next to them: a third-party timestamp of that file's own
+bytes, taken when the file arrived in the author's inbox, before the record was made. It shows
+the file existed by then. Check it like step 3, with the file as the data:
+
+```bash
+openssl ts -verify -data content/<id>/files/<name> -in content/<id>/files/<name>.tsr \
+  -CAfile certs/freetsa-cacert.pem -untrusted certs/freetsa-tsa.crt
+```
+
+For a DigiCert stamp (the token names its signer, as in step 3) use
+`-CAfile certs/digicert-trusted-root-g4.pem` alone: DigiCert tokens carry their other certificates.
+
+{% endif %}
 ### 4. Bitcoin anchor (OpenTimestamps)
 
 ```bash

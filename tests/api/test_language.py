@@ -67,6 +67,7 @@ def test_the_report_is_written_in_the_chosen_language(api, client):
                                    headers={"X-RPROV-Lang": "zh"}).content)
     assert '<html lang="en">' in html and "It can show" in html and "能证明" not in html
     assert md.startswith("# How to verify this evidence bundle")
+    assert "### 3b." not in md  # only bundles holding a file's own date stamp explain it
 
 
 def test_the_export_preview_follows_the_interface_language(api, client):

@@ -13,7 +13,7 @@ pytestmark = pytest.mark.skipif(find_git() is None, reason="git is not installed
 
 
 def wait_idle(client, headers=None):
-    for _ in range(100):
+    for _ in range(400):  # up to 20 s: the first steps are saved in the background
         status = client.get("/api/git", headers=headers or {}).json()
         if not any(s["busy"] for s in status["sources"]):
             return status

@@ -62,6 +62,8 @@ def report_to_dict(report: LogReport) -> dict:
                 "third_party_timestamp": {"state": r.tsa.state, "time": r.tsa.time, "source": r.tsa.source},
                 "bitcoin_anchor": {"state": r.btc.state, "time": r.btc.time, "source": r.btc.source},
                 "earliest_verified": {"time": ev[0], "from": ev[1]} if ev else None,
+                "file_stamps": [{"file": f.file, "state": f.check.state, "time": f.check.time,
+                                 "source": f.check.source, "code": f.check.code} for f in r.file_stamps],
             }
         )
     return out
@@ -87,6 +89,9 @@ def _print_report(report: LogReport, meta: dict) -> None:
         print(f"       {_proof_text(r.tsa)} | {_proof_text(r.btc)}")
         ev = r.earliest_verified()
         print(f"       Earliest verified time: {ev[0]} (from {ev[1]})" if ev else "       No verified time")
+        for f in r.file_stamps:  # stamps of attached files, taken when the file was first seen
+            print(f"       File {f.file} existed by {f.check.time} ({TSA_LABEL}, {f.check.source})" if f.check.verified
+                  else f"       File stamp of {f.file}: not verified ({f.check.code or f.check.state})")
         for issue in r.issues:
             print(f"         {issue.severity.upper()} {issue.code}: {issue.message}")
     for issue in report.log_issues:

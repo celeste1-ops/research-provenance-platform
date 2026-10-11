@@ -251,6 +251,11 @@ TEXTS: dict[str, str] = {
     "a step": "一步",
     "My research": "我的研究",
     "The research, step by step": "研究经过",
+    "The file {file} already existed by {time}, when it arrived in the inbox (date stamp).":
+        "文件 {file} 在 {time} 进入收件箱时就已经存在（日期章）。",
+    "Date stamp of {file}": "{file} 的日期章",
+    "verified — the file existed by {time}": "已验证——这个文件在 {time} 已经存在",
+    "not verified": "未通过核对",
     "On {date} the author recorded {kind}: {title}.": "{date}，作者记下了{kind}：{title}。",
     "It is older material added that day; the author dates it to {claimed} — the author's statement, not a verified date.":
         "这是当天补记的旧材料；作者说它来自 {claimed}——这是作者陈述，不是已验证的日期。",
@@ -397,6 +402,13 @@ MESSAGES: dict[str, str] = {
     "the keychain already holds a different signing key for this installation": "钥匙保管处里已经有这个安装的另一把签名钥匙",
     "body text is larger than 50 MB": "正文超过 50 MB",
     "commit must be a hexadecimal commit hash": "提交必须是十六进制的提交哈希",
+    # watched folders (D-049)
+    "choose a folder that does not contain the app's data folder": "请选一个不包含程序数据文件夹的文件夹",
+    "this folder has too many files; choose the folder of one piece of work": "这个文件夹里文件太多；请选某一项工作的文件夹",
+    "this folder is already being watched": "这个文件夹已经在盯着了",
+    "too many files to put into the inbox at once": "一次放进收件箱的文件太多",
+    "the folder is not there (is the drive connected?)": "找不到这个文件夹（硬盘接上了吗？）",
+    "could not read the folder ({value})": "读不了这个文件夹（{value}）",
     # recording a git repository (D-047)
     "git is not installed on this computer": "这台电脑上没有安装 git",
     "this folder is not a git repository": "这个文件夹不是 git 仓库",

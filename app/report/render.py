@@ -229,8 +229,10 @@ def build_model(plan, meta, mats, contents, report, trust) -> dict:
 
     from app.services.narrative import build_narrative
 
+    stamps = {rid: [(f.file, f.check.time) for f in res.file_stamps if f.check.verified]
+              for rid, res in results.items() if res.file_stamps}
     narrative = build_narrative([(r.id, r.seq, r.kind, payloads.get(r.id)) for r in plan.chain], when,
-                                title=meta["title"])
+                                title=meta["title"], file_stamps=stamps)
     anchors = {d["id"] for d in details}  # records with their own section below
     return {
         "narrative": narrative, "anchors": anchors,
@@ -249,7 +251,8 @@ def render_verify_md(*, plan, meta, mats, certs, uses_mock: bool) -> str:
     example = next((r for r in plan.chain if plan.levels[r.id] == "full"), None) or plan.chain[-1]
     env = _env()
     name = "VERIFY.zh.md.j2" if current() == "zh" else "VERIFY.md.j2"  # same commands, two languages
+    file_stamped = any(k.endswith(".tsr") for m in mats.values() for k in (m.content or {}))
     return env.get_template(name).render(
-        plan=plan, meta=meta, example=example, mats=mats, uses_mock=uses_mock,
+        plan=plan, meta=meta, example=example, mats=mats, uses_mock=uses_mock, file_stamped=file_stamped,
         has_body=example.id in mats and (mats[example.id].content or {}).get("body") is not None,
     )
