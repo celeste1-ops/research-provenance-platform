@@ -29,6 +29,9 @@ jobs:
         run: uv run python tools/capture_tsa_fixture.py
       - name: The saved responses verify offline
         run: uv run pytest tests/unit/test_tsa_der_order.py -o addopts="" -v
+      - name: Print the saved responses (public test data) for copying into tests/fixtures/tsa/
+        run: |
+          for f in tests/fixtures/tsa/*; do echo "== $(basename "$f")"; base64 -w0 "$f"; echo; done
       - uses: actions/upload-artifact@v4
         if: always()
         with:
