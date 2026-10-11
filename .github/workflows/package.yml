@@ -90,24 +90,14 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          # A release that already exists keeps its files, so they always match its SHA256SUMS.txt:
-          # running this again only brings a draft's notes up to date with RELEASE_NOTES.md, and
-          # publishing a draft (which creates its tag and so runs this workflow again) changes nothing.
-          # A draft's tag_name only reads back as the tag before an edit (the API clears it unless the
-          # edit sends it again), so drafts are matched by title too.
-          release=$(gh api "repos/$GITHUB_REPOSITORY/releases" --paginate --jq ".[] | select(.tag_name == \"$TAG\"
-              or (.draft and .name == \"Research History $TAG\")) | \"\(.id) \(.draft) \(.target_commitish)\"" | head -n 1)
-          if [ -n "$release" ]; then
-            read -r id draft target <<< "$release"
-            if [ "$draft" = "true" ]; then
-              keep=(-f tag_name="$TAG")
-              [ -n "$target" ] && keep+=(-f target_commitish="$target")
-              gh api -X PATCH "repos/$GITHUB_REPOSITORY/releases/$id" -F body=@packaging/RELEASE_NOTES.md "${keep[@]}" > /dev/null
-              echo "draft $TAG: notes updated from packaging/RELEASE_NOTES.md, files left as they are"
-            else
-              echo "release $TAG is already published; nothing to do"
-            fi
-            exit 0
+          # A release that already exists is left as it is, so its installers always match its
+          # SHA256SUMS.txt; publishing a draft creates its tag, which runs this workflow again. To
+          # redo a draft, delete it on GitHub and run this again. (Editing a draft through the API
+          # clears its tag name, and putting the tag back is refused to this workflow's token.)
+          found=$(gh api "repos/$GITHUB_REPOSITORY/releases" --paginate --jq ".[] | select(.tag_name == \"$TAG\"
+              or (.draft and .name == \"Research History $TAG\")) | .html_url" | head -n 1)
+          if [ -n "$found" ]; then
+            echo "release $TAG already exists ($found); nothing to do"; exit 0
           fi
           (cd dist && sha256sum -- * > SHA256SUMS.txt && cat SHA256SUMS.txt)
           gh release create "$TAG" --draft --target "$GITHUB_SHA" --title "Research History $TAG" \
