@@ -15,7 +15,7 @@ import sys
 from cryptography import x509
 
 from .bundle import BundleError, load_bundle
-from .certs import FREETSA_ROOT_SHA256, builtin_tsa_roots
+from .certs import builtin_tsa_root_labels, builtin_tsa_roots
 from .proofs import BTC_LABEL, TSA_LABEL
 from .providers.explorers import ExplorerHeaderLookup, NodeHeaderLookup
 from .verify import STATUS_LABELS, LogReport, verify_log
@@ -176,7 +176,9 @@ def main(argv: list[str] | None = None) -> int:
                 "\nNote: these timestamps come from the MOCK test TSA, which nothing trusts by default. "
                 "For testing only: --tsa-root certs/mock-tsa-root.pem"
             )
-        print(f"\nBuilt-in trust root: FreeTSA Root CA, SHA-256 {FREETSA_ROOT_SHA256}")
+        print()
+        for label, sha in builtin_tsa_root_labels():
+            print(f"Built-in trust root: {label}, SHA-256 {sha}")
     return 0 if report.ok else 1
 
 

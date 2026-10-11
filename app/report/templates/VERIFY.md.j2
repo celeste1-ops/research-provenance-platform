@@ -59,14 +59,26 @@ the `public_key` field of `payloads/{{ plan.chain[0].id }}.json`.
 
 ### 3. Third-party timestamp (RFC 3161)
 
+Each timestamp comes from one of two time-stamping authorities: FreeTSA, or DigiCert when
+FreeTSA could not be reached. The token names its signer
+(`openssl ts -reply -in proofs/<id>.tsr -text | grep TSA`). For FreeTSA:
+
 ```bash
 openssl ts -verify -data manifests/<id>.json -in proofs/<id>.tsr \
   -CAfile certs/freetsa-cacert.pem -untrusted certs/freetsa-tsa.crt
 ```
 
-Before trusting `certs/freetsa-cacert.pem`, compare its fingerprint with the one FreeTSA
-publishes (`openssl x509 -in certs/freetsa-cacert.pem -noout -fingerprint -sha256`); the
-expected value is `{{ meta.trusted_tsa_roots['freetsa-cacert.pem'] }}`.
+For DigiCert (`certs/digicert-tsa-chain.pem` is present when a record was stamped by DigiCert):
+
+```bash
+openssl ts -verify -data manifests/<id>.json -in proofs/<id>.tsr \
+  -CAfile certs/digicert-trusted-root-g4.pem -untrusted certs/digicert-tsa-chain.pem
+```
+
+Before trusting a root, compare its fingerprint
+(`openssl x509 -in certs/<root>.pem -noout -fingerprint -sha256`) with the one the authority
+publishes. Expected values: FreeTSA `{{ meta.trusted_tsa_roots['freetsa-cacert.pem'] }}`,
+DigiCert Trusted Root G4 `{{ meta.trusted_tsa_roots['digicert-trusted-root-g4.pem'] }}`.
 
 ### 4. Bitcoin anchor (OpenTimestamps)
 

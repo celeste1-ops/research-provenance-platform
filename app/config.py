@@ -25,9 +25,12 @@ KEYCHAIN_NAMES = {"Mac": "Keychain", "PC": "Windows Credential Manager"}
 class Settings:
     data_dir: Path = field(default_factory=lambda: Path(os.environ.get("RPROV_HOME", "~/.rprov")).expanduser())
     port: int = field(default_factory=lambda: int(os.environ.get("RPROV_PORT", DEFAULT_PORT)))
-    # Third-party timestamp provider: freetsa | mock | off
+    # Third-party timestamp ("date stamp") service tried first: freetsa | digicert | mock | off
     tsa: str = _env("RPROV_TSA", "freetsa")
     tsa_url: str = _env("RPROV_TSA_URL", "https://freetsa.org/tsr")
+    # Tried when the first cannot be reached: digicert | freetsa | off; empty = the other one (D-045).
+    tsa_fallback: str = _env("RPROV_TSA_FALLBACK", "")
+    digicert_tsa_url: str = _env("RPROV_DIGICERT_TSA_URL", "http://timestamp.digicert.com")
     # Bitcoin anchor provider: ots | mock | off
     btc: str = _env("RPROV_BTC", "ots")
     # Optional local Bitcoin node for checking block headers (else: two public block explorers)

@@ -10,12 +10,13 @@ import { Help } from "./components/Help";
 import { Legend, TechnicalDetails, WhereIsMyData } from "./components/InfoPanels";
 import { KeyBackupDialog } from "./components/KeyBackupDialog";
 import { RecordForm } from "./components/RecordForm";
+import { ServiceCheckDialog } from "./components/ServiceCheck";
 import { Setup } from "./components/Setup";
 import { Timeline } from "./components/Timeline";
 import { HELP, homeNote } from "./labels";
 import { dev, setDevice } from "./device";
 
-type Dialog = null | "form" | "export" | "backup" | "key" | "where" | "tech" | "practice-reset";
+type Dialog = null | "form" | "export" | "backup" | "key" | "where" | "tech" | "services" | "practice-reset";
 const SPACE_KEY = "rprov-space";
 
 // Remembered per browser so a reload stays in the same space (a convenience only).
@@ -229,6 +230,7 @@ export function App() {
           {menuOpen && (
             <div className="menu" role="menu">
               <button role="menuitem" onClick={checkProofs}>Check stamps now</button>
+              <button role="menuitem" onClick={() => openMenuItem("services")}>Check stamp services…</button>
               {!practice && <button role="menuitem" onClick={() => openMenuItem("backup")}>Backup…</button>}
               <button role="menuitem" onClick={() => openMenuItem("where")}>Where is my data?</button>
               <hr />
@@ -416,6 +418,7 @@ export function App() {
       {dialog === "tech" && (
         <TechnicalDetails status={status} onClose={() => setDialog(null)} onKeyBackup={() => setDialog("key")} />
       )}
+      {dialog === "services" && <ServiceCheckDialog onClose={() => setDialog(null)} />}
       {dialog === "export" && (
         <ExportDialog rows={timeline} defaultTitle={project?.title ?? "evidence"} onClose={() => setDialog(null)}
           practice={practice} />

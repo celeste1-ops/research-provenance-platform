@@ -200,3 +200,18 @@ export interface ExportPreview {
   warnings: string[];
   counts: Record<string, number>;
 }
+
+// “Check stamp services” (DECISIONS D-045)
+export interface ServiceCheck {
+  group: "tsa" | "calendar" | "explorer";
+  name: string;
+  url: string;
+  ok: boolean;
+  ms: number | null;
+  detail: string;
+}
+
+export interface ServiceCheckResult {
+  checks: ServiceCheck[];
+  in_use: { tsa: string[]; btc: boolean; explorers: boolean };
+}

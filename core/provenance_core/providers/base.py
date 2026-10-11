@@ -30,6 +30,7 @@ class AnchorResult:
     proof: bytes
     verified_time: str | None = None
     detail: str = ""
+    provider: str | None = None  # which service answered, when several are tried (D-045)
 
 
 class TimestampProvider(ABC):

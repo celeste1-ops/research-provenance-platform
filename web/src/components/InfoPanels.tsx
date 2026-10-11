@@ -62,7 +62,7 @@ export function WhereIsMyData({ status, onClose, onBackup }: { status: Status; o
         )}
         <h3>Stamps prove time — they don't store anything</h3>
         <p className="small">
-          The date stamp service (FreeTSA) and the Bitcoin network only receive a fingerprint (hash) of each step. From a
+          The date stamp services (FreeTSA, or DigiCert when FreeTSA can't be reached) and the Bitcoin network only receive a fingerprint (hash) of each step. From a
           fingerprint nobody can read or rebuild your content — so they can't give it back either, not even through
           Bitcoin. Only a backup can bring your files back.
         </p>

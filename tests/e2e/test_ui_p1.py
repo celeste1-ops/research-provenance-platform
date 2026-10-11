@@ -275,8 +275,8 @@ def test_empty_state_and_help_panels(tmp_path, browser):
         # Technical actions live in the More menu.
         page.get_by_test_id("settings-menu").click()
         items = [i.inner_text() for i in page.get_by_role("menuitem").all()]
-        assert items == ["Check stamps now", "Backup…", "Where is my data?", "Technical details",
-                         "Back up signing key only…"]
+        assert items == ["Check stamps now", "Check stamp services…", "Backup…", "Where is my data?",
+                         "Technical details", "Back up signing key only…"]
         page.get_by_role("menuitem", name="Where is my data?").click()
         where = page.get_by_test_id("where-is-my-data")
         text = where.inner_text()
@@ -289,6 +289,56 @@ def test_empty_state_and_help_panels(tmp_path, browser):
         tech = page.get_by_test_id("technical-details")
         assert srv.ctx.ledger.installation in tech.inner_text()
         assert "2 — 1 research step, plus" in tech.inner_text()
+        page.close()
+
+
+def _check(group, name, ok, detail, ms=420):
+    return {"group": group, "name": name, "url": f"https://{name}", "ok": ok, "ms": ms if ok else None,
+            "detail": detail}
+
+
+def test_check_stamp_services(tmp_path, browser):
+    """D-045: FreeTSA blocked, DigiCert working, one calendar blocked: the summary says what still works."""
+    with LiveServer(tmp_path) as srv:
+        srv.ctx.ledger.init_identity("Checker")
+        calls = []
+
+        def fake_check():
+            calls.append(1)
+            return {
+                "checks": [
+                    _check("tsa", "FreeTSA", False, "not reachable (ConnectTimeout)"),
+                    _check("tsa", "DigiCert", True, "stamp received and checked"),
+                    _check("calendar", "a.pool.opentimestamps.org", True, "answered"),
+                    _check("calendar", "b.pool.opentimestamps.org", True, "answered"),
+                    _check("calendar", "a.pool.eternitywall.com", False, "not reachable (ConnectError)"),
+                    _check("calendar", "ots.btc.catallaxy.com", True, "answered"),
+                    _check("explorer", "blockstream.info", True, "current block 917,123"),
+                    _check("explorer", "mempool.space", False, "not reachable (ConnectTimeout)"),
+                ],
+                "in_use": {"tsa": ["freetsa", "digicert"], "btc": True, "explorers": True},
+            }
+
+        srv.ctx.service_check = fake_check
+        page = browser.new_page(viewport={"width": 1400, "height": 900})
+        page.goto(srv.url)
+        page.get_by_test_id("empty-state").wait_for()
+        page.get_by_test_id("settings-menu").click()
+        page.get_by_role("menuitem", name="Check stamp services…").click()
+        dialog = page.get_by_test_id("service-check")
+        expect(dialog).to_contain_text("nothing from your notes")
+        assert calls == []  # nothing is contacted until the author asks
+        dialog.get_by_test_id("service-check-run").click()
+        summary = dialog.get_by_test_id("service-check-summary")
+        expect(summary).to_contain_text("Date stamps work (DigiCert answered).")
+        expect(summary).to_contain_text("Public stamps can start (3 of 4 services answered).")
+        expect(summary).to_contain_text("Finished public stamps can't be checked from here right now")
+        expect(dialog.get_by_test_id("service-FreeTSA")).to_contain_text("not reachable")
+        expect(dialog.get_by_test_id("service-DigiCert")).to_contain_text("0.4 s")
+        expect(dialog.get_by_test_id("service-check-run")).to_have_text("Check again")
+        assert calls == [1]
+        dialog.get_by_role("button", name="Close").click()
+        expect(page.get_by_test_id("service-check")).to_have_count(0)
         page.close()
 
 

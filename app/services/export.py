@@ -20,7 +20,7 @@ from app.report.render import render_report, render_verify_md
 from app.services.ledger import LedgerError
 from app.services.verification import trust_roots
 from provenance_core import bundle as B
-from provenance_core.certs import FREETSA_ROOT_SHA256, freetsa_bundle_files
+from provenance_core.certs import BUILTIN_TSA_ROOTS, digicert_bundle_files, freetsa_bundle_files
 from provenance_core.jcs import parse_json_strict
 from provenance_core.proofs import tsa_embedded_certificates
 from provenance_core.providers.mock import MOCK_TSA_DIR, mock_tsa_root
@@ -164,28 +164,43 @@ def _materials(ledger, anchor_rows, plan: Plan) -> tuple[dict[str, RecordMateria
     return mats, contents
 
 
+def signer_chain_file(embedded: list[x509.Certificate]) -> str:
+    """Which certs/ file the signing certificates of one token go to (D-045): DigiCert's
+    chain is issued by DigiCert; everything else is FreeTSA's."""
+    for cert in embedded:
+        orgs = cert.issuer.get_attributes_for_oid(x509.NameOID.ORGANIZATION_NAME)
+        if any("digicert" in str(o.value).lower() for o in orgs):
+            return "digicert-tsa-chain.pem"
+    return "freetsa-tsa.crt"
+
+
 def _cert_files(mats: dict[str, RecordMaterial], anchor_service) -> dict[str, bytes]:
     certs = dict(freetsa_bundle_files())
-    signers: list[x509.Certificate] = []
+    certs.update(digicert_bundle_files())
+    signers: dict[str, list[x509.Certificate]] = {"freetsa-tsa.crt": [], "digicert-tsa-chain.pem": []}
     uses_mock = False
     mock_root = mock_tsa_root()
     for m in mats.values():
         if not m.tsa_proof:
             continue
-        for cert in tsa_embedded_certificates(m.tsa_proof):
+        embedded = tsa_embedded_certificates(m.tsa_proof)
+        group = signer_chain_file(embedded)
+        for cert in embedded:
             if cert.issuer == mock_root.subject:
                 uses_mock = True
-            elif cert not in signers:
-                signers.append(cert)
-    if signers:
-        # The certificates that actually signed, for `openssl ts -verify -untrusted` (they are
-        # also embedded in every .tsr). Untrusted on purpose: only the root is a trust anchor.
-        pem = certs["freetsa-tsa.crt"].rstrip(b"\n") + b"\n"
-        for cert in signers:
+            elif cert not in signers[group]:
+                signers[group].append(cert)
+    # The certificates that actually signed, for `openssl ts -verify -untrusted` (they are also
+    # embedded in every .tsr). Untrusted on purpose: only the roots are trust anchors.
+    for name, found in signers.items():
+        if not found:
+            continue
+        pem = certs[name].rstrip(b"\n") + b"\n" if name in certs else b""
+        for cert in found:
             block = cert.public_bytes(serialization.Encoding.PEM)
             if block not in pem:
                 pem += block
-        certs["freetsa-tsa.crt"] = pem
+        certs[name] = pem
     if uses_mock:
         certs["mock-tsa-root.pem"] = (MOCK_TSA_DIR / "mock-tsa-root.pem").read_bytes()
         certs["mock-tsa.pem"] = (MOCK_TSA_DIR / "mock-tsa.pem").read_bytes()
@@ -238,7 +253,7 @@ def build_bundle_files(ledger, anchor_service, plan: Plan, *, now: datetime | No
         "records": [
             {"id": r.id, "seq": r.seq, "kind": r.kind, "disclosure": plan.levels[r.id]} for r in plan.chain
         ],
-        "trusted_tsa_roots": {"freetsa-cacert.pem": FREETSA_ROOT_SHA256},
+        "trusted_tsa_roots": {name: sha for name, _label, sha in BUILTIN_TSA_ROOTS},
         "note": "This index is not signed; verify.py re-derives everything from manifests, payloads, "
         "signatures and proofs.",
     }

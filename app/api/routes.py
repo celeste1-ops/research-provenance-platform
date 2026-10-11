@@ -406,6 +406,12 @@ def refresh_anchors(request: Request):
     return ctx(request).anchors.refresh(force=True)
 
 
+@router.post("/network/check")
+def network_check(request: Request):
+    """“Check stamp services” (D-045): only on request, and only random values are sent."""
+    return real(request).service_check()
+
+
 @router.get("/records/{record_id}/verify")
 def verify_record(record_id: str, request: Request):
     c = ctx(request)

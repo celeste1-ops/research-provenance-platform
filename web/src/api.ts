@@ -6,6 +6,7 @@ import type {
   Graph,
   Project,
   RecordDetail,
+  ServiceCheckResult,
   Status,
   TimelineRow,
 } from "./types";
@@ -105,6 +106,7 @@ export const api = {
   createRetraction: (target: string, reason: string) =>
     request<{ id: string }>("POST", "/api/retractions", { target, reason }),
   refreshAnchors: () => request<Record<string, number>>("POST", "/api/anchors/refresh"),
+  networkCheck: () => request<ServiceCheckResult>("POST", "/api/network/check"),
   verifyAll: () => request<{ ok: boolean; counts: Record<string, number> }>("POST", "/api/verify/all"),
   exportPreview: (body: { title: string; records: Record<string, string>; default: string }) =>
     request<ExportPreview>("POST", "/api/export/preview", body),

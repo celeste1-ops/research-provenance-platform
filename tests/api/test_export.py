@@ -5,7 +5,11 @@ import subprocess
 import sys
 import zipfile
 
+from cryptography import x509
+from cryptography.hazmat.primitives import hashes
+
 from provenance_core.bundle import load_bundle
+from provenance_core.certs import DIGICERT_ROOT_SHA256, FREETSA_ROOT_SHA256
 from provenance_core.providers.mock import mock_tsa_root
 from provenance_core.verify import verify_log
 from tests.sample import make_sample
@@ -43,9 +47,16 @@ def test_disclosure_levels_contain_the_right_files(tmp_path):
     assert f"payloads/{ids['genesis']}.json" in names
     for fixed in ("report.html", "bundle.json", "chain.json", "VERIFY.md", "verify.py",
                   "identity/public_key.pem", "certs/freetsa-cacert.pem", "certs/freetsa-tsa.crt",
-                  "certs/mock-tsa-root.pem"):
+                  "certs/digicert-trusted-root-g4.pem", "certs/mock-tsa-root.pem"):
         assert fixed in names, fixed
     meta = json.loads(s.files["bundle.json"])
+    # Both built-in time-stamping roots, with the fingerprints to compare by hand (D-045).
+    assert meta["trusted_tsa_roots"] == {"freetsa-cacert.pem": FREETSA_ROOT_SHA256,
+                                         "digicert-trusted-root-g4.pem": DIGICERT_ROOT_SHA256}
+    for name, sha in meta["trusted_tsa_roots"].items():
+        cert = x509.load_pem_x509_certificate(s.files[f"certs/{name}"])
+        assert cert.fingerprint(hashes.SHA256()).hex() == sha
+        assert sha in s.files["VERIFY.md"].decode()
     assert meta["format"] == "rprov.bundle/1"
     assert {r["id"]: r["disclosure"] for r in meta["records"]}[ids["old"]] == "existence"
 
@@ -87,6 +98,8 @@ def test_generated_verify_py_runs_in_repo_python(tmp_path):
                          capture_output=True, text=True, encoding="utf-8")
     assert out.returncode == 0, out.stdout + out.stderr
     assert "Result: OK" in out.stdout
+    assert f"Built-in trust root: FreeTSA Root CA, SHA-256 {FREETSA_ROOT_SHA256}" in out.stdout
+    assert f"Built-in trust root: DigiCert Trusted Root G4, SHA-256 {DIGICERT_ROOT_SHA256}" in out.stdout
     # Without trusting the mock root, the mock timestamps are (correctly) untrusted.
     out = subprocess.run([sys.executable, "-I", str(s.bundle_dir / "verify.py"), str(s.zip_path)],
                          capture_output=True, text=True, encoding="utf-8")

@@ -240,3 +240,11 @@ ul.plain { list-style: none; padding: 0; margin: 0; }
 .status-box.state-paused { background: #fff8e6; }
 .pill-other-copy .dot { background: var(--bad); } .pill-other-copy { color: var(--bad); border-color: #f0b8b3; }
 .status-box.state-other-copy { background: #fdf0ef; border-color: #f0b8b3; }
+
+/* Check stamp services (D-045) */
+.actions.start { justify-content: flex-start; }
+.service-summary p { margin: 4px 0; }
+.group .why { margin: 2px 0 6px; }
+.service-table { margin: 4px 0; }
+.service-table td:first-child { width: 1%; font-weight: 700; }
+.service-table td:nth-child(2), .service-table td:last-child { width: 1%; white-space: nowrap; }

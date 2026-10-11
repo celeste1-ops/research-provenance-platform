@@ -41,7 +41,7 @@ export const HELP = {
   share:
     "Make a package anyone can check: a report plus a small checking program. You choose how much of each step it shows.",
   dateStamp:
-    "An independent timestamp service (FreeTSA) signs a fingerprint of the step within seconds. It shows the step existed at that time and has not changed since. Reports call it “Third-party timestamp”.",
+    "An independent timestamp service (FreeTSA, or DigiCert when FreeTSA can't be reached) signs a fingerprint of the step within seconds. It shows the step existed at that time and has not changed since. Reports call it “Third-party timestamp”.",
   publicStamp:
     "The same fingerprint is also written into the public Bitcoin blockchain, which anyone can check without trusting any company. It takes a few hours. Reports call it “Bitcoin anchor”.",
 } as const;

@@ -10,9 +10,10 @@ help:
 	@echo "make dev          backend with reload on 127.0.0.1:$(PORT) + Vite dev server on 127.0.0.1:5173"
 	@echo "make run          build the UI and serve everything on 127.0.0.1:$(PORT)"
 	@echo "make test         ruff + full pytest suite (network tests skipped)"
-	@echo "make test-network run the tests that need real FreeTSA / OpenTimestamps"
+	@echo "make test-network run the tests that need real FreeTSA / DigiCert / OpenTimestamps"
 	@echo "make demo         load the FSF sample data into the data directory"
 	@echo "make verify-py    regenerate dist/verify.py from the core library"
+	@echo "make freetsa-certs refresh the FreeTSA certificates and check the DigiCert root"
 
 install:
 	$(UV) sync --extra ots --extra desktop
