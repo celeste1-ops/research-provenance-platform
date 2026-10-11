@@ -33,7 +33,7 @@ uv run dmgbuild -s packaging/macos/dmg_settings.py -D app="$APP" -D background=b
   "Research History" "$DMG"
 MNT="$(mktemp -d)"
 hdiutil attach "$DMG" -nobrowse -readonly -mountpoint "$MNT" >/dev/null
-for item in "Research History.app" Applications .DS_Store .background; do
+for item in "Research History.app" Applications .DS_Store .background.tiff; do
   [ -e "$MNT/$item" ] || { hdiutil detach "$MNT" >/dev/null; echo "disk image lacks $item"; exit 1; }
 done
 hdiutil detach "$MNT" >/dev/null
