@@ -11,6 +11,14 @@ jobs:
       - uses: astral-sh/setup-uv@v5
         with:
           python-version: "3.12"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - name: Build the UI (served by the app in the browser tests)
+        run: npm ci && npm run build
+        working-directory: web
       - run: uv sync --extra ots --locked
       - run: uv run ruff check .
       - name: Install Chromium for the Playwright smoke tests

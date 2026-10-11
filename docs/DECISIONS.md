@@ -116,3 +116,19 @@ each section.
 - **D-021 · End-to-end tests use Playwright for Python.** They run inside pytest (`make
   test`). Where the bundled Playwright browser build is missing (this cloud image), the
   pre-installed Chromium is used via `executable_path`; CI installs the matching browser.
+
+## User interface
+
+- **D-022 · Graph layout without dagre.** PRD §11 fixes the layout: records left to right by
+  `seq`, one row per node type that occurs. That is a deterministic grid, so the graph
+  computes positions directly instead of running dagre (which the PRD lists as optional
+  and replaceable). React Flow (`@xyflow/react`, MIT) draws it.
+- **D-023 · P0 user interface scope.** The P0 UI has first-start setup, the record form
+  (CodeMirror 6 Markdown editor, file drop, code/publication references, relations, "why",
+  milestone, import options), the evolution graph, a record sidebar split into Verified
+  record / Author statement / Later additions, and the export dialog with preview. The
+  milestones-only view, the timeline view, sidebar actions for later additions, the
+  "Changes" diff section and backup/restore screens follow in P1.
+- **D-024 · The session token is injected by the backend.** The built `index.html` keeps a
+  `__RPROV_SESSION_TOKEN__` placeholder that the local server replaces per launch; the Vite
+  plugin that fills it during `make dev` only runs on the dev server.

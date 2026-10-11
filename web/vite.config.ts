@@ -10,6 +10,7 @@ import { join } from "node:path";
 function devSessionToken() {
   return {
     name: "rprov-dev-session-token",
+    apply: "serve" as const, // the built page keeps the placeholder; the backend fills it in
     transformIndexHtml(html: string) {
       const home = process.env.RPROV_HOME ?? join(homedir(), ".rprov");
       const file = join(home, "dev-session-token");
@@ -29,5 +30,5 @@ export default defineConfig({
     strictPort: true,
     proxy: { "/api": { target: backend, changeOrigin: false } },
   },
-  build: { outDir: "dist", emptyOutDir: true },
+  build: { outDir: "dist", emptyOutDir: true, chunkSizeWarningLimit: 2000 },
 });
