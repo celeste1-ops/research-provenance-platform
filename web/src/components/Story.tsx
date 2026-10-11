@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { api } from "../api";
 import { t } from "../i18n";
 import type { Narrative, NarrativeSentence } from "../types";
+import { AiStory } from "./AiStory";
 
 // "Story" (DECISIONS D-048): the research told in sentences from fixed templates, no AI. Each
 // paragraph names the step it comes from; the author's own statements are highlighted.
@@ -87,6 +88,7 @@ export function Story({ projectId, version, onSelect }: {
           ))}
         </section>
       ))}
+      <AiStory projectId={projectId} onSelect={onSelect} />
     </article>
     </div>
   );

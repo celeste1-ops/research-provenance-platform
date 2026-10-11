@@ -106,3 +106,33 @@ def test_the_story_over_the_api_and_in_the_report(api, client):
                                                          "language": "en"}).content)
     assert 'id="narrative"' in html and "The research, step by step" in html
     assert f'href="#r-{a}"' in html
+
+
+def test_ai_retelling_over_the_api(api, client, monkeypatch, ctx):
+    import httpx
+
+    from app import preferences
+    from app.services import ai_story
+    from provenance_core.providers.local_ai import LocalModel
+
+    def handle(request):
+        if request.url.path == "/v1/models":
+            return httpx.Response(200, json={"data": [{"id": "qwen2.5:7b"}]})
+        return httpx.Response(200, json={"choices": [{"message": {"content": "研究从一个想法开始 [#1]。"}}]})
+
+    monkeypatch.setattr(ai_story, "model_factory",
+                        lambda url, model="": LocalModel(url, model, transport=httpx.MockTransport(handle)))
+    api.init()
+    api.entry("Idea", "idea", body="hello")
+    assert client.get("/api/ai").json() == {"url": "http://127.0.0.1:11434", "model": ""}
+    assert client.post("/api/ai/models", json={"url": "localhost:11434"}).json() == {
+        "url": "http://localhost:11434", "models": ["qwen2.5:7b"]}
+    zh = {"X-RPROV-Lang": "zh"}
+    out = client.post("/api/ai/story", json={"url": "http://127.0.0.1:11434", "model": "qwen2.5:7b",
+                                             "project": api.project_id}, headers=zh).json()
+    assert out["label"] == "AI 推断" and out["counts"] == {"ok": 1, "flagged": 0}
+    prefs = preferences.load(ctx.settings.data_dir)
+    assert prefs["ai_url"] == "http://127.0.0.1:11434" and prefs["ai_model"] == "qwen2.5:7b"
+    assert ctx.ledger.record_count() == 2  # nothing the model wrote became a record
+    r = client.post("/api/ai/models", json={"url": "https://api.example.com"}, headers=zh)
+    assert r.status_code == 400 and r.json()["detail"].startswith("只能用这台电脑上的模型")

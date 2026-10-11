@@ -620,3 +620,33 @@ verification rules or what leaves the machine for time proofs.
      in bundles that hold such a stamp) all show it. A file disclosed as "structure only" has
      no content in the bundle, so its stamp cannot be checked there and is not shown.
   4. *Per space.* Each space has its own watched folders (`watched_folders.json`) and inbox.
+
+- **D-050 · An optional retelling by a language model on the author's own computer.** PRD §4
+  left AI for a later version and set its rules: answer only from the records, point every
+  important sentence at its records, label it "AI inference" and keep it apart, and either ask
+  before sending anything to an AI company or use a model on the author's computer. The
+  author asked for the local model first (round 5); a cloud service is not part of this.
+  1. *Only this computer.* `provenance_core/providers/local_ai.py` (the one place network code
+     may live) speaks the chat API that Ollama, LM Studio and llama.cpp's server share
+     (`/v1/models`, `/v1/chat/completions`). It accepts only loopback addresses (127.0.0.0/8,
+     ::1, localhost; no user info), ignores proxy settings and does not follow redirects, so
+     a request cannot go anywhere else. The promise that content stays on the computer is
+     unchanged.
+  2. *What the model is given.* The template story (D-048) as numbered facts — the sentences
+     the author already sees, each with its record number, date (✓ for a date stamp) and
+     whether it is a record or an author's statement — plus rules: use only these facts, cite
+     them after every sentence ([#12]), give reasons only where the author did and say so,
+     and never speak of being first, authorship, originality or ownership. Never the bodies
+     of steps or their files.
+  3. *Every sentence is checked.* A sentence that names no record, names one that is not in
+     the story, contains a forbidden claim (`app/services/claims.py`, now shared with the
+     tests) or talks about what records can never show (originality, authorship, ownership,
+     being first — stricter than the check on the app's own texts) is crossed out with the
+     reason, and left out when the text is saved.
+  4. *Labelled and apart.* The text is shown under the story in its own colour as "AI
+     inference — written by <model> on <date>; it may be wrong". It runs only when the author
+     clicks "Write". It is **not saved as a record** (PRD §4 rule 5 would make it a new record
+     kind, which old verifiers do not know — as proposed, a format change waits until it is
+     needed) and it is never put into a bundle; it can be saved as a Markdown draft labelled
+     AI inference, without the crossed-out sentences. The address and model chosen are
+     remembered in `preferences.json`.
