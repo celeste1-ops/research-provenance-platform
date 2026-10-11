@@ -462,6 +462,35 @@ def test_practice_space(tmp_path, browser):
         page.close()
 
 
+# Holds back the map's answer for one project (window.__slowProject), so it arrives after newer ones.
+SLOW_PROJECT_MAP = """(() => { const f = window.fetch;
+  window.fetch = (u, o) => (window.__slowProject && String(u).includes('/api/graph')
+      && String(u).includes(window.__slowProject))
+    ? new Promise(r => setTimeout(r, 1500)).then(() => f(u, o)) : f(u, o); })()"""
+
+
+def test_practice_sample_survives_a_late_answer(tmp_path, browser):
+    """Filling practice with the sample replaces its project; a late map for the old one is dropped."""
+    with LiveServer(tmp_path) as srv:
+        srv.ctx.ledger.init_identity("Tester")
+        page = browser.new_page(viewport={"width": 1400, "height": 900})
+        page.add_init_script(SLOW_PROJECT_MAP)
+        page.goto(srv.url)
+        page.get_by_test_id("empty-state").wait_for()
+        page.get_by_test_id("space-practice").click()
+        page.get_by_test_id("practice-banner").wait_for()
+        page.get_by_test_id("empty-state").wait_for()
+        old = page.get_by_label("Project").input_value()
+        assert old
+        page.evaluate("id => { window.__slowProject = id; }", old)
+        page.get_by_test_id("practice-sample").click()
+        page.get_by_test_id("graph").locator(".record-node").nth(13).wait_for()
+        page.wait_for_timeout(2500)  # the late answer for the replaced project has arrived by now
+        assert page.get_by_test_id("graph").locator(".record-node").count() == 14
+        wait_for_step_count(page, "14 steps")
+        page.close()
+
+
 def test_practice_before_setting_up(tmp_path, browser):
     with LiveServer(tmp_path) as srv:
         page = browser.new_page(viewport={"width": 1400, "height": 900})
