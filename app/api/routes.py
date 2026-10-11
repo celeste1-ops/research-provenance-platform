@@ -13,6 +13,7 @@ from pydantic import BaseModel, Field
 from app.config import MAX_UPLOAD_BYTES
 from app.services.context import AppContext
 from app.services.ledger import EntryInput, LedgerError, NotInitialized, UploadedFile
+from app.services.spaces import PRACTICE, REAL, SPACE_HEADER
 from app.services.verification import report_json, result_json, verify_database
 from app.services.views import Snapshot, diff_view, graph_view, record_detail, timeline_view
 from provenance_core.records import NODE_TYPES, RELATION_TYPES
@@ -21,7 +22,26 @@ from provenance_core.signing import export_private_key_encrypted
 router = APIRouter(prefix="/api")
 
 
+def space_name(request: Request) -> str:
+    """Which space a request is for (DECISIONS D-038); the real record unless it says otherwise."""
+    return request.headers.get(SPACE_HEADER) or request.query_params.get("space") or REAL
+
+
 def ctx(request: Request) -> AppContext:
+    name = space_name(request)
+    spaces = getattr(request.app.state, "spaces", None)
+    if name == REAL or spaces is None:
+        if name != REAL:
+            raise HTTPException(400, f"unknown space {name!r}")
+        return request.app.state.ctx
+    try:
+        return spaces.get(name)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from None
+
+
+def real(request: Request) -> AppContext:
+    """Backups and restore always concern the real record; practice is never backed up."""
     return request.app.state.ctx
 
 
@@ -60,10 +80,25 @@ def status(request: Request):
         "relation_types": list(RELATION_TYPES),
         "key_backup_done": ledger.meta("key_backup_done") == "1",
         "backup_location": ledger.meta("backup_location"),
-        "backup": c.autobackup.status() if ledger.initialized() else None,
+        # Backups always concern the real record (practice is never backed up).
+        "backup": real(request).autobackup.status() if real(request).ledger.initialized() else None,
         "data_dir": str(c.settings.data_dir),
         "public_key": genesis["public_key"] if genesis else None,
+        "space": space_name(request),
+        "practice_dir": str(request.app.state.spaces.practice_dir),
     }
+
+
+class PracticeResetIn(BaseModel):
+    sample: bool = False  # fill the fresh practice space with the fictional FSF sample
+
+
+@router.post("/practice/reset")
+def practice_reset(body: PracticeResetIn, request: Request):
+    """Start the practice space over. There is no such operation for the real record."""
+    spaces = request.app.state.spaces
+    c = spaces.reset_practice(with_sample=body.sample)
+    return {"space": PRACTICE, "record_count": c.ledger.record_count()}
 
 
 class IdentityIn(BaseModel):
@@ -425,7 +460,7 @@ def create_backup_route(body: BackupIn, request: Request):
     """Download one encrypted backup now (independent of the automatic backups)."""
     from app.services.backup import create_backup
 
-    c = ctx(request)
+    c = real(request)
     try:
         name, data = create_backup(c, body.password)
     except NotInitialized as exc:
@@ -437,7 +472,7 @@ def create_backup_route(body: BackupIn, request: Request):
 
 @router.get("/backup/status")
 def backup_status(request: Request):
-    c = ctx(request)
+    c = real(request)
     if not c.ledger.initialized():
         raise HTTPException(409, "set up the app first")
     return c.autobackup.status()
@@ -447,7 +482,7 @@ def backup_status(request: Request):
 def backup_suggestions(request: Request):
     from app.services.autobackup import suggestions
 
-    return suggestions(ctx(request).settings.data_dir)
+    return suggestions(real(request).settings.data_dir)
 
 
 class BackupSettingsIn(BaseModel):
@@ -461,7 +496,7 @@ def backup_settings(body: BackupSettingsIn, request: Request):
     """Turn on automatic encrypted backups to this folder; writes the first one right away."""
     from app.services.backup import BackupError
 
-    c = ctx(request)
+    c = real(request)
     try:
         return c.autobackup.configure(body.location, body.password, create=body.create)
     except BackupError as exc:
@@ -470,7 +505,7 @@ def backup_settings(body: BackupSettingsIn, request: Request):
 
 @router.post("/backup/run")
 def backup_run(request: Request):
-    c = ctx(request)
+    c = real(request)
     result = c.autobackup.run("manual")
     if not result["ran"]:
         raise HTTPException(400, result["reason"])
@@ -484,7 +519,7 @@ async def restore_route(request: Request, file: Annotated[UploadFile, File()], p
     from app.services.backup import BackupError, restore_backup
     from app.services.verification import report_json, verify_database
 
-    c = ctx(request)
+    c = real(request)
     data = await file.read()
     try:
         summary = await run_in_threadpool(restore_backup, c, data, password)

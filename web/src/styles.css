@@ -202,3 +202,25 @@ ul.files { list-style: none; padding: 0; margin: 6px 0; }
 .legend { display: block; }
 .tabs { align-items: center; }
 .footbar { display: flex; align-items: center; gap: 10px; padding: 5px 16px; border-top: 1px solid var(--line); background: var(--panel); color: var(--muted); }
+
+/* Two spaces (D-038): practice looks clearly different everywhere. */
+[hidden] { display: none !important; }
+.space-switch { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.space-switch button { border: 0; border-radius: 0; padding: 5px 10px; background: #fff; color: var(--muted); font-size: 13px; }
+.space-switch button + button { border-left: 1px solid var(--line); }
+.space-switch button.on { background: var(--accent); color: #fff; }
+.space-practice .space-switch button.on { background: #c26a00; }
+.space-practice .topbar { background: #fff4e3; border-bottom-color: #efc98d; }
+.space-practice .viewbar, .space-practice .footbar { background: #fffaf2; }
+.space-practice .canvas { background: #fffdf8; }
+.space-practice button.primary { background: #c26a00; border-color: #c26a00; }
+.practice-banner { display: flex; align-items: center; gap: 10px; padding: 7px 16px; color: #6b4100; font-size: 14px; border-bottom: 1px solid #efc98d; background: repeating-linear-gradient(-45deg, #ffe8c4, #ffe8c4 12px, #fff1db 12px, #fff1db 24px); }
+.practice-banner .link { margin-left: auto; }
+.practice-note { margin: 0 0 8px; padding: 6px 10px; border-radius: 6px; background: #fff1db; color: #6b4100; font-size: 13px; }
+.confirm-real h2 { margin-top: 0; }
+.summary { display: block; font-size: 14px; margin: 10px 0; border: 1px solid var(--line); border-radius: 8px; padding: 6px 12px; background: #fafbfc; }
+.summary-row { display: grid; grid-template-columns: 130px 1fr; gap: 10px; padding: 5px 0; border-bottom: 1px solid #eef0f3; }
+.summary-row:last-child { border-bottom: 0; }
+.summary dt { color: var(--muted); font-size: 13px; }
+.summary dd { margin: 0; white-space: pre-wrap; word-break: break-word; }
+ul.plain { list-style: none; padding: 0; margin: 0; }

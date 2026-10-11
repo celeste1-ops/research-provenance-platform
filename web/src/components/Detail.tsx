@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { api } from "../api";
+import { api, contentUrl, type Space } from "../api";
 import type { GraphNode, RecordDetail } from "../types";
 import { Changes } from "./Changes";
 import { LaterActions, WithdrawRelation } from "./LaterActions";
@@ -16,11 +16,12 @@ interface Props {
   relationTypes: string[];
   onChanged: () => void;
   activeRelations: Set<string>;
+  space: Space;
 }
 
 // Record detail, split by source with fixed labels:
 // Verified record / Author statement / Later additions / Changes.
-export function Detail({ id, version, onClose, onSelect, entries, relationTypes, onChanged, activeRelations }: Props) {
+export function Detail({ id, version, onClose, onSelect, entries, relationTypes, onChanged, activeRelations, space }: Props) {
   const [detail, setDetail] = useState<RecordDetail | null>(null);
   const [body, setBody] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -93,7 +94,7 @@ export function Detail({ id, version, onClose, onSelect, entries, relationTypes,
               .filter((h) => h.name !== "body.md")
               .map((h) => (
                 <li key={h.name}>
-                  📎 <a href={`/api/records/${detail.id}/content?file=${encodeURIComponent(h.name)}`}>{h.name}</a>{" "}
+                  📎 <a href={contentUrl(detail.id, h.name)}>{h.name}</a>{" "}
                   <span className="muted">({h.size} bytes)</span>
                 </li>
               ))}
@@ -157,7 +158,8 @@ export function Detail({ id, version, onClose, onSelect, entries, relationTypes,
                   {activeRelations.has(`${detail.id}|${a.to}|${a.rel}`) ? (
                     <>
                       {" · "}
-                      <WithdrawRelation from={detail.id} to={a.to} rel={a.rel!} onChanged={onChanged} />
+                      <WithdrawRelation from={detail.id} to={a.to} rel={a.rel!} onChanged={onChanged} space={space}
+                        label={a.text} />
                     </>
                   ) : (
                     <span className="muted small"> · withdrawn later</span>
@@ -201,7 +203,7 @@ export function Detail({ id, version, onClose, onSelect, entries, relationTypes,
       )}
 
       <LaterActions detail={detail} node={entries.find((e) => e.id === detail.id)} entries={entries}
-        relationTypes={relationTypes} onChanged={onChanged} />
+        relationTypes={relationTypes} onChanged={onChanged} space={space} />
     </aside>
   );
 }

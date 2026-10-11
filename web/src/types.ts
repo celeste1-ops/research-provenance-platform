@@ -165,6 +165,8 @@ export interface Status {
   relation_types: string[];
   key_backup_done: boolean;
   backup_location: string | null;
+  space: "real" | "practice";
+  practice_dir: string;
 }
 
 export interface Project {

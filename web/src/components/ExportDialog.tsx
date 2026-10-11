@@ -13,9 +13,10 @@ interface Props {
   rows: TimelineRow[];
   defaultTitle: string;
   onClose: () => void;
+  practice?: boolean;
 }
 
-export function ExportDialog({ rows, defaultTitle, onClose }: Props) {
+export function ExportDialog({ rows, defaultTitle, onClose, practice = false }: Props) {
   const entries = rows.filter((r) => r.kind === "entry");
   const [title, setTitle] = useState(defaultTitle);
   const [levels, setLevels] = useState<Record<string, Level>>(() =>
@@ -72,6 +73,11 @@ export function ExportDialog({ rows, defaultTitle, onClose }: Props) {
           Makes one zip file to send: a web report, a checking program (<code>verify.py</code>) and step-by-step
           instructions. The reader needs neither this app nor trust in you.
         </p>
+        {practice && (
+          <p className="warning">
+            This is practice: the package is signed with the practice key and is not part of your real record.
+          </p>
+        )}
         <p className="note">
           The report uses the formal names: the date stamp is called “Third-party timestamp” and the public stamp
           “Bitcoin anchor”.

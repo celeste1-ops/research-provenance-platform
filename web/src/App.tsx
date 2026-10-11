@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { api } from "./api";
+import { api, setSpace, type Space } from "./api";
 import type { Graph as GraphData, Project, Status, TimelineRow } from "./types";
 import { BackupDialog, BackupPill } from "./components/BackupDialog";
 import { Detail } from "./components/Detail";
@@ -14,7 +14,21 @@ import { Setup } from "./components/Setup";
 import { Timeline } from "./components/Timeline";
 import { HELP, HOME_NOTE } from "./labels";
 
-type Dialog = null | "form" | "export" | "backup" | "key" | "where" | "tech";
+type Dialog = null | "form" | "export" | "backup" | "key" | "where" | "tech" | "practice-reset";
+const SPACE_KEY = "rprov-space";
+
+// Remembered per browser so a reload stays in the same space (a convenience only).
+function initialSpace(): Space {
+  let saved: string | null = null;
+  try {
+    saved = window.localStorage.getItem(SPACE_KEY);
+  } catch {
+    /* storage unavailable */
+  }
+  const space: Space = saved === "practice" ? "practice" : "real";
+  setSpace(space);
+  return space;
+}
 interface Notice {
   text: string;
   action?: { label: string; onClick: () => void };
@@ -22,6 +36,7 @@ interface Notice {
 }
 
 export function App() {
+  const [space, setSpaceState] = useState<Space>(initialSpace);
   const [status, setStatus] = useState<Status | null>(null);
   const [projects, setProjects] = useState<Project[]>([]);
   const [projectId, setProjectId] = useState<string>("");
@@ -53,7 +68,8 @@ export function App() {
     } catch (e) {
       setNotice({ text: (e as Error).message, kind: "error" });
     }
-  }, [projectId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [projectId, space]);
 
   useEffect(() => {
     reload();
@@ -77,8 +93,62 @@ export function App() {
     return () => document.removeEventListener("mousedown", close);
   }, [menuOpen]);
 
+  function switchSpace(next: Space) {
+    if (next === space) return;
+    setSpace(next);
+    try {
+      window.localStorage.setItem(SPACE_KEY, next);
+    } catch {
+      /* storage unavailable */
+    }
+    setMenuOpen(false);
+    setDialog(null);
+    setSelected(null);
+    setGraph(null);
+    setTimeline([]);
+    setProjects([]);
+    setProjectId("");
+    setStatus(null);
+    setSpaceState(next);
+    setNotice(
+      next === "real"
+        ? { text: "You are now in My research. Steps you save here are permanent — they can't be changed or deleted." }
+        : null,
+    );
+  }
+
+  async function resetPractice(sample: boolean) {
+    setDialog(null);
+    setMenuOpen(false);
+    setSelected(null);
+    setNotice({ text: sample ? "Filling practice with the sample research…" : "Starting practice over…" });
+    try {
+      await api.practiceReset(sample);
+      setProjectId("");
+      setGraph(null);
+      setNotice({ text: sample ? "Practice now holds the fictional sample research. Look around freely." : "Practice is empty again." });
+      await reload();
+    } catch (e) {
+      setNotice({ text: (e as Error).message, kind: "error" });
+    }
+  }
+
+  const practice = space === "practice";
+  const spaceSwitch = (
+    <div className="space-switch" role="group" aria-label="Space">
+      <button aria-pressed={!practice} className={!practice ? "on" : ""} onClick={() => switchSpace("real")}
+        data-testid="space-real">
+        My research
+      </button>
+      <button aria-pressed={practice} className={practice ? "on" : ""} onClick={() => switchSpace("practice")}
+        data-testid="space-practice">
+        Practice
+      </button>
+    </div>
+  );
+
   if (!status) return <div className="loading">Loading…</div>;
-  if (!status.initialized) return <Setup onDone={reload} />;
+  if (!status.initialized) return <Setup onDone={reload} onPractice={() => switchSpace("practice")} />;
 
   async function newProject() {
     const title = window.prompt("Name of the new research project");
@@ -117,9 +187,10 @@ export function App() {
   const empty = graph !== null && steps === 0;
 
   return (
-    <div className="app">
+    <div className={`app space-${space}`}>
       <header className="topbar">
         <div className="brand">Research history</div>
+        {spaceSwitch}
         <select value={projectId} onChange={(e) => setProjectId(e.target.value)} aria-label="Project">
           {projects.length === 0 && <option value="">No project</option>}
           {projects.map((p) => (
@@ -135,7 +206,7 @@ export function App() {
           {steps} {steps === 1 ? "step" : "steps"}
         </span>
         <div className="spacer" />
-        <BackupPill status={status.backup} onClick={() => setDialog("backup")} />
+        {!practice && <BackupPill status={status.backup} onClick={() => setDialog("backup")} />}
         <span className="with-help">
           <button className="secondary" onClick={() => setDialog("export")} disabled={steps === 0}>
             Share
@@ -156,15 +227,31 @@ export function App() {
           {menuOpen && (
             <div className="menu" role="menu">
               <button role="menuitem" onClick={checkProofs}>Check stamps now</button>
-              <button role="menuitem" onClick={() => openMenuItem("backup")}>Backup…</button>
+              {!practice && <button role="menuitem" onClick={() => openMenuItem("backup")}>Backup…</button>}
               <button role="menuitem" onClick={() => openMenuItem("where")}>Where is my data?</button>
               <hr />
               <button role="menuitem" onClick={() => openMenuItem("tech")}>Technical details</button>
-              <button role="menuitem" onClick={() => openMenuItem("key")}>Back up signing key only…</button>
+              {!practice && (
+                <button role="menuitem" onClick={() => openMenuItem("key")}>Back up signing key only…</button>
+              )}
+              {practice && (
+                <>
+                  <button role="menuitem" onClick={() => openMenuItem("practice-reset")}>Start practice over…</button>
+                  <button role="menuitem" onClick={() => resetPractice(true)}>Fill practice with sample research</button>
+                </>
+              )}
             </div>
           )}
         </div>
       </header>
+      {practice && (
+        <div className="practice-banner" data-testid="practice-banner">
+          <b>Practice:</b> nothing here goes into your real record. Try anything.
+          <button className="link small" onClick={() => switchSpace("real")}>
+            Back to My research
+          </button>
+        </div>
+      )}
       {btcOff && (
         <div className="banner muted small">Public stamp (Bitcoin): off. Date stamps are on.</div>
       )}
@@ -217,6 +304,8 @@ export function App() {
               backup={status.backup}
               onAdd={openForm}
               onBackup={() => setDialog("backup")}
+              space={space}
+              onSample={() => resetPractice(true)}
             />
           ) : view === "timeline" ? (
             <Timeline rows={timeline} onSelect={setSelected} />
@@ -236,6 +325,7 @@ export function App() {
             relationTypes={status.relation_types}
             onChanged={reload}
             activeRelations={new Set((graph?.edges ?? []).filter((e) => e.active).map((e) => `${e.to}|${e.from}|${e.rel}`))}
+            space={space}
           />
         )}
       </main>
@@ -254,13 +344,16 @@ export function App() {
               relationTypes={status.relation_types}
               existing={graph.nodes}
               initialType={formType}
+              space={space}
               onCancel={() => setDialog(null)}
               onCreated={async (id) => {
                 setDialog(null);
                 setSelected(id);
                 await reload();
                 const b = (await api.status()).backup;
-                if (b?.state === "ok") {
+                if (practice) {
+                  setNotice({ text: "Saved in practice. It is not part of your real record." });
+                } else if (b?.state === "ok") {
                   setNotice({ text: "Saved. It gets its date stamp in a few seconds and goes into the next automatic backup." });
                 } else {
                   setNotice({
@@ -301,7 +394,27 @@ export function App() {
         <TechnicalDetails status={status} onClose={() => setDialog(null)} onKeyBackup={() => setDialog("key")} />
       )}
       {dialog === "export" && (
-        <ExportDialog rows={timeline} defaultTitle={project?.title ?? "evidence"} onClose={() => setDialog(null)} />
+        <ExportDialog rows={timeline} defaultTitle={project?.title ?? "evidence"} onClose={() => setDialog(null)}
+          practice={practice} />
+      )}
+      {dialog === "practice-reset" && (
+        <div className="modal-backdrop" role="dialog" aria-modal="true" aria-label="Start practice over">
+          <div className="modal" data-testid="practice-reset">
+            <h2>Start practice over?</h2>
+            <p>
+              All practice steps and the practice signing key are thrown away and you get an empty practice space.
+              Your real record is not touched.
+            </p>
+            <div className="actions">
+              <button className="secondary" onClick={() => setDialog(null)}>
+                Cancel
+              </button>
+              <button className="primary" onClick={() => resetPractice(false)}>
+                Start over
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

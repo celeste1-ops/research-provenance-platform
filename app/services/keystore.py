@@ -33,6 +33,10 @@ class KeyStore(ABC):
     @abstractmethod
     def save(self, installation: str, key: Ed25519PrivateKey) -> None: ...
 
+    # Only used to throw away a practice space (DECISIONS D-038); never for the real key.
+    @abstractmethod
+    def delete(self, installation: str) -> None: ...
+
     # Small secrets (the backup password used for automatic encrypted backups).
     @abstractmethod
     def load_secret(self, name: str) -> str | None: ...
@@ -60,6 +64,14 @@ class KeyringKeyStore(KeyStore):
     def save(self, installation: str, key: Ed25519PrivateKey) -> None:
         self._keyring.set_password(KEYRING_SERVICE, installation, private_key_raw(key).hex())
 
+    def delete(self, installation: str) -> None:
+        from keyring.errors import PasswordDeleteError
+
+        try:
+            self._keyring.delete_password(KEYRING_SERVICE, installation)
+        except PasswordDeleteError:
+            pass
+
     def load_secret(self, name: str) -> str | None:
         return self._keyring.get_password(KEYRING_SECRET_SERVICE, name)
 
@@ -85,6 +97,9 @@ class MemoryKeyStore(KeyStore):
     def save(self, installation: str, key: Ed25519PrivateKey) -> None:
         self._keys[installation] = private_key_raw(key)
 
+    def delete(self, installation: str) -> None:
+        self._keys.pop(installation, None)
+
 
 class DevInsecureFileKeyStore(KeyStore):
     """Development only: key in a 0600 file inside the data directory."""
@@ -105,6 +120,10 @@ class DevInsecureFileKeyStore(KeyStore):
         fd = os.open(self.path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
         with os.fdopen(fd, "w") as fh:
             fh.write(f"{installation}:{private_key_raw(key).hex()}\n")
+
+    def delete(self, installation: str) -> None:
+        if self.load(installation) is not None:
+            self.path.unlink()
 
     def _secret_path(self, name: str) -> Path:
         safe = "".join(c if c.isalnum() or c in "-_." else "_" for c in name)

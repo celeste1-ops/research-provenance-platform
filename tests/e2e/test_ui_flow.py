@@ -35,6 +35,17 @@ def _new_record(page, node_type_label: str, title: str, body: str | None = None)
         _type_body(page, body)
 
 
+def _save_to_real_record(page) -> str:
+    """Saving into the real record asks first and lists what will be saved; returns that summary."""
+    page.get_by_test_id("submit-record").click()
+    confirm = page.get_by_test_id("confirm-real")
+    confirm.wait_for()
+    text = confirm.inner_text()
+    assert "can't be changed or deleted" in text
+    confirm.get_by_role("button", name="Save to my record").click()
+    return text
+
+
 def _sections(page) -> dict[str, str]:
     return {
         name: page.get_by_test_id(f"section-{name}").inner_text()
@@ -61,7 +72,13 @@ def test_p0_flow_in_the_browser(tmp_path, browser):
 
         # 3–5. Record an idea; both proofs appear separately within a second.
         _new_record(page, "Idea", "First formula", "E = m c^2")
+        # "Go back" returns to the unchanged form; nothing is saved yet.
         page.get_by_test_id("submit-record").click()
+        page.get_by_test_id("confirm-real").get_by_role("button", name="Go back").click()
+        assert page.get_by_test_id("record-form").locator("input[name=title]").input_value() == "First formula"
+        assert srv.ctx.ledger.record_count() == 1
+        summary = _save_to_real_record(page)
+        assert "First formula" in summary and "E = m c^2" in summary and "Idea" in summary
         detail = page.get_by_test_id("detail")
         detail.wait_for()
         verified = page.get_by_test_id("section-verified")
@@ -100,7 +117,9 @@ def test_p0_flow_in_the_browser(tmp_path, browser):
         form.get_by_label("Mark as a key step").check()
         form.get_by_label("This is older material I'm adding now").check()
         form.get_by_placeholder("Claimed date: 2025, 2025-11 or 2025-11-03").fill("2025-11")
-        page.get_by_test_id("submit-record").click()
+        summary = _save_to_real_record(page)
+        assert "Connected to" in summary and "First formula" in summary
+        assert "the experiment failed" in summary and "Key step" in summary and "2025-11" in summary
         page.get_by_test_id("section-author").get_by_text("the experiment failed").wait_for()
 
         page.get_by_test_id("section-verified").locator(".proof-line").nth(1).wait_for()
@@ -144,7 +163,7 @@ def test_p0_flow_in_the_browser(tmp_path, browser):
         form.get_by_placeholder("Commit hash").fill("0123abcd")
         assert form.get_by_text("External reference, code content not saved").is_visible()
         assert form.get_by_text("Saved steps can't be edited later").is_visible()
-        page.get_by_test_id("submit-record").click()
+        assert "0123abcd" in _save_to_real_record(page)
         page.get_by_test_id("section-verified").get_by_text("External reference, code content not saved").wait_for()
 
         # 8. Export with preview, then verify the downloaded bundle independently.

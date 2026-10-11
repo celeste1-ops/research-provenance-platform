@@ -4,7 +4,7 @@ import { HOME_NOTE } from "../labels";
 import { BackupSetup, RestoreForm } from "./BackupDialog";
 
 // First run: (1) your name + first project, (2) automatic backup. Or restore instead.
-export function Setup({ onDone }: { onDone: () => void }) {
+export function Setup({ onDone, onPractice }: { onDone: () => void; onPractice: () => void }) {
   const [step, setStep] = useState<"welcome" | "backup" | "restore">("welcome");
   const [label, setLabel] = useState("");
   const [project, setProject] = useState("");
@@ -66,6 +66,13 @@ export function Setup({ onDone }: { onDone: () => void }) {
                 key — not who you are.
               </p>
             </form>
+            <p className="small center">
+              Just want to try it first?{" "}
+              <button type="button" className="link" onClick={onPractice} data-testid="setup-practice">
+                Open the practice space
+              </button>{" "}
+              <span className="muted">— nothing there goes into your real record.</span>
+            </p>
             <p className="small center">
               Already used this app on another Mac?{" "}
               <button type="button" className="link" onClick={() => setStep("restore")}>

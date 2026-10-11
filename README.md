@@ -69,7 +69,11 @@ make run              # 打开 http://127.0.0.1:8765
 
 只想单独备份签名钥匙：**Settings → Back up signing key only…**（完整备份里已经包含钥匙）。
 
-**想先看看样例？** `make demo && make run` 会把虚构的 FSF 样例（14 条记录，9 种类型，3 种关系，里程碑、后来补加的关系、补充说明、L1/L2 导入、撤回）载入一个空的数据目录。记录不能删除，所以开始记真实材料之前，把样例挪开：`mv ~/.rprov ~/.rprov-demo`（以后用 `RPROV_HOME=~/.rprov-demo make run` 再看样例）。也可以一开始就 `RPROV_HOME=~/.rprov-demo make demo`。
+**先练习，再记正式的。** 记录一旦存下就删不掉，所以页面顶部有一个开关：**My research**（正式记录）/ **Practice**（练习空间）。练习空间是完全分开的另一套数据和签名钥匙（放在 `~/.rprov/practice/`），顶栏变成橙色，并一直显示「Practice: nothing here goes into your real record」；在那里保存直接存，按钮写 **Save practice step**。练习空间不备份，可以在 **Settings → Start practice over…** 清空重来，或者 **Fill practice with sample research** 放进虚构的 FSF 样例随便看。第一次打开时也可以先点「Open the practice space」。
+
+**存进正式记录前会再确认一次。** 在 My research 里点 **Save step**，会弹出「Save this step to your real record?」，列出类型、标题、正文开头、附件、和哪一步有关、你写的原因，提醒「存进去以后不能修改也不能删除，只能补充或撤回」。点 **Save to my record** 才真正存入，点 **Go back** 回去接着改。后来补关系、标关键一步、补说明、撤回，也都会先确认。从练习切回正式记录时会提醒一次。
+
+**想在命令行里另开一份样例？** `make demo && make run` 会把虚构的 FSF 样例（14 条记录，9 种类型，3 种关系，里程碑、后来补加的关系、补充说明、L1/L2 导入、撤回）载入一个空的数据目录。记录不能删除，所以开始记真实材料之前，把样例挪开：`mv ~/.rprov ~/.rprov-demo`（以后用 `RPROV_HOME=~/.rprov-demo make run` 再看样例）。也可以一开始就 `RPROV_HOME=~/.rprov-demo make demo`。
 
 数据都在 `~/.rprov/`（权限 0700）。原文、附件、标题、说明都不离开本机；对外只发送时间证明所需的哈希（记录 ID），时间证明服务能看到请求的 IP 地址和时间。没有账号，没有我们的云服务，没有任何统计或崩溃上报。自动备份只是往你选的本地文件夹里写一个加密文件；如果那个文件夹被你自己的 iCloud / Dropbox 同步，离开电脑的也只是这个打不开的加密文件（见 DECISIONS D-033）。
 

@@ -33,11 +33,21 @@ export function WhereIsMyData({ status, onClose, onBackup }: { status: Status; o
           <button className="link" onClick={onClose} aria-label="Close">✕</button>
         </div>
         <h3>Your research stays on this Mac</h3>
-        <p className="small">
-          Everything you add — text, files, links between steps — is stored here: <span className="mono">{status.data_dir}</span>.
-          The page you are looking at is served by this Mac to itself; nobody else can open it.
-        </p>
-        <h3>Backups bring it back</h3>
+        {status.space === "practice" ? (
+          <p className="small">
+            You are in the <b>practice space</b>. It is kept apart from your real record, in{" "}
+            <span className="mono">{status.data_dir}</span>, with its own signing key. It is never backed up and can
+            be started over from Settings.
+          </p>
+        ) : (
+          <p className="small">
+            Everything you add — text, files, links between steps — is stored here:{" "}
+            <span className="mono">{status.data_dir}</span>. The page you are looking at is served by this Mac to
+            itself; nobody else can open it. Practice steps are kept apart, in{" "}
+            <span className="mono">{status.practice_dir}</span>.
+          </p>
+        )}
+        <h3>Backups bring it back{status.space === "practice" ? " (for your real record)" : ""}</h3>
         {b?.configured ? (
           <p className="small">
             Automatic encrypted backups go to <span className="mono">{b.location}</span> ({b.where?.label}); last one{" "}

@@ -15,28 +15,34 @@ from app.api.routes import router
 from app.api.security import LocalOnlyMiddleware
 from app.config import Settings
 from app.services.context import AppContext
+from app.services.spaces import Spaces
 
 log = logging.getLogger("rprov")
 
 
 def create_app(ctx: AppContext, *, start_jobs: bool = False) -> FastAPI:
+    spaces = Spaces(ctx)
+
     @asynccontextmanager
     async def lifespan(app: FastAPI):
         scheduler = None
         if start_jobs:
             from app.jobs.scheduler import AnchorScheduler
 
-            scheduler = AnchorScheduler(ctx.anchors, after=lambda: ctx.autobackup.maybe_run("hourly"))
+            # Stamps are checked in both spaces; only the real record is backed up.
+            scheduler = AnchorScheduler(spaces, after=lambda: ctx.autobackup.maybe_run("hourly"))
             scheduler.start()
         try:
             yield
         finally:
             if scheduler is not None:
                 scheduler.stop()
+            spaces.close()
 
     app = FastAPI(title="Research provenance (local)", docs_url=None, redoc_url=None, openapi_url=None,
                   lifespan=lifespan)
     app.state.ctx = ctx
+    app.state.spaces = spaces
     app.add_middleware(
         LocalOnlyMiddleware,
         allowed_hosts=ctx.settings.allowed_hosts(),

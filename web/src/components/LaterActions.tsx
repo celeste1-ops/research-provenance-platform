@@ -1,6 +1,7 @@
 import { useState } from "react";
-import { api } from "../api";
+import { api, type Space } from "../api";
 import type { GraphNode, RecordDetail } from "../types";
+import { ConfirmRealModal, type SummaryItem } from "./Confirm";
 
 const REL_LABELS: Record<string, string> = { revises: "revises", derived_from: "derived from", uses: "uses" };
 
@@ -10,12 +11,20 @@ interface Props {
   entries: GraphNode[];
   relationTypes: string[];
   onChanged: () => void;
+  space: Space;
+}
+
+interface Pending {
+  title: string;
+  items: SummaryItem[];
+  action: () => Promise<unknown>;
 }
 
 type Mode = null | "relation" | "statement" | "retract";
 
 // Append-only actions: each one adds a new, separately signed and time-stamped record.
-export function LaterActions({ detail, node, entries, relationTypes, onChanged }: Props) {
+export function LaterActions({ detail, node, entries, relationTypes, onChanged, space }: Props) {
+  const [pending, setPending] = useState<Pending | null>(null);
   const [mode, setMode] = useState<Mode>(null);
   const [rel, setRel] = useState(relationTypes[0] ?? "revises");
   const [target, setTarget] = useState("");
@@ -28,11 +37,19 @@ export function LaterActions({ detail, node, entries, relationTypes, onChanged }
   const older = entries.filter((e) => e.seq < detail.seq);
   const statements = detail.later.items.filter((l) => l.kind === "statement");
 
-  async function run(fn: () => Promise<unknown>) {
+  // In the real record every action is permanent, so it is confirmed first; practice runs directly.
+  function run(fn: () => Promise<unknown>, title: string, items: SummaryItem[] = []) {
+    setError(null);
+    if (space === "practice") void execute(fn);
+    else setPending({ title, items, action: fn });
+  }
+
+  async function execute(fn: () => Promise<unknown>) {
     setBusy(true);
     setError(null);
     try {
       await fn();
+      setPending(null);
       setMode(null);
       setText("");
       setTarget("");
@@ -53,7 +70,12 @@ export function LaterActions({ detail, node, entries, relationTypes, onChanged }
           Add relation…
         </button>
         <button className="secondary small" disabled={busy}
-          onClick={() => run(() => api.createMilestone(detail.id, node?.milestone ? "unset" : "set"))}>
+          onClick={() =>
+            run(
+              () => api.createMilestone(detail.id, node?.milestone ? "unset" : "set"),
+              node?.milestone ? `Unmark “${detail.verified.title}” as a key step?` : `Mark “${detail.verified.title}” as a key step?`,
+            )
+          }>
           {node?.milestone ? "Unmark key step" : "Mark as key step"}
         </button>
         <button className="secondary small" onClick={() => setMode(mode === "statement" ? null : "statement")}>
@@ -84,7 +106,19 @@ export function LaterActions({ detail, node, entries, relationTypes, onChanged }
           <textarea placeholder="Why? (optional, shown as an author statement)" value={text}
             onChange={(e) => setText(e.target.value)} rows={2} />
           <button className="primary small" disabled={busy || !target}
-            onClick={() => run(() => api.createLink({ from: detail.id, to: target, rel, statement: text || undefined }))}>
+            onClick={() =>
+              run(
+                () => api.createLink({ from: detail.id, to: target, rel, statement: text || undefined }),
+                "Add this link to your real record?",
+                [
+                  {
+                    label: "Link",
+                    value: `“${detail.verified.title}” ${REL_LABELS[rel] ?? rel} “${older.find((e) => e.id === target)?.title ?? ""}”`,
+                  },
+                  ...(text.trim() ? [{ label: "Why", value: text }] : []),
+                ],
+              )
+            }>
             Add relation
           </button>
         </div>
@@ -101,7 +135,12 @@ export function LaterActions({ detail, node, entries, relationTypes, onChanged }
             </select>
           )}
           <button className="primary small" disabled={busy || !text.trim()}
-            onClick={() => run(() => api.createStatement(detail.id, text, corrects || undefined))}>
+            onClick={() =>
+              run(() => api.createStatement(detail.id, text, corrects || undefined), "Add this note to your real record?", [
+                { label: "On", value: detail.verified.title },
+                { label: "Note", value: text },
+              ])
+            }>
             Add statement
           </button>
         </div>
@@ -111,32 +150,75 @@ export function LaterActions({ detail, node, entries, relationTypes, onChanged }
           <textarea placeholder="Reason for retracting (shown as an author statement)" value={text}
             onChange={(e) => setText(e.target.value)} rows={2} />
           <button className="primary small" disabled={busy || !text.trim()}
-            onClick={() => run(() => api.createRetraction(detail.id, text))}>
+            onClick={() =>
+              run(() => api.createRetraction(detail.id, text), `Retract “${detail.verified.title}”?`, [
+                { label: "Reason", value: text },
+              ])
+            }>
             Retract this entry
           </button>
         </div>
       )}
-      {error && <p className="error small">{error}</p>}
+      {error && !pending && <p className="error small">{error}</p>}
+      {pending && (
+        <ConfirmRealModal
+          title={pending.title}
+          items={pending.items}
+          confirmLabel="Add to my record"
+          busy={busy}
+          error={error}
+          onConfirm={() => void execute(pending.action)}
+          onCancel={() => setPending(null)}
+        />
+      )}
       <p className="note">Each action is added as a new entry with its own signature and stamps. Nothing already saved is changed.</p>
     </section>
   );
 }
 
-export function WithdrawRelation({ from, to, rel, onChanged }: { from: string; to: string; rel: string; onChanged: () => void }) {
+export function WithdrawRelation({ from, to, rel, onChanged, space, label }: {
+  from: string;
+  to: string;
+  rel: string;
+  onChanged: () => void;
+  space: Space;
+  label: string;
+}) {
   const [busy, setBusy] = useState(false);
+  const [asking, setAsking] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function withdraw() {
+    setBusy(true);
+    setError(null);
+    try {
+      await api.createLink({ from, to, rel, op: "withdraw" });
+      setAsking(false);
+      onChanged();
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
-    <button className="link small" disabled={busy} title="Adds a new record that withdraws this relation"
-      onClick={async () => {
-        if (!window.confirm("Withdraw this relation? A new record is added; the original stays visible as withdrawn.")) return;
-        setBusy(true);
-        try {
-          await api.createLink({ from, to, rel, op: "withdraw" });
-          onChanged();
-        } finally {
-          setBusy(false);
-        }
-      }}>
-      withdraw
-    </button>
+    <>
+      <button className="link small" disabled={busy} title="Adds a new entry that withdraws this link"
+        onClick={() => (space === "practice" ? void withdraw() : setAsking(true))}>
+        withdraw
+      </button>
+      {asking && (
+        <ConfirmRealModal
+          title="Withdraw this link?"
+          items={[{ label: "Link", value: label }]}
+          confirmLabel="Withdraw it"
+          busy={busy}
+          error={error}
+          onConfirm={() => void withdraw()}
+          onCancel={() => setAsking(false)}
+        />
+      )}
+    </>
   );
 }

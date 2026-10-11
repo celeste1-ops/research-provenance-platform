@@ -255,3 +255,22 @@ verification rules or what leaves the machine for time proofs.
   `verify.py` and the API's `text` field keep the formal names unchanged, because they are
   read by third parties and the evidence bundle must not change. Other plain words: "Add a
   step", "Map", "List", "Key steps only" (milestone), "Share", "Settings" (was "⋯").
+- **D-038 · Practice space and confirmation before saving to the real record.** Records
+  can never be removed (rule 1), so a new user trying the app would leave test steps in
+  their real record forever. The app therefore has a second, completely separate space,
+  **Practice**, one click away in the top bar (and on the first screen). It is its own
+  installation in `<data folder>/practice`: own database, own files, own signing key (a new
+  installation ID, so a separate keychain item), own genesis record labelled "<name>
+  (practice)". Practice steps get the same stamps as real ones (only hashes leave, as
+  always), so practice looks exactly like the real thing; it is never backed up. Practice
+  can be started over or filled with the fictional FSF sample; that deletes the practice
+  folder and its key — the only delete anywhere in the app, never offered for the real
+  record. Each request names its space in a header (or `?space=` on plain links) and goes
+  to the real record otherwise, so a tab always saves where it says it saves. Practice is
+  marked everywhere (orange top bar, striped banner "Practice: nothing here goes into your
+  real record", "Save practice step"). In the real record, saving a step — and every later
+  action (key step, link, note, retraction, withdrawing a link) — first shows exactly what
+  will be saved and that it can't be changed or deleted afterwards ("Save to my record" /
+  "Go back"). Switching from practice to the real record shows that reminder once. This
+  adds no accounts and changes nothing about records, signatures, stamps, verification or
+  the evidence bundle.

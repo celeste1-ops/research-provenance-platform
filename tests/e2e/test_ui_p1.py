@@ -70,10 +70,16 @@ def test_changes_and_later_actions(demo_page):
     before = srv.ctx.ledger.record_count()
     actions = page.get_by_test_id("later-actions")
     actions.get_by_role("button", name="Mark as key step").click()
+    confirm = page.get_by_test_id("confirm-real")
+    assert "Mark “Formula v2” as a key step?" in confirm.inner_text()
+    confirm.get_by_role("button", name="Add to my record").click()
     actions.get_by_role("button", name="Unmark key step").wait_for()
     actions.get_by_role("button", name="Add statement…").click()
     actions.get_by_placeholder("Additional note or correction").fill("The 0.2 slope is a rough first guess.")
     actions.get_by_role("button", name="Add statement", exact=True).click()
+    confirm = page.get_by_test_id("confirm-real")
+    assert "The 0.2 slope is a rough first guess." in confirm.inner_text()
+    confirm.get_by_role("button", name="Add to my record").click()
     page.get_by_test_id("section-later").get_by_text("The 0.2 slope is a rough first guess.").wait_for()
     assert srv.ctx.ledger.record_count() == before + 2
     later = page.get_by_test_id("section-later").inner_text()
@@ -202,6 +208,7 @@ def test_empty_state_and_help_panels(tmp_path, browser):
         assert form.get_by_role("button", name="+ Connect to an earlier step").is_disabled()
         form.locator("input[name=title]").fill("Run 1")
         page.get_by_test_id("submit-record").click()
+        page.get_by_test_id("confirm-save").click()
         page.get_by_test_id("detail").wait_for()
         wait_for_step_count(page, "1 step")
         assert srv.ctx.ledger.record_count() == 2  # genesis + the step; only the step is counted
@@ -244,4 +251,71 @@ def test_empty_state_and_help_panels(tmp_path, browser):
         tech = page.get_by_test_id("technical-details")
         assert srv.ctx.ledger.installation in tech.inner_text()
         assert "2 — 1 research step, plus" in tech.inner_text()
+        page.close()
+
+
+def test_practice_space(tmp_path, browser):
+    """Practice: separate, clearly marked, saves without asking; the real record is untouched."""
+    with LiveServer(tmp_path) as srv:
+        srv.ctx.ledger.init_identity("Ada")
+        srv.ctx.ledger.create_project("FSF")
+        real_count = srv.ctx.ledger.record_count()
+        page = browser.new_page(viewport={"width": 1400, "height": 900})
+        page.goto(srv.url)
+        page.get_by_test_id("empty-state").wait_for()
+        assert page.get_by_test_id("practice-banner").count() == 0
+
+        page.get_by_test_id("space-practice").click()
+        banner = page.get_by_test_id("practice-banner")
+        banner.wait_for()
+        assert "nothing here goes into your real record" in banner.inner_text()
+        assert "space-practice" in (page.locator(".app").get_attribute("class") or "")
+        assert page.get_by_test_id("backup-pill").count() == 0  # practice is never backed up
+        assert page.get_by_label("Project").locator("option:checked").inner_text() == "Practice project"
+
+        page.get_by_test_id("start-idea").click()
+        form = page.get_by_test_id("record-form")
+        assert "Practice: this does not go into your real record." in form.inner_text()
+        form.locator("input[name=title]").fill("Scratch idea")
+        form.get_by_role("button", name="Save practice step").click()
+        page.get_by_test_id("detail").wait_for()  # saved straight away, no confirmation
+        assert page.get_by_test_id("confirm-real").count() == 0
+        wait_for_step_count(page, "1 step")
+        assert srv.ctx.ledger.record_count() == real_count
+
+        # Reloading keeps the space; the Settings menu offers practice-only actions.
+        page.reload()
+        page.get_by_test_id("practice-banner").wait_for()
+        wait_for_step_count(page, "1 step")
+        page.get_by_test_id("settings-menu").click()
+        items = [i.inner_text() for i in page.get_by_role("menuitem").all()]
+        assert "Backup…" not in items and "Start practice over…" in items
+        page.get_by_role("menuitem", name="Start practice over…").click()
+        page.get_by_test_id("practice-reset").get_by_role("button", name="Start over").click()
+        page.get_by_test_id("empty-state").wait_for()
+        wait_for_step_count(page, "0 steps")
+
+        page.get_by_test_id("practice-sample").click()
+        page.get_by_test_id("graph").locator(".record-node").nth(13).wait_for()
+        wait_for_step_count(page, "14 steps")
+        assert srv.ctx.ledger.record_count() == real_count
+
+        # Back to the real record: a reminder that saving there is permanent.
+        page.get_by_test_id("space-real").click()
+        page.get_by_test_id("notice").get_by_text("Steps you save here are permanent").wait_for()
+        page.get_by_test_id("empty-state").wait_for()
+        assert page.get_by_test_id("practice-banner").count() == 0
+        wait_for_step_count(page, "0 steps")
+        page.close()
+
+
+def test_practice_before_setting_up(tmp_path, browser):
+    with LiveServer(tmp_path) as srv:
+        page = browser.new_page(viewport={"width": 1400, "height": 900})
+        page.goto(srv.url)
+        page.get_by_test_id("setup-practice").click()
+        page.get_by_test_id("practice-banner").wait_for()
+        assert not srv.ctx.ledger.initialized()
+        page.get_by_test_id("space-real").click()
+        page.get_by_placeholder("Name or pen name").wait_for()  # the real record is still to be set up
         page.close()

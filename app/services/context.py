@@ -69,6 +69,7 @@ class AppContext:
         *,
         keystore: KeyStore | None = None,
         providers: dict[str, TimestampProvider | None] | None = None,
+        backups: bool = True,
     ) -> AppContext:
         settings.ensure_data_dir()
         engine = make_engine(settings.db_path)
@@ -82,7 +83,8 @@ class AppContext:
         from app.services.autobackup import AutoBackup
 
         ctx.autobackup = AutoBackup(ctx)
-        ledger.listeners.append(ctx.autobackup.schedule)
+        if backups:  # the practice space is never backed up
+            ledger.listeners.append(ctx.autobackup.schedule)
         return ctx
 
     def close(self) -> None:

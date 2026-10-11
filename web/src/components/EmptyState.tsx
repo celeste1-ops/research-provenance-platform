@@ -1,3 +1,4 @@
+import type { Space } from "../api";
 import { HOME_NOTE } from "../labels";
 import type { BackupStatus } from "../types";
 
@@ -19,17 +20,37 @@ export function EmptyState({
   backup,
   onAdd,
   onBackup,
+  space,
+  onSample,
 }: {
   projectTitle: string;
   backup: BackupStatus | null;
   onAdd: (type?: string) => void;
   onBackup: () => void;
+  space: Space;
+  onSample: () => void;
 }) {
+  const practice = space === "practice";
   return (
     <div className="empty-state" data-testid="empty-state">
       <div className="card wide">
-        <h1>Record the first step of {projectTitle}</h1>
-        <p className="lead">Build a verifiable history of how this research develops.</p>
+        {practice ? (
+          <>
+            <h1>Try it out here</h1>
+            <p className="lead">
+              This is the practice space: add a few steps, link them, share them — nothing here goes into your real
+              record.{" "}
+              <button className="link" onClick={onSample} data-testid="practice-sample">
+                Or fill it with sample research to look around
+              </button>
+            </p>
+          </>
+        ) : (
+          <>
+            <h1>Record the first step of {projectTitle}</h1>
+            <p className="lead">Build a verifiable history of how this research develops.</p>
+          </>
+        )}
         <div className="field-label">What are you adding?</div>
         <div className="type-grid">
           {STEP_TYPES.map((t) => (
@@ -54,7 +75,7 @@ export function EmptyState({
           </li>
         </ol>
         <p className="note" data-testid="home-note-empty">{HOME_NOTE}</p>
-        {backup?.state !== "ok" && (
+        {!practice && backup?.state !== "ok" && (
           <div className="callout">
             {backup?.state === "same-disk" ? (
               <>Your backup folder is on this Mac only, so it won't help if the Mac is lost.</>

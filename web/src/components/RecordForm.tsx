@@ -1,6 +1,7 @@
 import { useState } from "react";
-import { api } from "../api";
+import { api, type Space } from "../api";
 import type { GraphNode } from "../types";
+import { ConfirmReal, type SummaryItem } from "./Confirm";
 import { TYPE_LABELS } from "../labels";
 import { MarkdownEditor } from "./MarkdownEditor";
 
@@ -18,6 +19,7 @@ interface Props {
   onCreated: (id: string) => void;
   onCancel: () => void;
   initialType?: string;
+  space: Space;
 }
 
 interface Rel {
@@ -25,7 +27,9 @@ interface Rel {
   rel: string;
 }
 
-export function RecordForm({ projectId, nodeTypes, relationTypes, existing, onCreated, onCancel, initialType }: Props) {
+export function RecordForm({ projectId, nodeTypes, relationTypes, existing, onCreated, onCancel, initialType, space }: Props) {
+  const practice = space === "practice";
+  const [confirming, setConfirming] = useState(false);
   const [nodeType, setNodeType] = useState(initialType ?? "");
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
@@ -51,8 +55,45 @@ export function RecordForm({ projectId, nodeTypes, relationTypes, existing, onCr
     if (list) setFiles((f) => [...f, ...Array.from(list)]);
   }
 
-  async function submit(e: React.FormEvent) {
+  function submit(e: React.FormEvent) {
     e.preventDefault();
+    setError(null);
+    // The real record is permanent: show exactly what will be saved first. Practice saves directly.
+    if (practice) save();
+    else setConfirming(true);
+  }
+
+  function summary(): SummaryItem[] {
+    const items: SummaryItem[] = [
+      { label: "Type", value: TYPE_LABELS[nodeType] ?? nodeType },
+      { label: "Title", value: title },
+    ];
+    if (body.trim()) items.push({ label: "Text", value: body.length > 280 ? `${body.slice(0, 280)}…` : body });
+    if (files.length) items.push({ label: "Files", value: files.map((f) => f.name).join(", ") });
+    if (nodeType === "code" && (repoUrl || commit)) items.push({ label: "Code reference", value: `${repoUrl} ${commit}`.trim() });
+    if (nodeType === "publication" && pubRef.trim()) items.push({ label: pubKind.toUpperCase(), value: pubRef.trim() });
+    const rels = relations.filter((r) => r.to && r.rel);
+    if (rels.length)
+      items.push({
+        label: "Connected to",
+        value: (
+          <ul className="plain">
+            {rels.map((r, i) => (
+              <li key={i}>
+                {REL_LABELS[r.rel] ?? r.rel} “{existing.find((n) => n.id === r.to)?.title ?? r.to.slice(0, 10)}”
+              </li>
+            ))}
+          </ul>
+        ),
+      });
+    if (why.trim()) items.push({ label: "Why", value: why });
+    if (milestone) items.push({ label: "Key step", value: "yes" });
+    if (isImport && claimedDate.trim())
+      items.push({ label: "Older material", value: `claimed date ${claimedDate.trim()} (${level})` });
+    return items;
+  }
+
+  async function save() {
     setError(null);
     setBusy(true);
     const form = new FormData();
@@ -89,8 +130,20 @@ export function RecordForm({ projectId, nodeTypes, relationTypes, existing, onCr
   }
 
   return (
-    <form className="record-form" onSubmit={submit} data-testid="record-form">
-      <h2>Add a step</h2>
+    <>
+    {confirming && (
+      <ConfirmReal
+        title="Save this step to your real record?"
+        items={summary()}
+        busy={busy}
+        error={error}
+        onConfirm={save}
+        onCancel={() => setConfirming(false)}
+      />
+    )}
+    <form className="record-form" onSubmit={submit} data-testid="record-form" hidden={confirming}>
+      <h2>{practice ? "Add a practice step" : "Add a step"}</h2>
+      {practice && <p className="practice-note">Practice: this does not go into your real record.</p>}
       <fieldset className="types">
         <legend>What kind of step is it?</legend>
         {nodeTypes.map((t) => (
@@ -248,12 +301,15 @@ export function RecordForm({ projectId, nodeTypes, relationTypes, existing, onCr
           Cancel
         </button>
         <button className="primary" disabled={busy || !nodeType || !title.trim()} data-testid="submit-record">
-          Save step
+          {practice ? "Save practice step" : "Save step"}
         </button>
       </div>
       <p className="note center">
-        Saved steps can't be edited later — changes are added as new steps or notes, so the history stays honest.
+        {practice
+          ? "Practice steps work like real ones, but they stay in the practice space and can be thrown away."
+          : "Saved steps can't be edited later — changes are added as new steps or notes, so the history stays honest."}
       </p>
     </form>
+    </>
   );
 }

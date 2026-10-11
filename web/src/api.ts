@@ -15,6 +15,29 @@ function sessionToken(): string {
   return meta?.getAttribute("content") ?? "";
 }
 
+// Which space this page works in (DECISIONS D-038). Every request says so explicitly, so a
+// tab always saves where it shows it saves, whatever another tab does.
+export type Space = "real" | "practice";
+let currentSpace: Space = "real";
+
+export function setSpace(space: Space) {
+  currentSpace = space;
+}
+
+export function getSpace(): Space {
+  return currentSpace;
+}
+
+function spaceHeaders(): Record<string, string> {
+  return currentSpace === "practice" ? { "X-RPROV-Space": "practice" } : {};
+}
+
+// For plain links (attachments), which cannot carry a header.
+export function contentUrl(id: string, file: string): string {
+  const space = currentSpace === "practice" ? "&space=practice" : "";
+  return `/api/records/${id}/content?file=${encodeURIComponent(file)}${space}`;
+}
+
 export class ApiError extends Error {
   status: number;
   constructor(status: number, message: string) {
@@ -24,7 +47,7 @@ export class ApiError extends Error {
 }
 
 async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
-  const headers: Record<string, string> = {};
+  const headers: Record<string, string> = spaceHeaders();
   let payload: BodyInit | undefined;
   if (method !== "GET") headers["X-RPROV-Token"] = sessionToken();
   if (body instanceof FormData) {
@@ -62,7 +85,7 @@ export const api = {
     request<TimelineRow[]>("GET", `/api/timeline${project ? `?project=${encodeURIComponent(project)}` : ""}`),
   record: (id: string) => request<RecordDetail>("GET", `/api/records/${id}`),
   body: async (id: string) => {
-    const res = await fetch(`/api/records/${id}/content`);
+    const res = await fetch(`/api/records/${id}/content`, { headers: spaceHeaders() });
     if (!res.ok) throw new ApiError(res.status, "no content");
     return res.text();
   },
@@ -102,12 +125,14 @@ export const api = {
   },
   exportBundle: (body: { title: string; records: Record<string, string>; default: string }) =>
     request<Blob>("POST", "/api/export", body),
+  practiceReset: (sample: boolean) =>
+    request<{ space: string; record_count: number }>("POST", "/api/practice/reset", { sample }),
 };
 
 export async function downloadRequest(path: string, body: unknown) {
   const res = await fetch(path, {
     method: "POST",
-    headers: { "Content-Type": "application/json", "X-RPROV-Token": sessionToken() },
+    headers: { "Content-Type": "application/json", "X-RPROV-Token": sessionToken(), ...spaceHeaders() },
     body: JSON.stringify(body),
   });
   if (!res.ok) {
