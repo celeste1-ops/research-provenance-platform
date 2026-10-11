@@ -292,6 +292,36 @@ def test_empty_state_and_help_panels(tmp_path, browser):
         page.close()
 
 
+def test_slow_folder_suggestions_do_not_replace_a_typed_folder(tmp_path, browser, monkeypatch):
+    """Windows looks at every drive, so suggestions can arrive after the author typed a folder;
+    they must not overwrite it (seen on windows-latest)."""
+    import time
+
+    from app.services import autobackup
+
+    folder = tmp_path / "typed"
+    folder.mkdir()
+    other = tmp_path / "suggested"
+
+    def slow_suggestions(data_dir):
+        time.sleep(1.5)
+        return [{"path": str(other), "label": "Drive D:", "kind": "external"}]
+
+    monkeypatch.setattr(autobackup, "suggestions", slow_suggestions)
+    with LiveServer(tmp_path / "a") as srv:
+        srv.ctx.ledger.init_identity("Typist")
+        page = browser.new_page(viewport={"width": 1400, "height": 900})
+        page.goto(srv.url)
+        page.get_by_test_id("backup-pill").click()
+        dlg = page.get_by_test_id("backup-dialog")
+        field = dlg.get_by_label("Backup folder")
+        field.fill(str(folder))
+        expect(dlg.get_by_text("Drive D:")).to_be_visible()  # the suggestions have arrived
+        expect(field).to_have_value(str(folder))
+        expect(dlg.get_by_test_id("location-check")).to_contain_text("This Mac's own disk")
+        page.close()
+
+
 def _check(group, name, ok, detail, ms=420):
     return {"group": group, "name": name, "url": f"https://{name}", "ok": ok, "ms": ms if ok else None,
             "detail": detail}

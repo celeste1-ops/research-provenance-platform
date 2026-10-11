@@ -32,7 +32,8 @@ export function BackupSetup({
       .backupSuggestions()
       .then((s) => {
         setSuggestions(s);
-        if (!location && s.length > 0) setLocation(s[0].path);
+        // Only fill in an empty field: the list can arrive after the author typed a folder.
+        if (s.length > 0) setLocation((typed) => typed || s[0].path);
       })
       .catch(() => setSuggestions([]));
     // eslint-disable-next-line react-hooks/exhaustive-deps
