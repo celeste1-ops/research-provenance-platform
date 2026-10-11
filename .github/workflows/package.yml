@@ -90,10 +90,20 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          # Publishing a draft made by hand creates its tag, which runs this workflow again: the
-          # release is left as it is, so its installers always match its SHA256SUMS.txt.
-          if gh release view "$TAG" > /dev/null 2>&1; then
-            echo "release $TAG already exists; nothing to do"; exit 0
+          # A release that already exists keeps its files, so they always match its SHA256SUMS.txt:
+          # running this again only brings a draft's notes up to date with RELEASE_NOTES.md, and
+          # publishing a draft (which creates its tag and so runs this workflow again) changes nothing.
+          release=$(gh api "repos/$GITHUB_REPOSITORY/releases" --paginate \
+            --jq ".[] | select(.tag_name == \"$TAG\") | \"\(.id) \(.draft)\"" | head -n 1)
+          if [ -n "$release" ]; then
+            read -r id draft <<< "$release"
+            if [ "$draft" = "true" ]; then
+              gh api -X PATCH "repos/$GITHUB_REPOSITORY/releases/$id" -F body=@packaging/RELEASE_NOTES.md > /dev/null
+              echo "draft $TAG: notes updated from packaging/RELEASE_NOTES.md, files left as they are"
+            else
+              echo "release $TAG is already published; nothing to do"
+            fi
+            exit 0
           fi
           (cd dist && sha256sum -- * > SHA256SUMS.txt && cat SHA256SUMS.txt)
           gh release create "$TAG" --draft --target "$GITHUB_SHA" --title "Research History $TAG" \
