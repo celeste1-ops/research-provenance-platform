@@ -10,7 +10,7 @@ import type {
   Status,
   TimelineRow,
 } from "./types";
-import { lang } from "./i18n";
+import { lang, type Lang } from "./i18n";
 
 // The per-launch session token is embedded in the page by the local server — never in a URL.
 function sessionToken(): string {
@@ -111,6 +111,7 @@ export const api = {
     request<{ id: string }>("POST", "/api/retractions", { target, reason }),
   refreshAnchors: () => request<Record<string, number>>("POST", "/api/anchors/refresh"),
   networkCheck: () => request<ServiceCheckResult>("POST", "/api/network/check"),
+  preferences: () => request<{ language: Lang | null }>("GET", "/api/preferences"),
   setPreferences: (prefs: { language: string }) => request<{ language: string }>("POST", "/api/preferences", prefs),
   verifyAll: () => request<{ ok: boolean; counts: Record<string, number> }>("POST", "/api/verify/all"),
   exportPreview: (body: { title: string; records: Record<string, string>; default: string; language?: string }) =>

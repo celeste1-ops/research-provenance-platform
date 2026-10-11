@@ -89,3 +89,29 @@ def test_make_run_refuses_while_another_copy_holds_the_data_folder(tmp_path, mon
     again = InstanceLock(tmp_path)
     assert again.acquire()
     again.release()
+
+
+def test_menu_follows_the_language_chosen_in_the_app(tmp_path, monkeypatch):
+    from app import desktop, preferences
+
+    monkeypatch.setattr(desktop, "system_language", lambda: "en")
+    assert desktop.menu_language(tmp_path) == "en"
+    assert desktop.MENU["en"] == {"open": "Open Research History", "quit": "Quit"}
+    seen = []
+    preferences.on_change(seen.append)
+    try:
+        preferences.save(tmp_path, language="zh")
+    finally:
+        preferences._listeners.remove(seen.append)
+    assert seen == [{"language": "zh"}]
+    assert desktop.menu_language(tmp_path) == "zh"
+    assert desktop.MENU["zh"] == {"open": "打开 Research History", "quit": "退出"}
+
+
+def test_system_language_is_read_from_the_environment(monkeypatch):
+    from app import desktop
+
+    monkeypatch.setenv("LC_ALL", "zh_CN.UTF-8")
+    assert desktop.system_language() == "zh"
+    monkeypatch.setenv("LC_ALL", "en_GB.UTF-8")
+    assert desktop.system_language() == "en"

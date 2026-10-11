@@ -15,7 +15,7 @@ import { Setup } from "./components/Setup";
 import { Timeline } from "./components/Timeline";
 import { help, homeNote } from "./labels";
 import { dev, setDevice } from "./device";
-import { lang, setLang, t, tn, tx, type Lang } from "./i18n";
+import { chosenHere, lang, setLang, t, tn, tx, type Lang } from "./i18n";
 import { LangSwitch } from "./components/LangSwitch";
 
 type Dialog = null | "form" | "export" | "backup" | "key" | "where" | "tech" | "services" | "practice-reset";
@@ -146,6 +146,18 @@ export function App() {
     api.setPreferences({ language: next }).catch(() => undefined);
     void reload();
   }
+
+  // The language is shared with the menu bar / tray menu (D-046): a choice made in another browser
+  // wins over this browser's guess, and a first guess is remembered for the menu.
+  useEffect(() => {
+    api.preferences()
+      .then((p) => {
+        if (!p.language) api.setPreferences({ language: lang() }).catch(() => undefined);
+        else if (p.language !== lang() && !chosenHere()) changeLang(p.language);
+      })
+      .catch(() => undefined);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const practice = space === "practice";
   const spaceSwitch = (

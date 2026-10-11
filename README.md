@@ -126,6 +126,16 @@ RPROV_HOME=~/.rprov-restore-test RPROV_KEYSTORE=memory make run PORT=8767
 
 数据都在 `~/.rprov/`（权限 0700）。原文、附件、标题、说明都不离开本机；对外只发送时间证明所需的哈希（记录 ID），时间证明服务能看到请求的 IP 地址和时间。没有账号，没有我们的云服务，没有任何统计或崩溃上报。自动备份只是往你选的本地文件夹里写一个加密文件；如果那个文件夹被你自己的 iCloud / Dropbox 同步，离开电脑的也只是这个打不开的加密文件（见 DECISIONS D-033）。
 
+## 中文 / English
+
+界面右上角（第一次打开时在欢迎页上）有一个 **中文 / English** 按钮，点一下整个界面就换成另一种语言；第一次打开时跟着浏览器的语言走。选择会被记住，菜单栏 / 托盘图标的菜单也跟着换。
+
+- **只翻译程序自己的文字。** 你写的标题、正文、说明、理由照原样显示，从不翻译。
+- **报告可以选语言。** 导出时有「报告语言」一项，默认和界面一样：`report.html` 和 `VERIFY.md` 都有中文版。`verify.py` 的输出和失败代码一直是英文（它是给任何读者用的同一个检查程序）。
+- **Windows 安装程序**在中文 Windows 上显示中文，其他系统上显示英文。
+
+下面的说明用英文界面的按钮名，中文界面里是对应的中文，例如 **+ Add a step** =「+ 记一步」，**Share** =「分享」。
+
 ## 怎么用
 
 1. **新建研究项目**，比如「FSF」。
@@ -212,4 +222,5 @@ GitHub Actions 的 **Package** 工作流在每次推送时自动打两个安装�
 - **P0 已完成**：只追加的记录、签名、重放；第三方签名时间证明（RFC 3161）；导出证据包、`report.html`（含静态演化图）、`verify.py`、篡改测试；记录表单和演化图。
 - **P1 已完成**：比特币时间锚定（OpenTimestamps）和区块浏览器核对；「只看里程碑」视图；时间线视图；详情侧栏的完整分区（Verified record / Author statement / Later additions / Changes，以及在侧栏里追加关系、里程碑、说明、撤回）；备份与恢复；FSF 样例数据。
 - **第 4 轮（安装包）**：macOS（Apple 芯片）和 Windows 10/11 安装包，菜单栏/通知区域图标，只开一份；Windows 的备份位置建议和全套测试（含浏览器测试）在 GitHub Actions 上跑；日期章增加 DigiCert 作为备用；Settings → Check stamp services 检查各个时间证明服务能不能连上（见 DECISIONS D-043 – D-045）。
+- **第 5 轮（进行中）**：中英文切换——界面、程序自己写的文字和错误提示、导出的报告和 VERIFY.md、菜单栏 / 托盘菜单、Windows 安装程序（见 DECISIONS D-046）。
 - **需要在联网的 Mac 上完成**：`make freetsa-certs`、`make test-network`（AC-09：真实 FreeTSA 的 `.tsr` 用 `openssl ts -verify` 验证；真实 DigiCert 时间戳；真实 OpenTimestamps 日历和区块浏览器），以及 PRD 第 16 节的 4 项人工检查。

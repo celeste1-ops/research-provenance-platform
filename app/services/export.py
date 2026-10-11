@@ -16,6 +16,7 @@ from pathlib import Path
 from cryptography import x509
 from cryptography.hazmat.primitives import hashes, serialization
 
+from app.i18n import tr
 from app.report.render import render_report, render_verify_md
 from app.services.ledger import LedgerError
 from app.services.verification import trust_roots
@@ -99,30 +100,35 @@ def preview(ledger, plan: Plan) -> dict:
         level = plan.levels[r.id]
         item = {"id": r.id, "seq": r.seq, "kind": r.kind, "disclosure": level}
         if level == "existence":
-            item["visible"] = [f"record #{r.seq} existed by its verified time (kind: {r.kind})"]
+            item["visible"] = [tr("record #{seq} existed by its verified time (kind: {kind})", seq=r.seq,
+                                  kind=tr(r.kind))]
         else:
             vis = []
             if r.kind == "entry":
-                vis += [f"type: {payload['node_type']}", f"title: {payload['title']}",
-                        f"project name: {payload['project']['title']}"]
+                vis += [tr("type: {type}", type=tr(payload["node_type"])), tr("title: {title}", title=payload["title"]),
+                        tr("project name: {name}", name=payload["project"]["title"])]
                 if payload["relations"]:
-                    vis.append(f"{len(payload['relations'])} relation(s)")
+                    vis.append(tr("{n} relation(s)", n=len(payload["relations"])))
                 if payload["author_statement"]:
-                    vis.append(f"author statement: {payload['author_statement']}")
+                    vis.append(tr("author statement: {text}", text=payload["author_statement"]))
                 if payload["import"]:
-                    vis.append(f"claimed date: {payload['import']['claimed_date']}")
+                    vis.append(tr("claimed date: {date}", date=payload["import"]["claimed_date"]))
                 if payload["external"]:
-                    vis.append(f"external reference: {json.dumps(payload['external'], ensure_ascii=False)}")
+                    vis.append(tr("external reference: {ref}",
+                                  ref=json.dumps(payload["external"], ensure_ascii=False)))
                 names = [f.name for f in files.get(r.id, [])]
                 if level == "full":
-                    vis.append("full content: " + (", ".join(names) if names else "(none)"))
+                    vis.append(tr("full content: {names}", names=", ".join(names) if names else tr("(none)")))
                 elif names:
-                    vis.append("SHA-256 hashes (not content) of: " + ", ".join(names))
+                    vis.append(tr("SHA-256 hashes (not content) of: {names}", names=", ".join(names)))
             elif r.kind == "genesis":
-                vis += [f"author label: {payload['author_label']}", "signing public key (always included)"]
+                vis += [tr("author label: {label}", label=payload["author_label"]),
+                        tr("signing public key (always included)")]
             else:
                 text = payload.get("text") or payload.get("statement") or payload.get("reason")
-                vis.append(f"{r.kind} record" + (f": {text}" if text else ""))
+                kind = tr(r.kind)
+                vis.append(tr("{kind} record: {text}", kind=kind, text=text) if text
+                           else tr("{kind} record", kind=kind))
             item["visible"] = vis
         items.append(item)
     total = len(plan.chain)
@@ -130,9 +136,9 @@ def preview(ledger, plan: Plan) -> dict:
         "title": plan.title,
         "records": items,
         "warnings": [
-            HASH_WARNING,
-            f"chain.json shows that this installation has {total} record(s) up to the highest record in the "
-            f"bundle (seq {plan.max_seq}), including the ones you do not disclose.",
+            tr(HASH_WARNING),
+            tr("chain.json shows that this installation has {total} record(s) up to the highest record in the "
+               "bundle (seq {max_seq}), including the ones you do not disclose.", total=total, max_seq=plan.max_seq),
         ],
         "counts": {lvl: sum(1 for v in plan.levels.values() if v == lvl) for lvl in B.DISCLOSURE_LEVELS},
     }

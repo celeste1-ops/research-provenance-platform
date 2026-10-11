@@ -55,6 +55,9 @@ if __name__ == "__main__":
 # ---------------------------------------------------------------- server texts (app/locales/zh.py)
 
 SERVER_DIRS = ("app", "core/provenance_core/providers/diagnostics.py")
+TEMPLATES = "app/report/templates"
+# t("…") / th("…") in the report templates, with either kind of quotes.
+TEMPLATE_CALL = re.compile(r"""\b(?:t|th)\(\s*(?:"((?:[^"\\]|\\.)*)"|'((?:[^'\\]|\\.)*)')""")
 _ERROR_CLASSES = {"LedgerError", "BackupError", "PracticeResetError", "HTTPException", "ValueError", "KeyStoreError"}
 
 
@@ -93,9 +96,11 @@ def server_keys(root: Path | None = None) -> dict[str, str]:
         tree = ast.parse(f.read_text(encoding="utf-8"))
         for node in ast.walk(tree):
             if isinstance(node, ast.Call) and getattr(node.func, "id", None) == "tr" and node.args:
-                key = _literal(node.args[0])
-                if key:
-                    keys.setdefault(key, "tr")
+                arg = node.args[0]
+                for branch in (arg.body, arg.orelse) if isinstance(arg, ast.IfExp) else (arg,):
+                    key = _literal(branch)  # tr("a" if … else "b") uses both
+                    if key:
+                        keys.setdefault(key, "tr")
             if isinstance(node, ast.Raise) and isinstance(node.exc, ast.Call):
                 name = getattr(node.exc.func, "id", None) or getattr(node.exc.func, "attr", None)
                 if name not in _ERROR_CLASSES:
@@ -104,4 +109,7 @@ def server_keys(root: Path | None = None) -> dict[str, str]:
                     key = _literal(arg)
                     if key and re.search(r"[A-Za-z]{3}", key):
                         keys.setdefault(key, "error")
+    for f in sorted((root / TEMPLATES).glob("*.j2")):
+        for m in TEMPLATE_CALL.finditer(f.read_text(encoding="utf-8")):
+            keys.setdefault(m.group(1) if m.group(1) is not None else m.group(2), "tr")
     return keys

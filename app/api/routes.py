@@ -456,6 +456,7 @@ class ExportIn(BaseModel):
     title: str = "evidence"
     records: dict[str, str] = Field(default_factory=dict)  # record ID -> full | structure | existence
     default: str = "existence"
+    language: str | None = None  # of report.html and VERIFY.md; the interface's language if not given (D-046)
 
 
 @router.post("/export/preview")
@@ -473,6 +474,7 @@ def export_preview(body: ExportIn, request: Request):
 def export_bundle(body: ExportIn, request: Request):
     import os
 
+    from app.i18n import current, language
     from app.services.export import build_bundle_files, bundle_filename, plan_export, write_zip
 
     c = ctx(request)
@@ -480,7 +482,8 @@ def export_bundle(body: ExportIn, request: Request):
         plan = plan_export(c.ledger, body.title, body.records, body.default)
     except LedgerError as exc:
         raise _bad(exc) from None
-    data = write_zip(build_bundle_files(c.ledger, c.anchors, plan))
+    with language(body.language or current()):
+        data = write_zip(build_bundle_files(c.ledger, c.anchors, plan))
     name = bundle_filename(plan.title)
     exports = c.settings.data_dir / "exports"
     exports.mkdir(exist_ok=True)

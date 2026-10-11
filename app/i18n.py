@@ -17,7 +17,7 @@ from contextlib import contextmanager
 from contextvars import ContextVar
 from functools import lru_cache
 
-from app.locales.zh import ZH
+from app.locales.zh import MESSAGES, ZH
 
 LANGS = ("en", "zh")
 _lang: ContextVar[str] = ContextVar("rprov_lang", default="en")
@@ -72,7 +72,7 @@ def _fill(text: str, params: dict, zh: bool = False) -> str:
     return out
 
 
-def tr(text: str, **params) -> str:
+def tr(text: str, /, **params) -> str:
     """The app's own words in the current language; ``{name}`` placeholders are filled in."""
     if current() == "zh":
         return _fill(ZH.get(text, text), params, zh=True)
@@ -89,7 +89,7 @@ def device_word(device: str) -> str:
 @lru_cache(maxsize=1)
 def _patterns() -> list[tuple[re.Pattern, str]]:
     out = []
-    for key, value in ZH.items():
+    for key, value in MESSAGES.items():  # not the report's short patterns such as "{rel} {target}"
         if "{" not in key:
             continue
         parts = _PLACEHOLDER.split(key)

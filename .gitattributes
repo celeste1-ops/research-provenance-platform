@@ -8,3 +8,4 @@
 *.tsr binary
 *.der binary
 *.sqlite3 binary
+*.isl -text

@@ -21,6 +21,16 @@ function detect(): Lang {
 
 let current: Lang = typeof window === "undefined" ? "en" : detect();
 
+// True when the language was chosen in this browser, not guessed from its settings.
+export function chosenHere(): boolean {
+  try {
+    const saved = window.localStorage.getItem(STORE_KEY);
+    return saved === "en" || saved === "zh";
+  } catch {
+    return false;
+  }
+}
+
 export function lang(): Lang {
   return current;
 }
