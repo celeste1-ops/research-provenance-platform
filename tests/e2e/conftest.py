@@ -21,7 +21,7 @@ def browser():
         try:
             b = p.chromium.launch(executable_path=chromium_path())
         except Exception as exc:  # noqa: BLE001
-            pytest.skip(f"Chromium not available: {exc}")
+            pytest.skip(f"Chromium not available (run `make install`): {exc}")
         yield b
         b.close()
 

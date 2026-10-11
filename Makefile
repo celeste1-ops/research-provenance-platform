@@ -6,7 +6,7 @@ PORT    ?= 8765
 .PHONY: help install dev run test test-network lint fmt web demo verify-py freetsa-certs clean
 
 help:
-	@echo "make install      install Python (uv) and web (npm) dependencies"
+	@echo "make install      install Python (uv), web (npm) and test-browser dependencies"
 	@echo "make dev          backend with reload on 127.0.0.1:$(PORT) + Vite dev server on 127.0.0.1:5173"
 	@echo "make run          build the UI and serve everything on 127.0.0.1:$(PORT)"
 	@echo "make test         ruff + full pytest suite (network tests skipped)"
@@ -17,6 +17,7 @@ help:
 install:
 	$(UV) sync --extra ots
 	cd web && npm ci
+	$(UV) run playwright install chromium   # browser for the end-to-end tests in `make test`
 
 web/node_modules:
 	cd web && npm ci
