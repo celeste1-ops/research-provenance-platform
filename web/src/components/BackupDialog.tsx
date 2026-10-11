@@ -3,7 +3,7 @@ import { api, download } from "../api";
 import type { BackupStatus, BackupSuggestion, LocationCheck } from "../types";
 import { timeAgo } from "../util";
 import { dev, keychainName } from "../device";
-import { t, tx } from "../i18n";
+import { gap, t, tx } from "../i18n";
 
 const bold = { b: (s: string) => <b>{s}</b> };
 const boldMono = { b: (s: string) => <b>{s}</b>, mono: (s: string) => <span className="mono">{s}</span> };
@@ -150,10 +150,12 @@ export function BackupSetup({
         <input type="password" value={again} onChange={(e) => setAgain(e.target.value)} minLength={8} required />
       </label>
       <p className="warning small" data-testid="password-warning">
-        {tx("<b>If you forget this password, your backups can't be opened</b> — nobody can open them, including us. Write it down somewhere safe.", bold)}{" "}
+        {tx("<b>If you forget this password, your backups can't be opened</b> — nobody can open them, including us. Write it down somewhere safe.", bold)}
+        {gap()}
         {current?.recovery?.configured
           ? t("Your printed recovery code also opens them.")
-          : t("Next you get a recovery code to print: it opens your backups if the password is lost.")}{" "}
+          : t("Next you get a recovery code to print: it opens your backups if the password is lost.")}
+        {gap()}
         {t("This {device} remembers the password (in the {keychain}) so backups run by themselves.", { device: dev(), keychain: keychainName() })}
       </p>
       {error && <p className="error">{error}</p>}

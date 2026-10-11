@@ -37,6 +37,9 @@ export function setLang(next: Lang): void {
 
 type Params = Record<string, string | number>;
 
+const CJK = /[\u3400-\u9fff]/;
+const LATIN = /[A-Za-z0-9%]/;
+
 // Chinese next to Latin letters or digits reads better with a space between them.
 function spaced(s: string): string {
   return s
@@ -44,30 +47,59 @@ function spaced(s: string): string {
     .replace(/([A-Za-z0-9%])([\u3400-\u9fff])/g, "$1 $2");
 }
 
-export function t(en: string, params?: Params): string {
-  const text = current === "zh" ? (ZH[en] ?? en) : en;
-  const filled = params
-    ? text.replace(/\{(\w+)\}/g, (m: string, k: string) => (k in params ? String(params[k]) : m))
-    : text;
-  return current === "zh" ? spaced(filled) : filled;
+function template(en: string): string {
+  return current === "zh" ? (ZH[en] ?? en) : en;
 }
 
-/** Like t(), for text with markup: tx("Turn it <b>on</b>", { b: (s) => <b>{s}</b> }). */
+// Fills {name} placeholders. In Chinese, the app's own words are spaced and a space is put where
+// an inserted value meets them; the values themselves (often the author's words) stay as written.
+function fill(text: string, params?: Params): string {
+  const zh = current === "zh";
+  if (!params) return zh ? spaced(text) : text;
+  let out = "";
+  const add = (piece: string) => {
+    if (zh && out && piece) {
+      const a = out[out.length - 1];
+      const b = piece[0];
+      if ((CJK.test(a) && LATIN.test(b)) || (LATIN.test(a) && CJK.test(b))) out += " ";
+    }
+    out += piece;
+  };
+  const parts = text.split(/\{(\w+)\}/);
+  parts.forEach((part, i) => {
+    if (i % 2 === 0) add(zh ? spaced(part) : part);
+    else add(part in params ? String(params[part]) : `{${part}}`);
+  });
+  return out;
+}
+
+export function t(en: string, params?: Params): string {
+  return fill(template(en), params);
+}
+
+/** Like t(), for text with markup: tx("Turn it <b>on</b>", { b: (s) => <b>{s}</b> }). The markup
+ * comes from the template only; values (which may be the author's text) are filled in afterwards. */
 export function tx(en: string, tags: Record<string, (inner: string) => ReactNode>, params?: Params): ReactNode[] {
-  const text = t(en, params);
+  const text = template(en);
   const out: ReactNode[] = [];
   const re = /<(\w+)>(.*?)<\/\1>/g;
   let last = 0;
   let m: RegExpExecArray | null;
   let i = 0;
   while ((m = re.exec(text)) !== null) {
-    if (m.index > last) out.push(text.slice(last, m.index));
+    if (m.index > last) out.push(fill(text.slice(last, m.index), params));
     const render = tags[m[1]];
-    out.push(<span key={i++}>{render ? render(m[2]) : m[2]}</span>);
+    const inner = fill(m[2], params);
+    out.push(<span key={i++}>{render ? render(inner) : inner}</span>);
     last = re.lastIndex;
   }
-  if (last < text.length) out.push(text.slice(last));
+  if (last < text.length) out.push(fill(text.slice(last), params));
   return out;
+}
+
+/** The space between two sentences: English needs one, Chinese does not. */
+export function gap(): string {
+  return current === "zh" ? "" : " ";
 }
 
 /** Numbers of things: English needs singular and plural, Chinese does not. */

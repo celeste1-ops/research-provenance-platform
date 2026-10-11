@@ -5,7 +5,7 @@ import { Changes } from "./Changes";
 import { LaterActions, WithdrawRelation } from "./LaterActions";
 import { Markdown } from "./Markdown";
 import { stampName } from "../labels";
-import { t } from "../i18n";
+import { t, tx } from "../i18n";
 import { ProofLine } from "./ProofBadge";
 
 interface Props {
@@ -183,8 +183,7 @@ export function Detail({ id, version, onClose, onSelect, entries, relationTypes,
           <ul>
             {detail.later.items.map((l) => (
               <li key={l.record_id}>
-                <b>{l.title}</b>
-                {l.text && <>: {l.text}</>}
+                {l.text ? tx("<b>{title}</b>: {text}", { b: (x) => <b>{x}</b> }, { title: l.title, text: l.text }) : <b>{l.title}</b>}
                 <div className="muted small">
                   {t("added {date}", { date: l.date.time.slice(0, 10) })}
                   {!l.date.verified && ` (${t("unverified")})`} · {t("author statement")}

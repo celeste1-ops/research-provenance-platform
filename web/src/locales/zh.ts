@@ -168,6 +168,7 @@ export const ZH: Record<string, string> = {
   "Later additions": "后来补加",
   "None.": "没有。",
   "added {date}": "{date} 补加",
+  "<b>{title}</b>: {text}": "<b>{title}</b>：{text}",
   "unverified": "未核实",
   "author statement": "作者陈述",
   "Changes": "改了什么",

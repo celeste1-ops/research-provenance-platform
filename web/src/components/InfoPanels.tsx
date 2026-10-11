@@ -1,7 +1,7 @@
 import type { Status } from "../types";
 import { timeAgo } from "../util";
 import { dev } from "../device";
-import { t, tx } from "../i18n";
+import { gap, t, tx } from "../i18n";
 
 const bold = { b: (s: string) => <b>{s}</b> };
 const boldMono = { b: (s: string) => <b>{s}</b>, mono: (s: string) => <span className="mono">{s}</span> };
@@ -50,7 +50,8 @@ export function WhereIsMyData({ status, onClose, onBackup }: { status: Status; o
         <h3>{status.space === "practice" ? t("Backups bring it back (for your real record)") : t("Backups bring it back")}</h3>
         {b?.configured ? (
           <p className="small">
-            {tx("Automatic encrypted backups go to <mono>{folder}</mono> ({where}); last one {when}.", boldMono, { folder: b.location ?? "", where: b.where?.label ?? "", when: timeAgo(b.last_backup) })}{" "}
+            {tx("Automatic encrypted backups go to <mono>{folder}</mono> ({where}); last one {when}.", boldMono, { folder: b.location ?? "", where: b.where?.label ?? "", when: timeAgo(b.last_backup) })}
+            {b.where?.warning && gap()}
             {b.where?.warning}
           </p>
         ) : (

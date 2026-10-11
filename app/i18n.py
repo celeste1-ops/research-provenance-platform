@@ -52,14 +52,30 @@ def _spaced(s: str) -> str:
     return re.sub(r"([A-Za-z0-9%])([㐀-鿿])", r"\1 \2", s)
 
 
-def _fill(text: str, params: dict) -> str:
-    return _PLACEHOLDER.sub(lambda m: str(params[m.group(1)]) if m.group(1) in params else m.group(0), text)
+_CJK = re.compile(r"[\u3400-\u9fff]")
+_LATIN = re.compile(r"[A-Za-z0-9%]")
+
+
+def _fill(text: str, params: dict, zh: bool = False) -> str:
+    """Fill ``{name}`` placeholders. In Chinese the app's own words are spaced and a space is put
+    where an inserted value meets them; the values themselves (often the author's words) stay as
+    written."""
+    out = ""
+    for i, part in enumerate(_PLACEHOLDER.split(text)):
+        piece = (_spaced(part) if zh else part) if i % 2 == 0 else (
+            str(params[part]) if part in params else "{" + part + "}")
+        if zh and out and piece:
+            a, b = out[-1], piece[0]
+            if (_CJK.match(a) and _LATIN.match(b)) or (_LATIN.match(a) and _CJK.match(b)):
+                out += " "
+        out += piece
+    return out
 
 
 def tr(text: str, **params) -> str:
     """The app's own words in the current language; ``{name}`` placeholders are filled in."""
     if current() == "zh":
-        return _spaced(_fill(ZH.get(text, text), params))
+        return _fill(ZH.get(text, text), params, zh=True)
     return _fill(text, params)
 
 
@@ -101,5 +117,5 @@ def tr_message(message: str) -> str:
     for pattern, value in _patterns():
         m = pattern.match(message)
         if m:
-            return _spaced(_fill(value, {k: tr_message(v) for k, v in m.groupdict().items()}))
+            return _fill(value, {k: tr_message(v) for k, v in m.groupdict().items()}, zh=True)
     return message
