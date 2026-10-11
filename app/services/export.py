@@ -38,6 +38,11 @@ HASH_WARNING = (
 
 @lru_cache(maxsize=1)
 def verify_py_source() -> str:
+    # The installers ship verify.py built at packaging time: the core sources it is
+    # assembled from are not on disk there (D-044).
+    prebuilt = ROOT / "prebuilt" / "verify.py"
+    if prebuilt.is_file():
+        return prebuilt.read_text(encoding="utf-8")
     spec = importlib.util.spec_from_file_location("rprov_build_verify", ROOT / "tools" / "build_verify.py")
     module = importlib.util.module_from_spec(spec)
     assert spec.loader is not None

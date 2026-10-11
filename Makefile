@@ -1,6 +1,6 @@
 # Research provenance tool — one-command entry points (PRD §13).
 UV      ?= uv
-PY      := $(UV) run --extra ots python
+PY      := $(UV) run --extra ots --extra desktop python
 PORT    ?= 8765
 
 .PHONY: help install dev run test test-network lint fmt web demo verify-py freetsa-certs clean
@@ -15,7 +15,7 @@ help:
 	@echo "make verify-py    regenerate dist/verify.py from the core library"
 
 install:
-	$(UV) sync --extra ots
+	$(UV) sync --extra ots --extra desktop
 	cd web && npm ci
 	$(UV) run playwright install chromium   # browser for the end-to-end tests in `make test`
 
@@ -39,10 +39,10 @@ fmt:
 	$(UV) run ruff format .
 
 test: lint
-	$(UV) run --extra ots pytest
+	$(UV) run --extra ots --extra desktop pytest
 
 test-network:
-	RPROV_NETWORK_TESTS=1 $(UV) run --extra ots pytest -m network
+	RPROV_NETWORK_TESTS=1 $(UV) run --extra ots --extra desktop pytest -m network
 
 demo:
 	$(PY) -m app.demo

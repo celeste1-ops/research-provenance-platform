@@ -1,0 +1,58 @@
+name: Package
+
+# Builds the installers (DECISIONS D-044) and checks each one end to end: install, start without
+# browser or tray icon, set up, save a step, export, run the bundled verify.py, (Windows:)
+# uninstall and check the data folder stays. The installers are kept as workflow artifacts.
+on:
+  push:
+    branches: [main, "claude/**"]
+    tags: ["v*"]
+  workflow_dispatch:
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - name: Install Inno Setup
+        run: choco install innosetup --no-progress -y
+      - name: Build the installer
+        run: ./packaging/build_windows.ps1
+      - name: Smoke test (install, run, verify, uninstall)
+        run: ./packaging/smoke_windows.ps1
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ResearchHistory-windows-x64
+          path: dist/*.exe
+          if-no-files-found: error
+
+  macos:
+    runs-on: macos-latest  # Apple Silicon (arm64)
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - name: Build the app and disk image (includes the smoke test)
+        run: bash packaging/build_macos.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ResearchHistory-macos-arm64
+          path: dist/*.dmg
+          if-no-files-found: error

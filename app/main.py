@@ -9,7 +9,7 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import FileResponse, HTMLResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 
 from app.api.routes import router
 from app.api.security import LocalOnlyMiddleware
@@ -50,6 +50,12 @@ def create_app(ctx: AppContext, *, start_jobs: bool = False) -> FastAPI:
         token=ctx.session_token,
     )
     app.include_router(router)
+
+    @app.exception_handler(Exception)
+    async def log_unexpected(request: Request, exc: Exception):
+        # Unexpected errors go to the log with their traceback (the desktop app has no console).
+        log.error("unexpected error on %s %s", request.method, request.url.path, exc_info=exc)
+        return JSONResponse({"detail": "internal error (see the app log)"}, status_code=500)
     dist: Path = ctx.settings.web_dist
 
     def index() -> HTMLResponse:
