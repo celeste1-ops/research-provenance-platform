@@ -129,6 +129,7 @@ export const api = {
       installation: string;
       records: number;
       opened_with: string;
+      key_fingerprint: string;
       verification: { ok: boolean };
       backup: BackupStatus;
     }>(

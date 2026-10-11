@@ -144,6 +144,8 @@ export interface BackupStatus {
   needs_password?: boolean;
   state: "off" | "ok" | "same-disk" | "error" | "paused" | "other-copy";
   paused_after_restore?: boolean;
+  paused_reason?: "restored" | "copied" | null;
+  key_fingerprint?: string | null;
   other_copy?: { last_backup: string; copy: string | null } | null;
   recovery?: { configured: boolean; id?: string; created_local?: string };
   data_dir_warning?: string | null;

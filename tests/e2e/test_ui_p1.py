@@ -140,6 +140,8 @@ def test_backup_and_restore_in_the_browser(tmp_path, browser):
         sheet = dlg.get_by_test_id("recovery-code")
         sheet.wait_for()
         code = sheet.get_by_test_id("recovery-code-value").inner_text().strip()
+        fingerprint = sheet.get_by_test_id("recovery-fingerprint").locator("b").inner_text().strip()
+        assert len(fingerprint) == 19
         assert len(code) == 27 and code not in (a.ctx.ledger.meta("backup_recovery") or "")
         assert sheet.get_by_role("button", name="Continue").is_disabled()
         sheet.get_by_label("I have printed it or written it down").check()
@@ -155,7 +157,7 @@ def test_backup_and_restore_in_the_browser(tmp_path, browser):
         page.close()
     (backup,) = list(folder.iterdir())
     assert backup.name.endswith(".rprovbackup")
-    assert backup.read_bytes().startswith(b"RPROV-BACKUP-ENC/2\n")
+    assert backup.read_bytes().startswith(b"RPROV-BACKUP-ENC/3\n")
     assert b"Formula" not in backup.read_bytes()  # nothing readable without the password
     with LiveServer(tmp_path / "b") as b:
         page = browser.new_page(viewport={"width": 1400, "height": 900})
@@ -171,11 +173,24 @@ def test_backup_and_restore_in_the_browser(tmp_path, browser):
         form.get_by_role("button", name="Forgot the password? Use the recovery code instead").click()
         form.get_by_label("Recovery code").fill(code.lower())
         form.get_by_role("button", name="Restore my research").click()
+        # The signing key it brought back is shown, to compare with the printed sheet.
+        result = page.get_by_test_id("restore-result")
+        assert fingerprint in result.get_by_test_id("restored-fingerprint").inner_text()
+        result.get_by_role("button", name="Open the app").click()
         page.get_by_test_id("graph").locator(".record-node").nth(13).wait_for()
         wait_for_step_count(page, "14 steps")
         assert b.ctx.ledger.record_count() == count
-        # The old password is unknown now, so automatic backup asks for a new one.
-        assert "Backup needs your password" in page.get_by_test_id("backup-pill").inner_text()
+        # Paused until confirmed; the old password is unknown, so resuming asks for a new one.
+        pill = page.get_by_test_id("backup-pill")
+        assert "Backup paused" in pill.inner_text()
+        pill.click()
+        paused = page.get_by_test_id("backup-paused")
+        assert "restored from a backup" in paused.inner_text()
+        paused.get_by_label("Backup password (at least 8 characters)").fill("a new password")
+        paused.get_by_label("Repeat the password").fill("a new password")
+        paused.get_by_role("button", name="Set password and resume").click()
+        page.get_by_test_id("notice").get_by_text("Automatic backup resumed").wait_for()
+        assert len(list(folder.iterdir())) == 2
         page.close()
 
 

@@ -368,30 +368,90 @@ def test_password_still_opens_and_a_new_code_replaces_the_old_one(tmp_path):
     a.close()
 
 
-def test_format_2_header_and_tampering(tmp_path):
+def _header(data: bytes) -> tuple[dict, bytes]:
+    line = data[len(backup_mod.ENCRYPTED_MAGIC):].split(b"\n", 1)[0]
+    return json.loads(line), line
+
+
+def test_format_3_header_and_tampering(tmp_path):
     a, folder, st = _configured(tmp_path)
     data = next(folder.iterdir()).read_bytes()
     assert data.startswith(backup_mod.ENCRYPTED_MAGIC)
-    header_line = data[len(backup_mod.ENCRYPTED_MAGIC):].split(b"\n", 1)[0]
-    header = json.loads(header_line)
-    assert header["format"] == "rprov.backup-enc/2" and header["cipher"] == "AES-256-GCM"
+    header, header_line = _header(data)
+    assert header["format"] == "rprov.backup-enc/3" and header["cipher"] == "AES-256-GCM"
+    assert header["chunk_size"] == backup_mod.CHUNK_SIZE
     assert [slot["kind"] for slot in header["slots"]] == ["password", "recovery"]
     for plaintext in (b"Numerical experiment", b"SQLite format 3", b"PRIVATE KEY"):
         assert plaintext not in data
-    # Changing anything in the header breaks it (it is authenticated with the contents).
+    # Changing anything in the header breaks it (it is authenticated with every piece).
     forged = data.replace(b'"inner": "rprov.backup/1"', b'"inner": "rprov.backup/9"', 1)
     with pytest.raises(BackupError, match="damaged"):
         backup_mod.open_backup(forged, password=PASSWORD)
     # Swapping in another backup's wrapped key does not open it either.
     a.autobackup.run("again")
     other = max(folder.iterdir()).read_bytes()
-    other_header = json.loads(other[len(backup_mod.ENCRYPTED_MAGIC):].split(b"\n", 1)[0])
-    header["slots"][0] = other_header["slots"][0]
+    header["slots"][0] = _header(other)[0]["slots"][0]
     swapped = backup_mod.ENCRYPTED_MAGIC + json.dumps(header, sort_keys=True).encode() + data[
         len(backup_mod.ENCRYPTED_MAGIC) + len(header_line):]
     with pytest.raises(BackupError, match="damaged"):
         backup_mod.open_backup(swapped, password=PASSWORD)
     a.close()
+
+
+@pytest.mark.parametrize("size", [0, 1, 4095, 4096, 4097, 3 * 4096, 3 * 4096 + 17])
+def test_pieces_round_trip_and_resist_cutting_and_reordering(size):
+    import secrets as s
+
+    plain = s.token_bytes(size)
+    key = s.token_bytes(32)
+    out = io.BytesIO()
+    backup_mod.seal_stream(io.BytesIO(plain), out, key, PASSWORD, None, chunk_size=4096)
+    sealed = out.getvalue()
+    assert backup_mod.open_backup(sealed, password=PASSWORD)[0] == plain
+    header_end = sealed.index(b"\n", len(backup_mod.ENCRYPTED_MAGIC)) + 1
+    body = sealed[header_end:]
+    pieces = [body[i:i + 4096 + 16] for i in range(0, len(body), 4096 + 16)]
+    assert len(pieces) == size // 4096 + 1  # the last piece is always short, possibly empty
+    with pytest.raises(BackupError):  # the last piece cut off
+        backup_mod.open_backup(sealed[:header_end] + b"".join(pieces[:-1]), password=PASSWORD)
+    with pytest.raises(BackupError):  # cut in the middle of a piece
+        backup_mod.open_backup(sealed[:-5], password=PASSWORD)
+    if len(pieces) >= 3:
+        reordered = pieces[:]
+        reordered[0], reordered[1] = reordered[1], reordered[0]
+        with pytest.raises(BackupError, match="damaged"):
+            backup_mod.open_backup(sealed[:header_end] + b"".join(reordered), password=PASSWORD)
+
+
+def test_format_2_backups_still_restore(tmp_path):
+    a = make_ctx(tmp_path / "a")
+    build_log(a)
+    key = backup_mod.secrets.token_bytes(32)
+    _, plain = create_plain_backup(a, backup_mod.key_passphrase(key), key_protection="backup-key")
+    code = backup_mod.new_recovery_code()
+    old = backup_mod.seal_backup(plain, key, PASSWORD, backup_mod.make_recovery(code))
+    assert old.startswith(backup_mod.ENCRYPTED_MAGIC_V2)
+    a.close()
+    b = make_ctx(tmp_path / "b", keystore=MemoryKeyStore())
+    assert restore_backup(b, old, recovery_code=code)["opened_with"] == "recovery code"
+    b.close()
+
+
+def test_crafted_kdf_parameters_are_refused_quickly():
+    plain = b"x"
+    enc = bytearray(backup_mod.encrypt_backup(plain, PASSWORD))
+    forged = bytes(enc).replace(b'"r": 8', b'"r": 1048576', 1)
+    with pytest.raises(BackupError, match="unsupported"):
+        backup_mod.decrypt_backup(forged, PASSWORD)
+    huge_n = bytes(enc).replace(b'"n": 16384', b'"n": 1048576', 1)  # 1 GiB of memory with r = 8
+    with pytest.raises(BackupError, match="unsupported"):
+        backup_mod.decrypt_backup(huge_n, PASSWORD)
+
+
+def test_recovery_code_typed_with_other_dashes():
+    code = backup_mod.new_recovery_code()
+    assert backup_mod.normalize_recovery_code(code.replace("-", "\u2013")) == code.replace("-", "")
+    assert backup_mod.normalize_recovery_code(code.replace("-", " \u2014 ")) == code.replace("-", "")
 
 
 def test_format_1_backups_still_restore(tmp_path):
@@ -494,7 +554,7 @@ def test_a_restored_copy_does_not_back_up_by_itself(tmp_path, secret):
 
     # The real install's keychain entries are untouched: same key, still the newer password.
     assert private_key_raw(keychain.load(real.ledger.installation)) == real_key
-    assert keychain.load_secret(f"backup-password:{real.ledger.installation}") == "the newer password"
+    assert real.autobackup._password() == "the newer password"
     # The copy knows the folder but stays paused until the author confirms it.
     st = drill.autobackup.status()
     assert st["location"] == str(folder) and st["state"] == "paused" and st["paused_after_restore"]
@@ -517,6 +577,7 @@ def test_resuming_after_restore_keeps_each_copys_files_apart(tmp_path, monkeypat
     real_files = sorted(p.name for p in folder.iterdir())
     assert len(real_files) == 2
     restore_backup(drill, (folder / real_files[-1]).read_bytes(), PASSWORD)
+    drill.autobackup.adopt_restored_password(PASSWORD)
     st = drill.autobackup.resume()
     assert st["state"] != "paused" and st["auto"]
     for _ in range(3):
@@ -601,3 +662,135 @@ def test_other_copy_over_http(tmp_path):
         assert r.status_code == 200 and r.json()["other_copy"] is None
     old.close()
     new.close()
+
+
+# ---------------------------------------------------------------- copied folders, per-copy passwords (D-042)
+
+
+def _reopen(path, keystore):
+    from app.config import Settings
+    from app.services.context import AppContext
+    from provenance_core.providers.mock import MockProvider
+
+    settings = Settings(data_dir=path, port=8765, tsa="mock", btc="mock", keystore="memory")
+    return AppContext.create(settings, keystore=keystore,
+                             providers={"tsa": MockProvider("tsa"), "btc": MockProvider("btc")})
+
+
+def test_a_copied_data_folder_becomes_its_own_copy(tmp_path, monkeypatch):
+    """Migration Assistant / Time Machine / cp -r copy the database *and* the keychain."""
+    import shutil
+
+    from app.services import autobackup
+
+    monkeypatch.setattr(autobackup, "KEEP_BACKUPS", 3)
+    keychain = MemoryKeyStore()
+    old = make_ctx(tmp_path / "old", keystore=keychain)
+    build_log(old)
+    folder = tmp_path / "icloud"
+    old.autobackup.configure(str(folder), PASSWORD, create=True)
+    old_dir = old.settings.data_dir
+    old.close()
+    new_dir = tmp_path / "new-mac" / "rprov"
+    shutil.copytree(old_dir, new_dir)
+    old = _reopen(old_dir, keychain)
+    new = _reopen(new_dir, keychain)
+
+    assert old.autobackup.status()["state"] != "paused"  # the original carries on
+    st = new.autobackup.status()
+    assert st["state"] == "paused" and st["paused_reason"] == "copied"
+    assert new.autobackup.run("hourly")["ran"] is False  # nothing written until confirmed
+    assert st["needs_password"]  # its own keychain entry: the original's is never shared
+    new.autobackup.configure(str(folder), PASSWORD)  # the author confirms on the new Mac
+    assert new.ledger.meta("backup_copy") != old.ledger.meta("backup_copy")
+    for _ in range(4):
+        old.autobackup.run("old mac")
+        new.autobackup.run("new mac")
+    names = [p.name for p in folder.iterdir()]
+    for ctx in (old, new):
+        mine = [n for n in names if f"-{ctx.ledger.meta('backup_copy')}-" in n]
+        assert len(mine) == 3  # each keeps its own newest three; neither deletes the other's
+    assert old.autobackup.status()["other_copy"] and new.autobackup.status()["other_copy"]
+    old.close()
+    new.close()
+
+
+def test_a_drill_copy_cannot_change_the_real_password(tmp_path):
+    real, drill, folder, code, keychain = _shared_keychain_pair(tmp_path)
+    restore_backup(drill, next(folder.iterdir()).read_bytes(), recovery_code=code)
+    drill.autobackup.configure(str(tmp_path / "elsewhere"), "drill throwaway", create=True)
+    assert real.autobackup._password() == PASSWORD
+    assert drill.autobackup._password() == "drill throwaway"
+    real.close()
+    drill.close()
+
+
+def test_the_pause_is_enforced_by_the_server(tmp_path):
+    real, drill, folder, code, keychain = _shared_keychain_pair(tmp_path)
+    restore_backup(drill, next(folder.iterdir()).read_bytes(), PASSWORD)
+    drill.autobackup.adopt_restored_password(PASSWORD)
+    before = sorted(folder.iterdir())
+    assert drill.autobackup.run("manual")["ran"] is False
+    with pytest.raises(BackupError, match="confirm the backup folder"):
+        drill.autobackup.new_recovery_code()
+    assert sorted(folder.iterdir()) == before
+    real.close()
+    drill.close()
+
+
+def test_recovery_code_restore_is_paused_and_asks_for_a_password(tmp_path):
+    a, folder, st = _configured(tmp_path)
+    fingerprint = st["key_fingerprint"]
+    assert len(fingerprint) == 19
+    data = next(folder.iterdir()).read_bytes()
+    a.close()
+    b = make_ctx(tmp_path / "b", keystore=MemoryKeyStore())
+    summary = restore_backup(b, data, recovery_code=st["recovery_code"])
+    assert summary["key_fingerprint"] == fingerprint  # the same as on the printed recovery sheet
+    st = b.autobackup.status()
+    assert st["state"] == "paused" and st["needs_password"] and st["paused_after_restore"]
+    b.close()
+
+
+def test_a_password_set_up_before_per_copy_entries_keeps_working(tmp_path):
+    ctx = make_ctx(tmp_path / "a")
+    ctx.ledger.init_identity("A")
+    folder = tmp_path / "bk"
+    folder.mkdir()
+    ctx.ledger.set_meta("backup_location", str(folder))
+    ctx.ledger.set_meta("backup_auto", "1")
+    ctx.keystore.save_secret(f"backup-password:{ctx.ledger.installation}", PASSWORD)  # older entry name
+    st = ctx.autobackup.status()
+    assert st["configured"] and st["state"] != "paused"
+    assert ctx.autobackup.run("after update")["ran"]
+    ctx.close()
+
+
+def test_saving_a_step_does_not_wait_for_a_running_backup(tmp_path, monkeypatch):
+    import threading
+    import time
+
+    from app.services import autobackup
+
+    ctx = make_ctx(tmp_path / "a")
+    build_log(ctx)
+    ctx.autobackup.configure(str(tmp_path / "bk"), PASSWORD, create=True)
+    started = threading.Event()
+    real_write = autobackup.write_backup_file
+
+    def slow_write(*args, **kwargs):
+        started.set()
+        time.sleep(1.5)
+        return real_write(*args, **kwargs)
+
+    monkeypatch.setattr(autobackup, "write_backup_file", slow_write)
+    ctx.autobackup.debounce = 30  # the change only schedules a later backup
+    ctx.ledger.set_meta("backup_last_fingerprint", "")
+    worker = threading.Thread(target=ctx.autobackup.run, args=("slow",))
+    worker.start()
+    started.wait(5)
+    t0 = time.monotonic()
+    ctx.ledger.create_entry(EntryInput(ctx.ledger.projects()[0].id, "note", "saved during a backup"))
+    assert time.monotonic() - t0 < 1.0
+    worker.join()
+    ctx.close()

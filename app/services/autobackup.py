@@ -24,18 +24,23 @@ from sqlalchemy import func, select
 from app.db.models import AnchorRow, RecordRow
 from app.services.backup import (
     BACKUP_SUFFIX,
+    COPY_ANCHOR_META,
     COPY_META,
+    ORIGIN_META,
     RECOVERY_META,
     SINCE_META,
     BackupError,
     backup_copy_id,
-    create_backup,
+    folder_anchor,
+    key_fingerprint,
     make_recovery,
+    name_stamp,
     new_recovery_code,
     parse_backup_name,
     stamp_to_iso,
-    write_backup_to,
+    write_backup_file,
 )
+from provenance_core.signing import public_key_hex
 
 log = logging.getLogger("rprov.backup")
 
@@ -167,17 +172,52 @@ class AutoBackup:
         self.ctx = ctx
         self.debounce = debounce
         self._timer: threading.Timer | None = None
-        self._lock = threading.Lock()
+        # Separate locks: saving a step (which only schedules) never waits for a running backup.
+        self._run_lock = threading.Lock()
+        self._timer_lock = threading.Lock()
 
     # ------------------------------------------------------------------ settings
 
     def _secret_name(self) -> str:
-        return f"backup-password:{self.ctx.ledger.installation}"
+        # Per copy (D-042): a restored or copied installation shares the installation ID and,
+        # on the same Mac, the keychain; its own entry keeps it from touching the original's.
+        return f"backup-password:{self.ctx.ledger.installation}:{backup_copy_id(self.ctx)}"
 
     def _password(self) -> str | None:
-        if not self.ctx.ledger.installation:
+        ledger = self.ctx.ledger
+        if not ledger.installation:
             return None
-        return self.ctx.keystore.load_secret(self._secret_name())
+        password = self.ctx.keystore.load_secret(self._secret_name())
+        if password is None and not ledger.meta(ORIGIN_META):
+            # Set up before per-copy entries existed: only the original install may take it over.
+            legacy = self.ctx.keystore.load_secret(f"backup-password:{ledger.installation}")
+            if legacy is not None:
+                self.ctx.keystore.save_secret(self._secret_name(), legacy)
+                password = legacy
+        return password
+
+    def detect_copied_folder(self) -> bool:
+        """At start-up: is this data folder a copy (Migration Assistant, Time Machine, ``cp -r``)?
+
+        A copy carries the original's copy id inside its database. It then gets a new id, its
+        automatic backup pauses until the author confirms, and the original's files count as
+        another copy's from now on (D-042)."""
+        ledger = self.ctx.ledger
+        copy, anchor = ledger.meta(COPY_META), ledger.meta(COPY_ANCHOR_META)
+        if not copy:
+            return False
+        current = folder_anchor(self.ctx.settings.data_dir)
+        if not anchor:
+            ledger.set_meta(COPY_ANCHOR_META, current)  # first start since copy ids were tied to folders
+            return False
+        if anchor == current:
+            return False
+        for key, value in ((COPY_META, ""), (COPY_ANCHOR_META, ""), (ORIGIN_META, "copied"),
+                           ("backup_auto", "0"), ("backup_paused", "copied"), ("backup_last_error", ""),
+                           ("backup_last_fingerprint", ""), (SINCE_META, name_stamp())):
+            ledger.set_meta(key, value)
+        log.warning("this data folder is a copy of another one: automatic backup paused until confirmed")
+        return True
 
     def configure(self, location: str, password: str, *, create: bool = False) -> dict:
         ledger = self.ctx.ledger
@@ -216,8 +256,11 @@ class AutoBackup:
 
     def new_recovery_code(self) -> str:
         """Replace the recovery code: new backups open with the new one (older ones with the old one)."""
-        if not self.status()["configured"]:
+        st = self.status()
+        if not st["configured"]:
             raise BackupError("turn on automatic backup first")
+        if st["state"] == "paused":
+            raise BackupError("confirm the backup folder first (automatic backup is paused)")
         code = self._store_recovery()
         self.run("new recovery code")
         return code
@@ -232,7 +275,7 @@ class AutoBackup:
             self.ctx.keystore.save_secret(self._secret_name(), password)
 
     def resume(self) -> dict:
-        """After a restore: the author confirms that this copy should back up to the folder again."""
+        """After a restore or copy: the author confirms this copy should back up to the folder."""
         if not self.status()["configured"]:
             raise BackupError("set a backup password first")
         ledger = self.ctx.ledger
@@ -308,7 +351,9 @@ class AutoBackup:
             st["where"] = classify_location(Path(location), self.ctx.settings.data_dir)
         if location and not configured:
             st["needs_password"] = True
-        st["paused_after_restore"] = ledger.meta("backup_paused") == "restored"
+        paused = ledger.meta("backup_paused") or ""
+        st["paused_after_restore"] = paused == "restored"
+        st["paused_reason"] = paused or None
         other = self._latest_other_copy() if location else None
         st["other_copy"] = {"last_backup": stamp_to_iso(other[0]), "copy": other[1]} if other else None
         recovery = ledger.meta(RECOVERY_META)
@@ -318,7 +363,13 @@ class AutoBackup:
             else {"configured": False}
         )
         st["data_dir_warning"] = data_dir_warning(self.ctx.settings.data_dir)
-        if not configured:
+        try:  # printed on the recovery sheet, shown again after a recovery-code restore
+            st["key_fingerprint"] = key_fingerprint(public_key_hex(ledger.signing_key().public_key()))
+        except Exception:  # noqa: BLE001 - no key available (not set up yet)
+            st["key_fingerprint"] = None
+        if location and paused:
+            st["state"] = "paused"  # even without a password: confirm the folder first (D-040)
+        elif not configured:
             st["state"] = "off"
         elif not st["auto"]:
             st["state"] = "paused"
@@ -335,17 +386,18 @@ class AutoBackup:
     # ------------------------------------------------------------------ running
 
     def run(self, reason: str = "manual") -> dict:
-        """Write one encrypted backup now (if configured) and prune old ones."""
-        with self._lock:
+        """Write one encrypted backup now (if configured and not paused) and prune old ones."""
+        with self._run_lock:
             ledger = self.ctx.ledger
             location = ledger.meta("backup_location")
             password = self._password()
             if not location or password is None:
                 return {"ran": False, "reason": "backup is not set up"}
+            if ledger.meta("backup_paused"):
+                return {"ran": False, "reason": "automatic backup is paused: confirm the backup folder first"}
             fingerprint = self._fingerprint()
             try:
-                name, data = create_backup(self.ctx, password)
-                path = write_backup_to(location, name, data)
+                path = write_backup_file(self.ctx, password, Path(location))
                 self._prune(Path(location))
             except Exception as exc:  # noqa: BLE001 - report, keep the app running
                 msg = f"{type(exc).__name__}: {exc}"
@@ -363,7 +415,7 @@ class AutoBackup:
     def _prune(self, folder: Path) -> None:
         # Only this copy's own files: another Mac (or a restored copy) may share the folder.
         inst = (self.ctx.ledger.installation or "")[:8]
-        copy = backup_copy_id(self.ctx.ledger)
+        copy = backup_copy_id(self.ctx)
         mine = sorted(folder.glob(f"rprov-backup-{inst}-{copy}-*{BACKUP_SUFFIX}"))
         for old in mine[:-KEEP_BACKUPS]:
             try:
@@ -384,7 +436,7 @@ class AutoBackup:
         if self.debounce <= 0:
             self.maybe_run("after change")
             return
-        with self._lock:
+        with self._timer_lock:
             if self._timer is not None:
                 self._timer.cancel()
             self._timer = threading.Timer(self.debounce, self.maybe_run, kwargs={"reason": "after change"})
@@ -392,7 +444,7 @@ class AutoBackup:
             self._timer.start()
 
     def stop(self) -> None:
-        with self._lock:
+        with self._timer_lock:
             if self._timer is not None:
                 self._timer.cancel()
                 self._timer = None

@@ -76,7 +76,10 @@ export function BackupSetup({
   }
 
   if (created?.recovery_code) {
-    return <RecoveryCodeSheet code={created.recovery_code} onDone={() => onDone(created)} />;
+    return (
+      <RecoveryCodeSheet code={created.recovery_code} fingerprint={created.key_fingerprint}
+        onDone={() => onDone(created)} />
+    );
   }
 
   return (
@@ -144,7 +147,11 @@ export function BackupSetup({
 }
 
 // Shown once: the code is never stored by the app, only the public half of a key made from it.
-export function RecoveryCodeSheet({ code, onDone }: { code: string; onDone: () => void }) {
+export function RecoveryCodeSheet({ code, fingerprint, onDone }: {
+  code: string;
+  fingerprint?: string | null;
+  onDone: () => void;
+}) {
   const [kept, setKept] = useState(false);
   const made = new Date().toISOString().slice(0, 10);
   return (
@@ -159,6 +166,12 @@ export function RecoveryCodeSheet({ code, onDone }: { code: string; onDone: () =
           install the app on a Mac, choose <b>Restore from a backup</b>, pick the newest <span className="mono">.rprovbackup</span>{" "}
           file and click <b>Use the recovery code instead</b>.
         </p>
+        {fingerprint && (
+          <p className="small" data-testid="recovery-fingerprint">
+            Signing key: <b className="mono">{fingerprint}</b> — after a restore with this code the app shows the
+            signing key it brought back; it must be this one. If it is not, the backup is not yours: don't use it.
+          </p>
+        )}
       </div>
       <p className="warning small">
         This is the only time the code is shown — the app does not keep it. Print it or write it down, and keep it
@@ -214,11 +227,12 @@ export function BackupDialog({
   onClose: () => void;
   onChanged: (message: string) => void;
 }) {
-  const [editing, setEditing] = useState(!status?.configured);
+  // A paused copy first sees why it is paused (D-040), even when it has no password yet.
+  const [editing, setEditing] = useState(!status?.configured && status?.state !== "paused");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [oneOff, setOneOff] = useState("");
-  const [newCode, setNewCode] = useState<string | null>(null);
+  const [newCode, setNewCode] = useState<{ code: string; fingerprint?: string | null } | null>(null);
 
   async function runNow() {
     setBusy(true);
@@ -263,7 +277,8 @@ export function BackupDialog({
     setBusy(true);
     setError(null);
     try {
-      setNewCode((await api.backupNewRecoveryCode()).recovery_code);
+      const out = await api.backupNewRecoveryCode();
+      setNewCode({ code: out.recovery_code, fingerprint: out.status.key_fingerprint });
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -294,7 +309,8 @@ export function BackupDialog({
           </button>
         </div>
         {newCode ? (
-          <RecoveryCodeSheet code={newCode} onDone={() => onChanged("New recovery code made. Keep the printed copy safe.")} />
+          <RecoveryCodeSheet code={newCode.code} fingerprint={newCode.fingerprint}
+            onDone={() => onChanged("New recovery code made. Keep the printed copy safe.")} />
         ) : (
           <>
             <p className="small">
@@ -306,7 +322,11 @@ export function BackupDialog({
               <div className="status-box state-paused" data-testid="backup-paused">
                 <div>
                   <b>Automatic backup is paused</b>
-                  {status.paused_after_restore ? " because this copy was restored from a backup." : "."}
+                  {status.paused_reason === "restored"
+                    ? " because this copy was restored from a backup."
+                    : status.paused_reason === "copied"
+                      ? " because this data folder was copied from somewhere else (for example by Migration Assistant or Time Machine)."
+                      : "."}
                 </div>
                 <div className="small">
                   Folder: <span className="mono">{status.location}</span> ({status.where?.label})
@@ -323,14 +343,28 @@ export function BackupDialog({
                   backs up into this folder, choose a different folder instead. If this was only a test of your backup,
                   don't resume: close this copy and delete its folder.
                 </p>
-                <div className="row">
-                  <button className="primary small" onClick={resume} disabled={busy}>
-                    Resume automatic backup to this folder
-                  </button>
-                  <button className="secondary small" onClick={() => setEditing(true)}>
-                    Choose a different folder
-                  </button>
-                </div>
+                {status.needs_password ? (
+                  <>
+                    <p className="small">
+                      To resume, set a backup password for this Mac (it can be the same as before). Your printed
+                      recovery code stays valid.
+                    </p>
+                    <BackupSetup
+                      current={status}
+                      submitLabel="Set password and resume"
+                      onDone={() => onChanged("Automatic backup resumed. A new backup was written.")}
+                    />
+                  </>
+                ) : (
+                  <div className="row">
+                    <button className="primary small" onClick={resume} disabled={busy}>
+                      Resume automatic backup to this folder
+                    </button>
+                    <button className="secondary small" onClick={() => setEditing(true)}>
+                      Choose a different folder
+                    </button>
+                  </div>
+                )}
               </div>
             )}
             {status?.other_copy && status.state !== "paused" && !editing && (
@@ -436,6 +470,7 @@ export function RestoreForm({ onDone }: { onDone: () => void }) {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [restoredWithProblems, setRestoredWithProblems] = useState(false);
+  const [restoredFingerprint, setRestoredFingerprint] = useState<string | null>(null);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -444,8 +479,11 @@ export function RestoreForm({ onDone }: { onDone: () => void }) {
     setError(null);
     try {
       const out = await api.restore(file, useCode ? { recoveryCode: code } : { password });
-      if (out.verification.ok) onDone();
-      else setRestoredWithProblems(true);
+      if (!out.verification.ok) setRestoredWithProblems(true);
+      // Anyone who can write to the backup folder could leave a file that opens with the recovery
+      // code (its key is public); the signing key printed on the recovery sheet tells them apart.
+      if (out.opened_with === "recovery code") setRestoredFingerprint(out.key_fingerprint);
+      else if (out.verification.ok) onDone();
     } catch (err) {
       setError((err as Error).message);
     } finally {
@@ -453,13 +491,22 @@ export function RestoreForm({ onDone }: { onDone: () => void }) {
     }
   }
 
-  if (restoredWithProblems) {
+  if (restoredWithProblems || restoredFingerprint) {
     return (
-      <div className="restore" data-testid="restore-problems">
-        <p className="error">
-          Restored, but the check found problems with some records. Open the app and look at the records marked as
-          failed before relying on them; keep the backup file.
-        </p>
+      <div className="restore" data-testid="restore-result">
+        {restoredFingerprint && (
+          <p data-testid="restored-fingerprint">
+            Restored with the recovery code. Signing key: <b className="mono">{restoredFingerprint}</b>. Check that this
+            is the signing key printed on your recovery sheet. If it is different, this backup is not yours — don't
+            use it.
+          </p>
+        )}
+        {restoredWithProblems && (
+          <p className="error">
+            The check found problems with some records. Open the app and look at the records marked as failed before
+            relying on them; keep the backup file.
+          </p>
+        )}
         <button className="primary" onClick={onDone}>
           Open the app
         </button>

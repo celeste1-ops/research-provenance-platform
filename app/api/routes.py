@@ -465,16 +465,28 @@ class BackupIn(BaseModel):
 @router.post("/backup")
 def create_backup_route(body: BackupIn, request: Request):
     """Download one encrypted backup now (independent of the automatic backups)."""
-    from app.services.backup import create_backup
+    import shutil
+    import tempfile
+    from pathlib import Path
+
+    from fastapi.responses import FileResponse
+    from starlette.background import BackgroundTask
+
+    from app.services.backup import write_backup_file
 
     c = real(request)
+    tmp = tempfile.mkdtemp(dir=c.settings.data_dir)
     try:
-        name, data = create_backup(c, body.password)
+        path = write_backup_file(c, body.password, Path(tmp))
     except NotInitialized as exc:
+        shutil.rmtree(tmp, ignore_errors=True)
         raise _bad(exc) from None
+    except Exception:
+        shutil.rmtree(tmp, ignore_errors=True)
+        raise
     c.ledger.set_meta("key_backup_done", "1")
-    return Response(data, media_type="application/octet-stream",
-                    headers={"Content-Disposition": f'attachment; filename="{name}"'})
+    return FileResponse(path, media_type="application/octet-stream", filename=path.name,
+                        background=BackgroundTask(shutil.rmtree, tmp, ignore_errors=True))
 
 
 @router.get("/backup/status")
@@ -565,19 +577,30 @@ async def restore_route(
     password: Annotated[str, Form()] = "",
     recovery_code: Annotated[str, Form()] = "",
 ):
+    import shutil
+    import tempfile
+    from pathlib import Path
+
     from starlette.concurrency import run_in_threadpool
 
     from app.services.backup import BackupError, restore_backup
     from app.services.verification import report_json, verify_database
 
     c = real(request)
-    data = await file.read()
+    # Stream the upload to a temporary file: backups can be larger than memory.
+    tmp = tempfile.mkdtemp(dir=c.settings.data_dir)
     try:
+        upload = Path(tmp) / "upload.rprovbackup"
+        with open(upload, "wb") as out:
+            while block := await file.read(1024 * 1024):
+                out.write(block)
         summary = await run_in_threadpool(
-            lambda: restore_backup(c, data, password or None, recovery_code=recovery_code or None)
+            lambda: restore_backup(c, upload, password or None, recovery_code=recovery_code or None)
         )
     except (BackupError, LedgerError) as exc:
         raise HTTPException(400, str(exc)) from None
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
     # Same password, same folder (if it exists on this Mac): automatic backups simply continue.
     # Opened with the recovery code: the status asks for a new backup password.
     c.autobackup.adopt_restored_password(password if summary["opened_with"] == "password" else None)

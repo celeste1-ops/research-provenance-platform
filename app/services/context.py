@@ -85,6 +85,7 @@ class AppContext:
         ctx.autobackup = AutoBackup(ctx)
         if backups:  # the practice space is never backed up
             ledger.listeners.append(ctx.autobackup.schedule)
+            ctx.autobackup.detect_copied_folder()
         return ctx
 
     def close(self) -> None:

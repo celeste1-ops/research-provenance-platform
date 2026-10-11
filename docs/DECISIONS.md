@@ -329,3 +329,41 @@ verification rules or what leaves the machine for time proofs.
   continue meanwhile: each copy's own files are complete and kept apart. The app does
   not try to decide which Mac is "the real one" or merge the two histories; it makes the
   situation visible so the author can stop one of them.
+- **D-042 · Hardening after an independent review of the backup code.**
+  1. *Copied data folders.* Migration Assistant, a Time Machine restore or `cp -r` copy
+     the database (and on a Mac usually the keychain), so the copy carried the
+     original's per-copy id and the two would have pruned each other's backups without
+     any warning. The copy id is now tied to the data folder on disk (inode and creation
+     time). At start-up a folder whose identity no longer matches is treated like a
+     restore: a new copy id, automatic backup paused until the author confirms ("this
+     data folder was copied from somewhere else"), and the original's files count as
+     another copy's from then on.
+  2. *Per-copy keychain entries.* The backup password is now stored per copy
+     (`backup-password:<installation>:<copy>`). A restore drill on the same Mac can no
+     longer change the original's password, even by choosing another folder and
+     password in the copy. The original install takes over the older entry name once;
+     restored or copied installs never read it.
+  3. *Pause enforced by the server.* While paused, `run`, the manual "Back up now" and
+     "new recovery code" refuse; only "Resume" or setting the folder and password again
+     ends the pause. After a recovery-code restore (no password known), the paused box
+     asks for a new password instead of skipping straight to the setup form.
+  4. *Format 3, in pieces.* AES-GCM in `cryptography` takes at most 2 GiB per message,
+     so a large research folder would have made every backup fail. Format 3
+     (`RPROV-BACKUP-ENC/3`) encrypts the inner zip in 4 MiB pieces under the same random
+     backup key and key slots. Each piece's nonce is a random prefix plus its number,
+     and its associated data is the header, its number and a last-piece flag, so pieces
+     can't be reordered, dropped or cut off. Backups are now built, encrypted, uploaded
+     for restore and decrypted through temporary files in the data folder, so memory
+     use no longer grows with the research. Formats 2 and 1 and plain zips still restore.
+  5. *Bounded key derivation.* A crafted header can no longer ask for more than 256 MiB
+     of scrypt memory (n a power of two, r ≤ 32, p ≤ 4) in any format.
+  6. *Saving never waits for a backup.* Scheduling the next backup and running one use
+     separate locks.
+  7. *Recovery-code restores show the signing key.* The recovery key is public (it sits
+     in every header), so anyone able to write into the backup folder could leave a
+     file that opens with the code. Password restores are not affected. The recovery
+     sheet now prints the first 16 hex digits of the signing public key. After a
+     recovery-code restore the app shows the key it brought back and asks the author to
+     compare the two before opening the app. Sheets printed before this change have no
+     such line; making a new recovery code prints one.
+  8. Recovery codes may be typed with any kind of dash.
