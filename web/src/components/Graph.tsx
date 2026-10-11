@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useCallback, useMemo, useRef } from "react";
 import {
   Background,
   Controls,
@@ -8,6 +8,7 @@ import {
   ReactFlow,
   type Edge,
   type Node,
+  type NodeChange,
   type NodeProps,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
@@ -76,11 +77,43 @@ interface Props {
   milestonesOnly?: boolean;
 }
 
+// The map is redrawn whenever its data is fetched again, often with nothing changed (the app
+// loads twice on start-up and after a restore; every save reloads). React Flow measures each
+// node before showing it, and a node handed over as a new object is hidden and measured
+// again; a second redraw at the wrong moment could leave a node hidden for good. So nodes
+// that did not change are handed over as the same object, and changed ones keep their last
+// measured size until they are measured again.
+function useStableNodes(fresh: Node[]) {
+  const previous = useRef(new Map<string, { key: string; node: Node }>());
+  const measured = useRef(new Map<string, { width: number; height: number }>());
+  const nodes = useMemo(() => {
+    const next = new Map<string, { key: string; node: Node }>();
+    const out = fresh.map((n) => {
+      const key = JSON.stringify([n.type, n.position, n.data, n.selected, n.className]);
+      const old = previous.current.get(n.id);
+      const size = measured.current.get(n.id);
+      const node = old && old.key === key ? old.node : size ? { ...n, measured: size } : n;
+      next.set(n.id, { key, node });
+      return node;
+    });
+    previous.current = next;
+    return out;
+  }, [fresh]);
+  const onNodesChange = useCallback((changes: NodeChange[]) => {
+    for (const c of changes) {
+      if (c.type === "dimensions" && c.dimensions) measured.current.set(c.id, c.dimensions);
+    }
+  }, []);
+  return { nodes, onNodesChange };
+}
+
 export function Graph({ data, selected, onSelect, milestonesOnly = false }: Props) {
-  const { nodes, edges } = useMemo(
+  const drawn = useMemo(
     () => (milestonesOnly ? milestoneLayout(data, selected) : layout(data, selected)),
     [data, selected, milestonesOnly],
   );
+  const { nodes, onNodesChange } = useStableNodes(drawn.nodes);
+  const edges = drawn.edges;
   if (data.nodes.length === 0) {
     return <div className="empty">No records yet. Use “New record” to make the first one.</div>;
   }
@@ -93,6 +126,7 @@ export function Graph({ data, selected, onSelect, milestonesOnly = false }: Prop
         key={milestonesOnly ? "milestones" : "all"} // re-fit the view when the mode changes
         nodes={nodes}
         edges={edges}
+        onNodesChange={onNodesChange}
         nodeTypes={nodeTypes}
         nodesDraggable={false}
         nodesConnectable={false}

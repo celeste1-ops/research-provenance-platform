@@ -45,6 +45,26 @@ def test_milestones_only_view(demo_page):  # AC-13
     assert graph.locator(".record-node").count() == 14
 
 
+def test_redrawing_the_map_never_hides_steps_again(demo_page):
+    """The map is fetched again after start-up, a restore and every save, mostly unchanged. Steps
+    handed to React Flow as new objects were hidden and measured again each time, and a redraw at
+    the wrong moment left one hidden for good (seen on CI after a restore). Unchanged steps now
+    stay the same objects; changed ones keep their size."""
+    page, ids, _srv = demo_page
+    page.wait_for_timeout(500)
+    page.evaluate("""() => { window.__hidden = 0;
+        new MutationObserver(ms => { for (const m of ms) if (m.target.classList?.contains('react-flow__node')
+            && m.target.style.visibility === 'hidden') window.__hidden++; })
+          .observe(document.querySelector('.react-flow'), {subtree: true, attributes: true, attributeFilter: ['style']}); }""")
+    page.get_by_test_id("settings-menu").click()
+    page.get_by_role("menuitem", name="Check stamps now").click()  # the same data again
+    page.get_by_test_id(f"node-{ids['exp1']}").click()  # a redraw where two steps change
+    page.get_by_test_id("detail").wait_for()
+    page.get_by_test_id(f"node-{ids['exp2']}").click()
+    page.wait_for_timeout(1000)
+    assert page.evaluate("window.__hidden") == 0
+
+
 def test_timeline_view(demo_page):
     page, ids, srv = demo_page
     page.get_by_test_id("tab-timeline").click()
