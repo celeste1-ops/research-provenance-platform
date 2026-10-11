@@ -26,7 +26,7 @@ class GitRepo:
 
     def commit(self, message: str, date: str | None = None, tag: str | None = None) -> str:
         self.n += 1
-        (self.path / "model.py").write_text(f"version = {self.n}\n", encoding="utf-8")
+        (self.path / "model.py").write_bytes(f"version = {self.n}\n".encode())  # LF on every system
         self.git("add", "model.py")
         self.git("commit", "-q", "-m", message, date=date)
         if tag:
