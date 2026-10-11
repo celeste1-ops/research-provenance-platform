@@ -294,6 +294,7 @@ def test_location_classification(tmp_path, monkeypatch):
     data = tmp_path / "data"
     data.mkdir()
     monkeypatch.setattr(locations, "sync_roots", lambda *a, **k: [])
+    locations.clear_cache()
     assert autobackup.classify_location(tmp_path / "nope", data)["kind"] == "missing"
     assert autobackup.classify_location(tmp_path, data)["kind"] == "same-disk"
     fake_icloud = tmp_path / "Mobile Documents" / "com~apple~CloudDocs"
@@ -302,6 +303,7 @@ def test_location_classification(tmp_path, monkeypatch):
     (fake_dropbox / "bk").mkdir(parents=True)
     monkeypatch.setattr(locations, "sync_roots", lambda *a, **k: [("iCloud Drive", fake_icloud),
                                                                    ("Dropbox", fake_dropbox)])
+    locations.clear_cache()
     got = autobackup.classify_location(fake_icloud / "Research Provenance Backups", data)
     assert got == {"kind": "synced", "label": "iCloud Drive", "safe": True}
     assert autobackup.classify_location(fake_dropbox / "bk", data)["label"] == "Dropbox"
@@ -487,6 +489,7 @@ def test_location_checks(tmp_path, monkeypatch):
     icloud = tmp_path / "Mobile Documents" / "com~apple~CloudDocs"
     icloud.mkdir(parents=True)
     monkeypatch.setattr(locations, "sync_roots", lambda *a, **k: [("iCloud Drive", icloud)])
+    locations.clear_cache()
     synced = autobackup.check_location(str(icloud / "Research Provenance Backups"), data_dir)
     assert synced["ok"] and synced["kind"] == "synced" and synced["label"] == "iCloud Drive" and synced["safe"]
     # The live database must not live in a synced folder; backups may.

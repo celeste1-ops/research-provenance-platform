@@ -6,6 +6,7 @@ import hashlib
 import json
 import shutil
 import subprocess
+import sys
 
 import pytest
 
@@ -18,7 +19,7 @@ def test_verify_py_in_fresh_venv(tmp_path, uv_bin):
     s = make_sample(tmp_path)
     venv = tmp_path / "fresh-venv"
     subprocess.run([uv_bin, "venv", "--quiet", "--python", "3.12", str(venv)], check=True)
-    py = venv / "bin" / "python"
+    py = venv / "Scripts" / "python.exe" if sys.platform == "win32" else venv / "bin" / "python"
     # Exactly the dependencies verify.py declares in its header.
     header = (s.bundle_dir / "verify.py").read_text(encoding="utf-8").split('"""')[1]
     assert 'pip install "cryptography>=44" "rfc3161-client>=1.0.6"' in header

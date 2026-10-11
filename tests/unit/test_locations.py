@@ -57,3 +57,17 @@ def test_suggestions_list_sync_folders_then_other_disks(tmp_path, monkeypatch):
     got = locations.suggestions(data)
     assert [(s["label"], s["kind"]) for s in got] == [("OneDrive", "synced"), ("Drive E:", "external")]
     assert got[0]["path"].endswith(locations.SUGGESTED_FOLDER_NAME)
+
+
+def test_scanning_this_computer_is_quick_and_cached(tmp_path):
+    """The real scan runs on every status poll's first call: it must not stall (e.g. on drives
+    that are not ready) and it is cached for a minute."""
+    import time
+
+    t0 = time.monotonic()
+    first = locations.cached_sync_roots()
+    assert time.monotonic() - t0 < 5, f"scan took {time.monotonic() - t0:.1f}s"
+    t0 = time.monotonic()
+    assert locations.cached_sync_roots() == first
+    assert time.monotonic() - t0 < 0.05
+    print("sync folders on this machine:", first, "drives:", locations.windows_drives())

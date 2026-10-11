@@ -10,6 +10,8 @@ from __future__ import annotations
 import json
 import os
 import sys
+import threading
+import time
 from pathlib import Path
 
 SUGGESTED_FOLDER_NAME = "Research Provenance Backups"
@@ -45,13 +47,47 @@ def _dropbox_from_info(env) -> list[tuple[str, Path]]:
     return out
 
 
+_DRIVE_FIXED, _DRIVE_REMOTE, _DRIVE_REMOVABLE = 3, 4, 2
+
+
 def windows_drives() -> list[Path]:
-    if hasattr(os, "listdrives"):  # Python 3.12+ on Windows
-        try:
-            return [Path(d) for d in os.listdrives()]
-        except OSError:
-            return []
-    return [Path(f"{c}:\\") for c in "ABCDEFGHIJKLMNOPQRSTUVWXYZ" if Path(f"{c}:\\").exists()]
+    """Drive letters worth looking at: fixed, removable and network drives. CD/DVD drives and
+    unknown types are skipped — probing a drive that is not ready can take many seconds."""
+    if sys.platform != "win32":
+        return []
+    import ctypes
+
+    get_type = ctypes.windll.kernel32.GetDriveTypeW
+    letters = os.listdrives() if hasattr(os, "listdrives") else [f"{c}:\\" for c in "CDEFGHIJKLMNOPQRSTUVWXYZ"]
+    out = []
+    for root in letters:
+        if root[:1].upper() in "AB":  # floppy letters: probing them stalls
+            continue
+        if get_type(ctypes.c_wchar_p(root)) in (_DRIVE_FIXED, _DRIVE_REMOTE, _DRIVE_REMOVABLE):
+            out.append(Path(root))
+    return out
+
+
+_CACHE_SECONDS = 60.0
+_cache: dict = {}
+_cache_lock = threading.Lock()
+
+
+def clear_cache() -> None:
+    with _cache_lock:
+        _cache.clear()
+
+
+def cached_sync_roots() -> list[tuple[str, Path]]:
+    """sync_roots() for this computer, re-scanned at most once a minute (status is polled often)."""
+    with _cache_lock:
+        hit = _cache.get("roots")
+        if hit is not None and time.monotonic() - hit[0] < _CACHE_SECONDS:
+            return hit[1]
+    roots = sync_roots()
+    with _cache_lock:
+        _cache["roots"] = (time.monotonic(), roots)
+    return roots
 
 
 def sync_roots(platform: str | None = None, home: Path | None = None, env=None,
@@ -94,7 +130,7 @@ def synced_service(path: Path, roots: list[tuple[str, Path]] | None = None) -> s
         resolved = path.expanduser().resolve()
     except OSError:
         return None
-    for label, root in sync_roots() if roots is None else roots:
+    for label, root in cached_sync_roots() if roots is None else roots:
         try:
             base = root.resolve()
         except OSError:

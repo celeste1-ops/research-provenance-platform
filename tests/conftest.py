@@ -33,6 +33,16 @@ def make_ctx(tmp_path, *, tsa=None, btc=None, keystore=None) -> AppContext:
     return AppContext.create(settings, keystore=keystore or MemoryKeyStore(), providers=providers)
 
 
+@pytest.fixture(autouse=True)
+def _fresh_location_scan():
+    """Each test sees its own (possibly monkeypatched) sync folders, not a cached scan."""
+    from app.services import locations
+
+    locations.clear_cache()
+    yield
+    locations.clear_cache()
+
+
 @pytest.fixture
 def ctx(tmp_path):
     c = make_ctx(tmp_path)
