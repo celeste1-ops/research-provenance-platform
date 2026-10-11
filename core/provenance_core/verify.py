@@ -89,6 +89,31 @@ class RecordMaterial:
 
 
 @dataclass
+class FileStamp:
+    """A date stamp of one attached file's own bytes (DECISIONS D-049)."""
+
+    file: str
+    check: ProofCheck
+
+
+STAMP_SUFFIX = ".tsr"
+
+
+def file_stamps(content: dict[str, bytes], tsa_roots: list[x509.Certificate]) -> list[FileStamp]:
+    """An attachment "<name>.tsr" next to "<name>" is a third-party timestamp of that file's
+    bytes, taken when the file was first seen: it shows the file existed by then, even if the
+    record that holds it was made later. It is checked like any timestamp (signature, chain to
+    a trusted root, digest) but does not change the record's own result."""
+    out = []
+    for key in sorted(content):
+        if key.startswith("files/") and key.endswith(STAMP_SUFFIX) and key[: -len(STAMP_SUFFIX)] in content:
+            target = key[: -len(STAMP_SUFFIX)]
+            out.append(FileStamp(target[len("files/"):],
+                                 verify_tsa_proof(sha256_hex(content[target]), content[key], tsa_roots)))
+    return out
+
+
+@dataclass
 class RecordResult:
     record_id: str
     seq: int | None = None
@@ -100,6 +125,7 @@ class RecordResult:
     tsa: ProofCheck = field(default_factory=lambda: no_proof(TSA_KIND))
     btc: ProofCheck = field(default_factory=lambda: no_proof(BTC_KIND))
     status: str = STATUS_PASS
+    file_stamps: list[FileStamp] = field(default_factory=list)  # earlier stamps of attached files
 
     @property
     def failure_codes(self) -> list[str]:
@@ -262,6 +288,8 @@ def verify_log(
         if pub is not None and not verify_record_signature(pub, rid, m.signature):
             res.issues.append(Issue("SIGNATURE_INVALID", "Ed25519 signature over the record ID does not verify"))
         res.tsa = verify_tsa_proof(rid, m.tsa_proof, tsa_roots)
+        if m.content:
+            res.file_stamps = file_stamps(m.content, tsa_roots)
         if btc_check is not None:
             res.btc = btc_check(rid, m.btc_proof)
         else:

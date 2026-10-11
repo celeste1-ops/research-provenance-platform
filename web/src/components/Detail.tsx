@@ -101,6 +101,13 @@ export function Detail({ id, version, onClose, onSelect, entries, relationTypes,
               ))}
           </ul>
         )}
+        {(detail.file_stamps ?? []).map((f) => (
+          <p key={f.file} className={`small ${f.state === "verified" ? "" : "warning"}`} data-testid="file-stamp">
+            {f.state === "verified"
+              ? t("Date stamp ✓ of the file {file}: it existed by {time}, when it arrived in the inbox.", { file: f.file, time: f.time ?? "" })
+              : t("Date stamp of the file {file}: could not be verified ({code}).", { file: f.file, code: f.code ?? f.state })}
+          </p>
+        ))}
         <div className="proofs">
           <ProofLine proof={v.timestamps.tsa} />
           <p className="proof-help small">{proofHelp(v.timestamps.tsa)}</p>

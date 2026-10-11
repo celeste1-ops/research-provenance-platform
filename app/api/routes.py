@@ -86,6 +86,7 @@ def status(request: Request):
         "data_dir": str(c.settings.data_dir),
         "public_key": genesis["public_key"] if genesis else None,
         "space": space_name(request),
+        "inbox": c.inbox.count(),  # versions from watched folders waiting to be recorded (D-049)
         # Words for this kind of computer in the interface: "this Mac", "this PC", "this computer".
         "device": c.settings.device,
         "keychain_name": c.settings.keychain_name,
@@ -342,10 +343,13 @@ def create_retraction(body: RetractionIn, request: Request):
 
 @router.get("/records/{record_id}")
 def get_record(record_id: str, request: Request):
+    from app.services.verification import record_file_stamps
+
     c = ctx(request)
     detail = record_detail(Snapshot.load(c.ledger, c.anchors), record_id)
     if detail is None:
         raise HTTPException(404, "no such record")
+    detail["file_stamps"] = record_file_stamps(c.ledger, c.anchors, record_id)
     return detail
 
 
@@ -408,7 +412,15 @@ def get_narrative(request: Request, project: str | None = None):
     snap = Snapshot.load(c.ledger, c.anchors)
     title = next((p.title for p in c.ledger.projects() if p.id == project), None) if project else None
     records = [(r.id, r.seq, r.kind, snap.payloads[r.id]) for r in snap.rows]
-    return build_narrative(records, snap.when, title=title or tr("My research"), project_id=project)
+    from app.services.verification import record_file_stamps
+
+    stamps = {}
+    for rid, files in snap.files.items():  # only steps that hold an inbox date stamp (D-049)
+        if any(f.name.endswith(".tsr") for f in files):
+            stamps[rid] = [(f["file"], f["time"]) for f in record_file_stamps(c.ledger, c.anchors, rid)
+                           if f["state"] == "verified"]
+    return build_narrative(records, snap.when, title=title or tr("My research"), project_id=project,
+                           file_stamps=stamps)
 
 
 # ---------------------------------------------------------------- time proofs & verification
@@ -521,6 +533,85 @@ def git_remove(source_id: str, request: Request):
     except LedgerError as exc:
         raise HTTPException(404, str(exc)) from None
     return c.git.status()
+
+
+# ---------------------------------------------------------------- watched folders and the inbox (D-049)
+
+
+class FolderIn(BaseModel):
+    path: str
+    project_id: str | None = None
+    include_existing: bool = False
+
+
+class InboxRecordIn(BaseModel):
+    title: str | None = None
+    node_type: str | None = None
+
+
+@router.get("/inbox")
+def inbox_status(request: Request):
+    return ctx(request).inbox.status()
+
+
+@router.post("/inbox/folders/inspect")
+def inbox_inspect(body: FolderIn, request: Request):
+    from app.services.inbox import InboxError
+
+    try:
+        return ctx(request).inbox.inspect(body.path)
+    except InboxError as exc:
+        raise HTTPException(400, str(exc)) from None
+
+
+@router.post("/inbox/folders")
+def inbox_add_folder(body: FolderIn, request: Request):
+    from app.services.inbox import InboxError
+
+    c = ctx(request)
+    if not c.ledger.initialized():
+        raise HTTPException(409, "set up the app first")
+    try:
+        c.inbox.add_folder(body.path, body.project_id or "", include_existing=body.include_existing)
+    except (InboxError, LedgerError) as exc:
+        raise HTTPException(400, str(exc)) from None
+    return c.inbox.status()
+
+
+@router.delete("/inbox/folders/{folder_id}")
+def inbox_remove_folder(folder_id: str, request: Request):
+    c = ctx(request)
+    try:
+        c.inbox.remove_folder(folder_id)
+    except LedgerError as exc:
+        raise HTTPException(404, str(exc)) from None
+    return c.inbox.status()
+
+
+@router.post("/inbox/check")
+def inbox_check(request: Request):
+    c = ctx(request)
+    return {"arrived": c.inbox.scan(), **c.inbox.status()}
+
+
+@router.post("/inbox/items/{item_id}/record")
+def inbox_record(item_id: str, body: InboxRecordIn, request: Request):
+    c = ctx(request)
+    try:
+        rid = c.inbox.record(item_id, title=body.title, node_type=body.node_type)
+    except LedgerError as exc:
+        raise HTTPException(400, str(exc)) from None
+    return {"id": rid, **c.inbox.status()}
+
+
+@router.delete("/inbox/items/{item_id}")
+def inbox_discard(item_id: str, request: Request):
+    c = ctx(request)
+    try:
+        c.inbox.discard(item_id)
+    except LedgerError as exc:
+        raise HTTPException(404, str(exc)) from None
+    return c.inbox.status()
 
 
 # ---------------------------------------------------------------- evidence bundle

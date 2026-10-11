@@ -108,6 +108,7 @@ class AppContext:
     session_token: str
     autobackup: object = field(default=None, repr=False)
     git: object = field(default=None, repr=False)  # repositories recorded automatically (D-047)
+    inbox: object = field(default=None, repr=False)  # watched folders and their inbox (D-049)
     # “Check stamp services”; tests swap it for one that makes no network requests.
     service_check: Callable[[], dict] | None = field(default=None, repr=False)
 
@@ -136,6 +137,9 @@ class AppContext:
         from app.services.gitsources import GitSources
 
         ctx.git = GitSources(ctx)
+        from app.services.inbox import Inbox
+
+        ctx.inbox = Inbox(ctx)
         if backups:  # the practice space is never backed up
             ledger.listeners.append(ctx.autobackup.schedule)
             ctx.autobackup.detect_copied_folder()

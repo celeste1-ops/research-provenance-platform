@@ -277,3 +277,9 @@ ul.plain { list-style: none; padding: 0; margin: 0; }
   .story-view { max-width: none; padding: 0; }
   .story-scroll { position: static; overflow: visible; }
 }
+/* Watched folders and the inbox (D-049) */
+.pill-inbox { background: #eef1fb; border: 1px solid #b9c4ef; color: #1e3a8a; font-weight: 600; white-space: nowrap; }
+.inbox-list { list-style: none; padding: 0; margin: 8px 0; }
+.inbox-item { border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; margin: 6px 0; }
+.inbox-item .row { margin: 0 0 4px; }
+.inbox-item .row > select { flex: 0 0 auto; min-width: 120px; }

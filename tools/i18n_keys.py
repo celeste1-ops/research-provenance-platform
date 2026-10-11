@@ -59,7 +59,7 @@ TEMPLATES = "app/report/templates"
 # t("…") / th("…") in the report templates, with either kind of quotes.
 TEMPLATE_CALL = re.compile(r"""\b(?:t|th)\(\s*(?:"((?:[^"\\]|\\.)*)"|'((?:[^'\\]|\\.)*)')""")
 _ERROR_CLASSES = {"LedgerError", "BackupError", "PracticeResetError", "HTTPException", "ValueError", "KeyStoreError",
-                  "GitError"}
+                  "GitError", "InboxError"}
 
 
 def _literal(node) -> str | None:

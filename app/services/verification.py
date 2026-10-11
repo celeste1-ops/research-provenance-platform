@@ -61,6 +61,21 @@ def proof_json(p: ProofCheck) -> dict:
     return {"kind": p.kind, "state": p.state, "time": p.time, "code": p.code, "detail": p.detail, "source": p.source}
 
 
+def file_stamp_json(f) -> dict:
+    return {"file": f.file, **proof_json(f.check)}
+
+
+def record_file_stamps(ledger, anchor_service, record_id: str) -> list[dict]:
+    """The earlier date stamps of a step's attached files (an inbox stamp, D-049), checked now."""
+    from provenance_core.verify import STAMP_SUFFIX, file_stamps
+
+    files = {f.name: f for f in ledger.record_files(record_id) if f.role != "body"}
+    if not any(n.endswith(STAMP_SUFFIX) and n[: -len(STAMP_SUFFIX)] in files for n in files):
+        return []
+    content = {f"files/{n}": ledger.blobs.get(f.sha256) for n, f in files.items()}
+    return [file_stamp_json(f) for f in file_stamps(content, trust_roots(anchor_service))]
+
+
 def result_json(r: RecordResult) -> dict:
     ev = r.earliest_verified()
     return {
@@ -76,6 +91,7 @@ def result_json(r: RecordResult) -> dict:
         "btc": proof_json(r.btc),
         "earliest_verified": {"time": ev[0], "from": ev[1]} if ev else None,
         "signature": "invalid" if "SIGNATURE_INVALID" in r.failure_codes else "valid",
+        "file_stamps": [file_stamp_json(f) for f in r.file_stamps],
     }
 
 
