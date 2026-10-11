@@ -367,3 +367,106 @@ verification rules or what leaves the machine for time proofs.
      compare the two before opening the app. Sheets printed before this change have no
      such line; making a new recovery code prints one.
   8. Recovery codes may be typed with any kind of dash.
+
+## Round 4: installers, Windows, reachability of the stamp services
+
+- **D-043 · Windows 10/11 as a second system (PRD §4 conflict).** PRD §4 lists "web and
+  mobile versions" as out of scope and says to get the Mac version right first; it does
+  not mention Windows. The author asked for Windows 11 support so the app can be shared
+  with others. It is the same local app (no account, no cloud, 127.0.0.1 only), so none
+  of the §4 reasons apply; it is added as a second desktop system, not as a web version.
+  1. *Wording.* The interface says "this Mac", "this PC" or "this computer" and names the
+     system's credential store (Keychain, Windows Credential Manager) from
+     `Settings.device` (`RPROV_DEVICE` overrides). Tests pin "Mac".
+  2. *S5 (PRD §14).* "The private key is stored only in the macOS Keychain" is read as
+     "only in the system's credential store": on Windows `keyring` uses Windows
+     Credential Manager (DPAPI, tied to the Windows account). Never a plain file, as
+     before; exported backups still need a password.
+  3. *Backup folders.* Suggestions per system: OneDrive (personal and work), iCloud for
+     Windows, Dropbox (also a custom location from its `info.json`), Google Drive's "My
+     Drive" on any drive letter, other drives. Only fixed, removable and network drives
+     are looked at, and the scan is cached for a minute (probing a drive that is not
+     ready can take many seconds). The "live data in a synced folder" warning works the
+     same on every system.
+  4. *Portability fixes.* UTF-8 for all text files and for verify.py's output (a piped
+     Windows console used to crash on non-ASCII titles); LF line endings kept by
+     `.gitattributes` for hash-checked fixtures; "Start practice over" reports a folder
+     that Windows still keeps in use instead of reopening the old practice data.
+  5. *CI.* A `windows-latest` job runs the whole suite, browser tests included.
+
+- **D-044 · Desktop app and installers.** For people who will not install Python, uv and
+  Node: a double-clickable app named "Research History".
+  1. *Same server, no new network code.* `app/desktop.py` starts the usual local server
+     (127.0.0.1; the next free port if 8765 is taken), opens the default browser and
+     shows a menu bar / notification area icon with "Open Research History" and "Quit".
+     Readiness is read from the server object, so the rule "network code only in
+     providers" still holds. One copy per data folder: an OS file lock in the data folder
+     (released even after a crash); a second start just opens the browser at the running
+     copy. With no console window, everything goes to `<data>/logs/app.log`, including
+     tracebacks of unexpected server errors.
+  2. *Bundles.* PyInstaller, one folder, with its own Python, the built interface, the
+     report templates, the sample data and the public TSA certificates. The two public
+     mock-TSA certificates are included because export compares token issuers with the
+     mock root; the spec refuses to package any file whose name contains "key". The
+     frozen app has no core sources to assemble verify.py from, so a verify.py built at
+     packaging time from the same core is shipped and used for exports.
+  3. *Windows.* Inno Setup, per user (no administrator rights), installed into
+     `%LOCALAPPDATA%\Programs\Research History`, Start menu entry, optional desktop icon,
+     uninstaller. Data stays in `%USERPROFILE%\.rprov`; uninstalling and upgrading never
+     touch it. The `AppId` must never change, or upgrades become a second installation.
+  4. *macOS.* `.app` in a `.dmg`, Apple Silicon first (Intel needs a build on an Intel
+     runner or a universal2 Python and wheels; the code itself is ready). Menu bar only
+     (`LSUIElement`), macOS 11 or later. Data stays in `~/.rprov`.
+  5. *Not signed yet.* macOS gets an ad-hoc signature only, Windows none. First-open
+     steps and what signing would take are in the README. Because an unsigned app has no
+     stable identity, macOS asks again for Keychain access after every upgrade
+     ("Always Allow").
+  6. *Built and tested on GitHub Actions.* `package.yml` builds both installers on every
+     push to main and to `claude/**` branches, on `v*` tags and on demand, installs each
+     one silently, sets up a throwaway data folder (never `~/.rprov`, never the real
+     Keychain on macOS), saves a step with a non-ASCII title, exports, runs the bundled
+     verify.py on the export, uninstalls and checks the data folder is still there.
+
+- **D-045 · A second time-stamping authority, and checking whether the stamp services
+  can be reached.** Some of the public services may be blocked or slow in some places,
+  mainland China in particular. Facts the design rests on: saving a step waits for its
+  date stamp; a step without one is still saved and gets it later from the retry job.
+  1. *DigiCert as fallback, FreeTSA first.* `http://timestamp.digicert.com` (DigiCert's
+     public RFC 3161 service: free, no account, widely used for code signing) is tried
+     when FreeTSA does not answer. FreeTSA stays
+     first so nothing changes where it works and existing bundles keep the same layout.
+     `RPROV_TSA=digicert` reverses the order; `RPROV_TSA_FALLBACK=off` disables the
+     fallback. One timestamp per record, from whichever authority answered; the stored
+     row and the token itself name the signer.
+  2. *Built-in root, pinned.* DigiCert Trusted Root G4 (valid 2013-08-01 → 2038-01-15,
+     SHA-256 `55:2F:7B:DC:F1:A7:AF:9E:6C:E6:72:01:7F:4F:12:AB:F7:72:40:C7:8E:76:1A:C2:03:D1:D9:D2:0A:C8:99:88`),
+     committed next to the FreeTSA root and checked against its fingerprint whenever it
+     is loaded. The copy came from the operating system trust store (DigiCert's download
+     server is not reachable from the cloud environment); `make freetsa-certs` now also
+     compares it with `https://cacerts.digicert.com/DigiCertTrustedRootG4.crt`. Each
+     authority accepts only tokens chaining to its own root; checking (app, verify.py,
+     report) accepts either root. Unknown roots are still refused (TSA_CHAIN_UNTRUSTED).
+  3. *Plain HTTP is fine here.* DigiCert documents its timestamp endpoint as plain HTTP.
+     The request holds just the 32-byte digest and a nonce, and the answer is checked in
+     full (signature, chain to the pinned root, digest, nonce) before it is accepted, so
+     an eavesdropper learns nothing new and a tamperer can only make the stamp fail.
+  4. *No slow saves while a service is blocked.* An authority that failed is moved to
+     the back of the line for an hour, so the next saves go straight to the one that
+     works. If a whole kind of stamp could not be reached (no authority, or fewer than
+     two OpenTimestamps calendars), saves skip it for 10 minutes instead of waiting for
+     its time limit again; the record stays "waiting" and the retry job and "Check stamps
+     now" still try. So only one save in ten minutes waits for an unreachable service.
+  5. *Bundles and verify.py.* `certs/` always holds both roots;
+     `certs/digicert-tsa-chain.pem` holds the DigiCert signing chain when a record was
+     stamped by DigiCert (`freetsa-tsa.crt` as before for FreeTSA). `bundle.json` lists
+     both fingerprints under `trusted_tsa_roots`; VERIFY.md gives an `openssl ts -verify`
+     command for each authority; verify.py embeds both roots and prints both
+     fingerprints. Bundles exported before this change verify exactly as before.
+  6. *"Check stamp services" (Settings menu).* Runs only when the author clicks "Check
+     now". It asks each authority for a real stamp of a random value (the answer is
+     checked like a real one), asks each of the four calendars about a random value
+     they have never seen, and asks both block explorers for the current block height.
+     Nothing from the author's work is sent. All checks run at once with the usual
+     time limit; the result says in plain words what works (date stamps, public stamps
+     starting, finished public stamps being checked) and that nothing is lost while a
+     service is unreachable.
