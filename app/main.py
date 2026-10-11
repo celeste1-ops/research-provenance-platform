@@ -26,7 +26,7 @@ def create_app(ctx: AppContext, *, start_jobs: bool = False) -> FastAPI:
         if start_jobs:
             from app.jobs.scheduler import AnchorScheduler
 
-            scheduler = AnchorScheduler(ctx.anchors)
+            scheduler = AnchorScheduler(ctx.anchors, after=lambda: ctx.autobackup.maybe_run("hourly"))
             scheduler.start()
         try:
             yield

@@ -67,3 +67,10 @@ class LiveServer:
         self.server.should_exit = True
         self.thread.join(timeout=5)
         self.ctx.close()
+
+
+def wait_for_step_count(page, text: str) -> None:
+    """The top-bar counter refreshes just after a save; wait for the exact text."""
+    import re
+
+    page.locator("[data-testid=step-count]", has_text=re.compile(f"^{re.escape(text)}$")).wait_for()

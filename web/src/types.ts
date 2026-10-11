@@ -124,11 +124,42 @@ export interface TimelineRow {
   source_label: SourceLabel;
 }
 
+export interface BackupWhere {
+  kind: "synced" | "external" | "same-disk" | "missing";
+  label: string;
+  safe: boolean;
+  warning?: string;
+}
+
+export interface BackupStatus {
+  configured: boolean;
+  location: string | null;
+  auto: boolean;
+  last_backup: string | null;
+  last_file: string | null;
+  last_error: string | null;
+  pending_changes: boolean;
+  keep: number;
+  where?: BackupWhere;
+  needs_password?: boolean;
+  state: "off" | "ok" | "same-disk" | "error";
+}
+
+export interface BackupSuggestion {
+  path: string;
+  label: string;
+  kind: string;
+}
+
 export interface Status {
   initialized: boolean;
   author_label: string | null;
   installation: string | null;
+  entry_count: number;
   record_count: number;
+  backup: BackupStatus | null;
+  data_dir: string;
+  public_key: string | null;
   providers: { tsa: string | null; btc: string | null };
   node_types: string[];
   relation_types: string[];

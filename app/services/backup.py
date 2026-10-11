@@ -1,11 +1,19 @@
 """Full backup and restore (PRD §14 S4, S7).
 
-A backup is one zip (format ``rprov.backup/1``):
+A backup file (``*.rprovbackup``) is fully encrypted with the backup password:
+
+    RPROV-BACKUP-ENC/1\n        magic
+    {"kdf": "scrypt", ...}\n     header: KDF parameters, salt, nonce (no content)
+    AES-256-GCM ciphertext       of the inner zip; the header is authenticated too
+
+The inner zip (format ``rprov.backup/1``) holds:
 
     rprov-backup.json          index: installation, counts, SHA-256 of every member
     db/rprov.sqlite3           consistent snapshot of the database
     blobs/ab/cd/<sha256>       every stored file
-    key/signing-key.pem        the signing key, encrypted with the backup password
+    key/signing-key.pem        the signing key, additionally encrypted with the password
+
+Older, unencrypted ``rprov.backup/1`` zips can still be restored.
 
 Restore only goes into an installation without records: rows are inserted (never
 updated) and the key returns to the keychain, so the restored app signs new records
@@ -27,6 +35,9 @@ import zipfile
 from datetime import UTC, datetime
 from pathlib import Path
 
+from cryptography.exceptions import InvalidTag
+from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+from cryptography.hazmat.primitives.kdf.scrypt import Scrypt
 from sqlalchemy import insert, select
 
 from app.db.models import WRITE_LOCK, AnchorRow, BlobRow, MetaRow, ProjectRow, RecordFileRow, RecordRow
@@ -34,6 +45,12 @@ from app.services.ledger import LedgerError
 from provenance_core.signing import KeyBackupError, export_private_key_encrypted, load_private_key_encrypted
 
 BACKUP_FORMAT = "rprov.backup/1"
+ENCRYPTED_MAGIC = b"RPROV-BACKUP-ENC/1\n"
+BACKUP_SUFFIX = ".rprovbackup"
+# scrypt cost: 2**17 * 8 * 128 bytes = 128 MiB of memory, about half a second.
+SCRYPT_N = 2**17
+SCRYPT_R = 8
+SCRYPT_P = 1
 MAX_RESTORE_BYTES = 20 * 1024**3  # 20 GiB uncompressed (S4)
 _BLOB_NAME = re.compile(r"\Ablobs/([0-9a-f]{2})/([0-9a-f]{2})/([0-9a-f]{64})\Z")
 _FIXED_NAMES = {"rprov-backup.json", "db/rprov.sqlite3", "key/signing-key.pem"}
@@ -49,8 +66,61 @@ def _now() -> str:
     return datetime.now(UTC).replace(microsecond=0).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
+def _derive_key(password: str, salt: bytes, n: int, r: int, p: int) -> bytes:
+    return Scrypt(salt=salt, length=32, n=n, r=r, p=p).derive(password.encode("utf-8"))
+
+
+def encrypt_backup(plain: bytes, password: str) -> bytes:
+    import secrets
+
+    salt = secrets.token_bytes(16)
+    nonce = secrets.token_bytes(12)
+    header = {
+        "kdf": "scrypt",
+        "n": SCRYPT_N,
+        "r": SCRYPT_R,
+        "p": SCRYPT_P,
+        "salt": salt.hex(),
+        "cipher": "AES-256-GCM",
+        "nonce": nonce.hex(),
+        "inner": BACKUP_FORMAT,
+    }
+    header_line = json.dumps(header, sort_keys=True).encode() + b"\n"
+    key = _derive_key(password, salt, SCRYPT_N, SCRYPT_R, SCRYPT_P)
+    return ENCRYPTED_MAGIC + header_line + AESGCM(key).encrypt(nonce, plain, ENCRYPTED_MAGIC + header_line)
+
+
+def decrypt_backup(data: bytes, password: str) -> bytes:
+    if not data.startswith(ENCRYPTED_MAGIC):
+        raise BackupError("not an encrypted backup")
+    rest = data[len(ENCRYPTED_MAGIC) :]
+    newline = rest.find(b"\n")
+    if newline < 0 or newline > 4096:
+        raise BackupError("damaged backup header")
+    header_line = rest[: newline + 1]
+    try:
+        header = json.loads(header_line)
+        n, r, p = int(header["n"]), int(header["r"]), int(header["p"])
+        salt, nonce = bytes.fromhex(header["salt"]), bytes.fromhex(header["nonce"])
+    except (ValueError, KeyError, TypeError) as exc:
+        raise BackupError("damaged backup header") from exc
+    if header.get("kdf") != "scrypt" or header.get("cipher") != "AES-256-GCM" or not (2**10 <= n <= 2**20):
+        raise BackupError("unsupported backup encryption")
+    key = _derive_key(password, salt, n, r, p)
+    try:
+        return AESGCM(key).decrypt(nonce, rest[newline + 1 :], ENCRYPTED_MAGIC + header_line)
+    except InvalidTag as exc:
+        raise BackupError("wrong backup password (or damaged backup)") from exc
+
+
 def create_backup(ctx, password: str) -> tuple[str, bytes]:
-    """Returns (file name, zip bytes)."""
+    """Returns (file name, encrypted backup bytes)."""
+    name, plain = create_plain_backup(ctx, password)
+    return name, encrypt_backup(plain, password)
+
+
+def create_plain_backup(ctx, password: str) -> tuple[str, bytes]:
+    """The inner zip only (the signing key inside is still password-protected)."""
     ledger = ctx.ledger
     key = ledger.signing_key()
     key_pem = export_private_key_encrypted(key, password)
@@ -76,23 +146,33 @@ def create_backup(ctx, password: str) -> tuple[str, bytes]:
         "record_count": ledger.record_count(),
         "blob_count": len(digests),
         "members": {name: hashlib.sha256(data).hexdigest() for name, data in sorted(members.items())},
-        "note": "The signing key inside is encrypted with the backup password; the database and files are not.",
+        "note": "Normally wrapped in an encrypted .rprovbackup file; the signing key is also encrypted on its own.",
     }
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, "w", compression=zipfile.ZIP_DEFLATED) as zf:
         zf.writestr("rprov-backup.json", json.dumps(index, indent=2))
         for name in sorted(members):
             zf.writestr(name, members[name])
-    name = f"rprov-backup-{datetime.now(UTC).strftime('%Y-%m-%d-%H%M%S')}.zip"
+    inst = (ledger.installation or "unknown")[:8]
+    now = datetime.now(UTC)
+    # Millisecond precision so two backups in the same second never share a name.
+    name = f"rprov-backup-{inst}-{now:%Y%m%d-%H%M%S}-{now.microsecond // 1000:03d}{BACKUP_SUFFIX}"
     return name, buf.getvalue()
 
 
 def write_backup_to(location: str, name: str, data: bytes) -> Path:
+    import os
+
     folder = Path(location).expanduser()
     if not folder.is_absolute() or not folder.is_dir():
         raise BackupError("the backup location must be an existing folder (absolute path)")
     target = folder / name
-    target.write_bytes(data)
+    tmp = folder / f".{name}.partial"
+    with open(tmp, "wb") as fh:
+        fh.write(data)
+        fh.flush()
+        os.fsync(fh.fileno())
+    os.replace(tmp, target)  # never leaves a half-written backup under the real name
     return target
 
 
@@ -135,10 +215,12 @@ def restore_backup(ctx, data: bytes, password: str, *, max_bytes: int = MAX_REST
     ledger = ctx.ledger
     if ledger.record_count() > 0 or ledger.installation is not None:
         raise LedgerError("restore only works into an empty installation (this one already has records)")
+    if data.startswith(ENCRYPTED_MAGIC):
+        data = decrypt_backup(data, password)
     try:
         zf = zipfile.ZipFile(io.BytesIO(data))
     except zipfile.BadZipFile as exc:
-        raise BackupError("not a backup zip") from exc
+        raise BackupError("not a backup file") from exc
     with zf:
         members = _safe_members(zf, max_bytes)
         index = json.loads(_read_capped(zf, members["rprov-backup.json"]))

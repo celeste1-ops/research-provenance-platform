@@ -6,15 +6,19 @@ import { MarkdownEditor } from "./MarkdownEditor";
 const TYPE_LABELS: Record<string, string> = {
   idea: "Idea",
   note: "Note",
-  claim: "Claim / hypothesis",
+  claim: "Hypothesis / claim",
   document: "Document",
   code: "Code",
   experiment: "Experiment",
-  dataset: "Dataset",
+  dataset: "Data",
   figure: "Figure",
-  publication: "Publication",
+  publication: "Paper",
 };
-const REL_LABELS: Record<string, string> = { revises: "revises", derived_from: "derived from", uses: "uses" };
+const REL_LABELS: Record<string, string> = {
+  revises: "is a new version of (revises)",
+  derived_from: "grew out of (derived from)",
+  uses: "builds on (uses)",
+};
 
 interface Props {
   projectId: string;
@@ -23,6 +27,7 @@ interface Props {
   existing: GraphNode[];
   onCreated: (id: string) => void;
   onCancel: () => void;
+  initialType?: string;
 }
 
 interface Rel {
@@ -30,8 +35,8 @@ interface Rel {
   rel: string;
 }
 
-export function RecordForm({ projectId, nodeTypes, relationTypes, existing, onCreated, onCancel }: Props) {
-  const [nodeType, setNodeType] = useState("");
+export function RecordForm({ projectId, nodeTypes, relationTypes, existing, onCreated, onCancel, initialType }: Props) {
+  const [nodeType, setNodeType] = useState(initialType ?? "");
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
   const [files, setFiles] = useState<File[]>([]);
@@ -95,9 +100,9 @@ export function RecordForm({ projectId, nodeTypes, relationTypes, existing, onCr
 
   return (
     <form className="record-form" onSubmit={submit} data-testid="record-form">
-      <h2>New record</h2>
+      <h2>Add a research step</h2>
       <fieldset className="types">
-        <legend>Type</legend>
+        <legend>What kind of step is it?</legend>
         {nodeTypes.map((t) => (
           <label key={t} className={`type-chip ${nodeType === t ? "selected" : ""}`}>
             <input type="radio" name="node_type" value={t} checked={nodeType === t} onChange={() => setNodeType(t)} />
@@ -108,11 +113,14 @@ export function RecordForm({ projectId, nodeTypes, relationTypes, existing, onCr
 
       <label>
         Title
-        <input name="title" value={title} onChange={(e) => setTitle(e.target.value)} required />
+        <input name="title" value={title} onChange={(e) => setTitle(e.target.value)} required
+          placeholder="e.g. First version of the model" />
       </label>
 
       <div className="field">
-        <span className="field-label">Body (Markdown)</span>
+        <span className="field-label">
+          What is it? <span className="muted">(text, optional — Markdown works)</span>
+        </span>
         <MarkdownEditor value={body} onChange={setBody} />
       </div>
 
@@ -129,7 +137,7 @@ export function RecordForm({ projectId, nodeTypes, relationTypes, existing, onCr
           addFiles(e.dataTransfer.files);
         }}
       >
-        Drop files here or{" "}
+        Attach files: drop them here or{" "}
         <label className="link">
           choose files
           <input type="file" multiple hidden onChange={(e) => addFiles(e.target.files)} data-testid="file-input" />
@@ -180,10 +188,10 @@ export function RecordForm({ projectId, nodeTypes, relationTypes, existing, onCr
       )}
 
       <div className="group">
-        <span className="field-label">Related to earlier records</span>
+        <span className="field-label">How does it connect to earlier steps?</span>
         {relations.map((r, i) => (
           <div className="row" key={i}>
-            <span className="muted">this record</span>
+            <span className="muted">this step</span>
             <select value={r.rel} onChange={(e) => setRelations(relations.map((x, j) => (j === i ? { ...x, rel: e.target.value } : x)))}>
               {relationTypes.map((t) => (
                 <option key={t} value={t}>
@@ -192,7 +200,7 @@ export function RecordForm({ projectId, nodeTypes, relationTypes, existing, onCr
               ))}
             </select>
             <select value={r.to} onChange={(e) => setRelations(relations.map((x, j) => (j === i ? { ...x, to: e.target.value } : x)))}>
-              <option value="">choose a record…</option>
+              <option value="">choose an earlier step…</option>
               {[...existing].reverse().map((n) => (
                 <option key={n.id} value={n.id}>
                   #{n.seq} {n.title}
@@ -206,22 +214,24 @@ export function RecordForm({ projectId, nodeTypes, relationTypes, existing, onCr
         ))}
         <button type="button" className="secondary small" disabled={existing.length === 0}
           onClick={() => setRelations([...relations, { to: "", rel: relationTypes[0] ?? "revises" }])}>
-          + Add relation
+          + Connect to an earlier step
         </button>
+        {existing.length === 0 && <p className="note">This is the first step — later steps can connect to it.</p>}
       </div>
 
       <label>
-        Why? <span className="muted">(optional — shown as an author statement)</span>
+        Why? <span className="muted">(optional — shown as your own statement, not as a verified fact)</span>
         <textarea value={why} onChange={(e) => setWhy(e.target.value)} rows={2} />
       </label>
 
       <label className="check">
-        <input type="checkbox" checked={milestone} onChange={(e) => setMilestone(e.target.checked)} /> Milestone
+        <input type="checkbox" checked={milestone} onChange={(e) => setMilestone(e.target.checked)} /> Mark as a
+        milestone <span className="muted">(an important step — shown in “Milestones only”)</span>
       </label>
 
       <label className="check">
-        <input type="checkbox" checked={isImport} onChange={(e) => setIsImport(e.target.checked)} /> Importing older
-        material
+        <input type="checkbox" checked={isImport} onChange={(e) => setIsImport(e.target.checked)} /> This is older
+        material I'm adding now
       </label>
       {isImport && (
         <div className="group">
@@ -248,10 +258,12 @@ export function RecordForm({ projectId, nodeTypes, relationTypes, existing, onCr
           Cancel
         </button>
         <button className="primary" disabled={busy || !nodeType || !title.trim()} data-testid="submit-record">
-          Record
+          Save step
         </button>
       </div>
-      <p className="note center">Once recorded, this cannot be changed — only added to.</p>
+      <p className="note center">
+        Saved steps can't be edited later — changes are added as new steps or notes, so the history stays honest.
+      </p>
     </form>
   );
 }

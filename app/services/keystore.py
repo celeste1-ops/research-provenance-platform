@@ -19,6 +19,7 @@ from provenance_core.signing import private_key_from_raw, private_key_raw
 
 log = logging.getLogger("rprov.keystore")
 KEYRING_SERVICE = "rprov-signing-key"
+KEYRING_SECRET_SERVICE = "rprov-secret"
 
 
 class KeyStoreError(RuntimeError):
@@ -31,6 +32,13 @@ class KeyStore(ABC):
 
     @abstractmethod
     def save(self, installation: str, key: Ed25519PrivateKey) -> None: ...
+
+    # Small secrets (the backup password used for automatic encrypted backups).
+    @abstractmethod
+    def load_secret(self, name: str) -> str | None: ...
+
+    @abstractmethod
+    def save_secret(self, name: str, value: str) -> None: ...
 
 
 class KeyringKeyStore(KeyStore):
@@ -52,10 +60,23 @@ class KeyringKeyStore(KeyStore):
     def save(self, installation: str, key: Ed25519PrivateKey) -> None:
         self._keyring.set_password(KEYRING_SERVICE, installation, private_key_raw(key).hex())
 
+    def load_secret(self, name: str) -> str | None:
+        return self._keyring.get_password(KEYRING_SECRET_SERVICE, name)
+
+    def save_secret(self, name: str, value: str) -> None:
+        self._keyring.set_password(KEYRING_SECRET_SERVICE, name, value)
+
 
 class MemoryKeyStore(KeyStore):
     def __init__(self) -> None:
         self._keys: dict[str, bytes] = {}
+        self._secrets: dict[str, str] = {}
+
+    def load_secret(self, name: str) -> str | None:
+        return self._secrets.get(name)
+
+    def save_secret(self, name: str, value: str) -> None:
+        self._secrets[name] = value
 
     def load(self, installation: str) -> Ed25519PrivateKey | None:
         raw = self._keys.get(installation)
@@ -84,6 +105,19 @@ class DevInsecureFileKeyStore(KeyStore):
         fd = os.open(self.path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
         with os.fdopen(fd, "w") as fh:
             fh.write(f"{installation}:{private_key_raw(key).hex()}\n")
+
+    def _secret_path(self, name: str) -> Path:
+        safe = "".join(c if c.isalnum() or c in "-_." else "_" for c in name)
+        return self.path.parent / f"DEV-INSECURE-secret-{safe}"
+
+    def load_secret(self, name: str) -> str | None:
+        p = self._secret_path(name)
+        return p.read_text() if p.exists() else None
+
+    def save_secret(self, name: str, value: str) -> None:
+        fd = os.open(self._secret_path(name), os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+        with os.fdopen(fd, "w") as fh:
+            fh.write(value)
 
 
 def make_keystore(kind: str, data_dir: Path) -> KeyStore:

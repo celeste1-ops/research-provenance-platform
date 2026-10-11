@@ -39,10 +39,12 @@ def status(request: Request):
     c = ctx(request)
     ledger = c.ledger
     genesis = None
+    entry_count = 0
     if ledger.initialized():
         rows = ledger.records()
         if rows:
             genesis = json.loads(rows[0].payload_bytes)
+        entry_count = sum(1 for r in rows if r.kind == "entry")
     providers = {
         k: (p.name if p is not None else None) for k, p in c.anchors.providers.items()
     }
@@ -50,12 +52,17 @@ def status(request: Request):
         "initialized": ledger.initialized(),
         "author_label": genesis["author_label"] if genesis else None,
         "installation": ledger.installation,
+        # Research steps are entries; the genesis record and later additions are not counted.
+        "entry_count": entry_count,
         "record_count": ledger.record_count(),
         "providers": providers,
         "node_types": list(NODE_TYPES),
         "relation_types": list(RELATION_TYPES),
         "key_backup_done": ledger.meta("key_backup_done") == "1",
         "backup_location": ledger.meta("backup_location"),
+        "backup": c.autobackup.status() if ledger.initialized() else None,
+        "data_dir": str(c.settings.data_dir),
+        "public_key": genesis["public_key"] if genesis else None,
     }
 
 
@@ -411,30 +418,63 @@ def export_bundle(body: ExportIn, request: Request):
 
 class BackupIn(BaseModel):
     password: str = Field(min_length=8)
-    location: str | None = None  # also write the backup into this folder, and remember it
 
 
 @router.post("/backup")
 def create_backup_route(body: BackupIn, request: Request):
-    from app.services.backup import BackupError, create_backup, write_backup_to
+    """Download one encrypted backup now (independent of the automatic backups)."""
+    from app.services.backup import create_backup
 
     c = ctx(request)
     try:
         name, data = create_backup(c, body.password)
     except NotInitialized as exc:
         raise _bad(exc) from None
-    headers = {"Content-Disposition": f'attachment; filename="{name}"'}
-    location = body.location or c.ledger.meta("backup_location")
-    if location:
-        try:
-            path = write_backup_to(location, name, data)
-        except BackupError as exc:
-            raise HTTPException(400, str(exc)) from None
-        c.ledger.set_meta("backup_location", location)
-        headers["X-Backup-Path"] = str(path)
-    c.ledger.set_meta("last_backup_local", name)
     c.ledger.set_meta("key_backup_done", "1")
-    return Response(data, media_type="application/zip", headers=headers)
+    return Response(data, media_type="application/octet-stream",
+                    headers={"Content-Disposition": f'attachment; filename="{name}"'})
+
+
+@router.get("/backup/status")
+def backup_status(request: Request):
+    c = ctx(request)
+    if not c.ledger.initialized():
+        raise HTTPException(409, "set up the app first")
+    return c.autobackup.status()
+
+
+@router.get("/backup/suggestions")
+def backup_suggestions(request: Request):
+    from app.services.autobackup import suggestions
+
+    return suggestions(ctx(request).settings.data_dir)
+
+
+class BackupSettingsIn(BaseModel):
+    location: str
+    password: str = Field(min_length=8)
+    create: bool = False  # create the folder if it does not exist yet
+
+
+@router.post("/backup/settings")
+def backup_settings(body: BackupSettingsIn, request: Request):
+    """Turn on automatic encrypted backups to this folder; writes the first one right away."""
+    from app.services.backup import BackupError
+
+    c = ctx(request)
+    try:
+        return c.autobackup.configure(body.location, body.password, create=body.create)
+    except BackupError as exc:
+        raise HTTPException(400, str(exc)) from None
+
+
+@router.post("/backup/run")
+def backup_run(request: Request):
+    c = ctx(request)
+    result = c.autobackup.run("manual")
+    if not result["ran"]:
+        raise HTTPException(400, result["reason"])
+    return {**result, "status": c.autobackup.status()}
 
 
 @router.post("/restore")
@@ -450,5 +490,7 @@ async def restore_route(request: Request, file: Annotated[UploadFile, File()], p
         summary = await run_in_threadpool(restore_backup, c, data, password)
     except (BackupError, LedgerError) as exc:
         raise HTTPException(400, str(exc)) from None
+    # Same password, same folder (if it exists on this Mac): automatic backups simply continue.
+    c.autobackup.adopt_restored_password(password)
     report = await run_in_threadpool(verify_database, c.ledger, c.anchors)
-    return {**summary, "verification": report_json(report)}
+    return {**summary, "verification": report_json(report), "backup": c.autobackup.status()}

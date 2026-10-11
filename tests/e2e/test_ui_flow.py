@@ -15,7 +15,7 @@ from pathlib import Path
 
 import pytest
 
-from tests.e2e.server import LiveServer
+from tests.e2e.server import LiveServer, wait_for_step_count
 
 pytestmark = pytest.mark.e2e
 SNAPSHOT = Path(__file__).resolve().parent / "snapshots" / "ui_detail_sections.json"
@@ -48,10 +48,15 @@ def test_p0_flow_in_the_browser(tmp_path, browser):
         page.goto(srv.url)
 
         # 1–2. First start: key + genesis, first project.
-        page.get_by_placeholder("Your name or pen name").fill("UI Tester")
+        page.get_by_placeholder("Name or pen name").fill("UI Tester")
         page.get_by_placeholder("e.g. FSF").fill("FSF")
-        page.get_by_role("button", name="Create signing key").click()
-        page.get_by_test_id("new-record").wait_for()
+        page.get_by_role("button", name="Start").click()
+        # Onboarding step 2 offers automatic backup; it can be skipped.
+        page.get_by_test_id("backup-setup").wait_for()
+        page.get_by_role("button", name="Skip for now").click()
+        page.get_by_test_id("empty-state").wait_for()
+        wait_for_step_count(page, "0 research steps")  # genesis is not a step
+        assert page.get_by_test_id("backup-pill").inner_text().strip().endswith("Backup not set up")
         assert "Bitcoin anchor: not enabled" not in page.content()  # mock Bitcoin anchor is on here
 
         # 3–5. Record an idea; both proofs appear separately within a second.
@@ -64,8 +69,12 @@ def test_p0_flow_in_the_browser(tmp_path, browser):
         assert "Bitcoin anchor: pending" in verified.inner_text()
         assert "E = m c^2" in verified.inner_text()  # the content itself is part of the verified record
 
-        # Key backup: password-protected, opens with the password, matches the genesis key.
-        page.get_by_role("button", name="Back up key…").click()
+        # Saving without a backup folder says so, with a way to set it up.
+        assert "Automatic backup is not set up yet" in page.get_by_test_id("notice").inner_text()
+
+        # Key backup (More menu): password-protected, opens with the password, matches the genesis key.
+        page.get_by_test_id("more-menu").click()
+        page.get_by_role("menuitem", name="Back up signing key only…").click()
         kb = page.get_by_test_id("key-backup-dialog")
         kb.get_by_label("Password (at least 8 characters)").fill("correct horse battery")
         kb.get_by_label("Repeat password").fill("correct horse battery")
@@ -81,15 +90,15 @@ def test_p0_flow_in_the_browser(tmp_path, browser):
         assert b"ENCRYPTED" in key_file.read_bytes()
 
         # A second record with a relation, a "why", a claimed date (import) and milestone.
-        _new_record(page, "Claim / hypothesis", "Revised model", "now with friction")
+        _new_record(page, "Hypothesis / claim", "Revised model", "now with friction")
         form = page.get_by_test_id("record-form")
-        form.get_by_role("button", name="+ Add relation").click()
+        form.get_by_role("button", name="+ Connect to an earlier step").click()
         rel_row = form.locator(".group .row").first
         rel_row.locator("select").nth(0).select_option("revises")
         rel_row.locator("select").nth(1).select_option(label="#1 First formula")
         form.locator("textarea").first.fill("the experiment failed, so the hypothesis changed")
-        form.get_by_label("Milestone").check()
-        form.get_by_label("Importing older material").check()
+        form.get_by_label("Mark as a milestone").check()
+        form.get_by_label("This is older material I'm adding now").check()
         form.get_by_placeholder("Claimed date: 2025, 2025-11 or 2025-11-03").fill("2025-11")
         page.get_by_test_id("submit-record").click()
         page.get_by_test_id("section-author").get_by_text("the experiment failed").wait_for()
@@ -134,12 +143,13 @@ def test_p0_flow_in_the_browser(tmp_path, browser):
         form.get_by_placeholder("Repository URL").fill("https://github.com/example/fsf")
         form.get_by_placeholder("Commit hash").fill("0123abcd")
         assert form.get_by_text("External reference, code content not saved").is_visible()
-        assert form.get_by_text("Once recorded, this cannot be changed — only added to.").is_visible()
+        assert form.get_by_text("Saved steps can't be edited later").is_visible()
         page.get_by_test_id("submit-record").click()
         page.get_by_test_id("section-verified").get_by_text("External reference, code content not saved").wait_for()
 
         # 8. Export with preview, then verify the downloaded bundle independently.
-        page.get_by_role("button", name="Export…").click()
+        wait_for_step_count(page, "3 research steps")
+        page.get_by_role("button", name="Share…").click()
         dialog = page.get_by_test_id("export-dialog")
         dialog.get_by_test_id("export-warnings").wait_for()
         warnings = dialog.get_by_test_id("export-warnings").inner_text()

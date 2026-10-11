@@ -24,8 +24,33 @@ from tests.sample import build_log  # noqa: E402
 OUT = ROOT / "docs" / "screenshots"
 
 
+def first_run(browser) -> None:
+    """The two onboarding screens: about you, then automatic backup."""
+    with tempfile.TemporaryDirectory() as tmp, LiveServer(Path(tmp)) as srv:
+        page = browser.new_page(viewport={"width": 1440, "height": 900})
+        page.goto(srv.url)
+        page.get_by_placeholder("Name or pen name").fill("A. Researcher")
+        page.get_by_placeholder("e.g. FSF").fill("FSF")
+        page.screenshot(path=OUT / "first-run.png")
+        page.get_by_role("button", name="Start").click()
+        page.get_by_test_id("backup-setup").get_by_label("Backup folder").fill(
+            "/Users/you/Library/Mobile Documents/com~apple~CloudDocs/Research Provenance Backups"
+        )
+        page.wait_for_timeout(300)
+        page.screenshot(path=OUT / "first-run-backup.png")
+        page.get_by_role("button", name="Skip for now").click()
+        page.get_by_test_id("empty-state").wait_for()
+        page.wait_for_timeout(300)
+        page.screenshot(path=OUT / "empty-project.png")
+        page.close()
+
+
 def main() -> None:
     OUT.mkdir(parents=True, exist_ok=True)
+    with sync_playwright() as p:
+        browser = p.chromium.launch(executable_path=chromium_path())
+        first_run(browser)
+        browser.close()
     with tempfile.TemporaryDirectory() as tmp, LiveServer(Path(tmp)) as srv, sync_playwright() as p:
         ids = build_log(srv.ctx)
         browser = p.chromium.launch(executable_path=chromium_path())

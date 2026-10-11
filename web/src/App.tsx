@@ -1,14 +1,23 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "./api";
 import type { Graph as GraphData, Project, Status, TimelineRow } from "./types";
-import { BackupDialog } from "./components/BackupDialog";
+import { BackupDialog, BackupPill } from "./components/BackupDialog";
 import { Detail } from "./components/Detail";
+import { EmptyState } from "./components/EmptyState";
 import { ExportDialog } from "./components/ExportDialog";
 import { Graph } from "./components/Graph";
+import { LegendButton, TechnicalDetails, WhereIsMyData } from "./components/InfoPanels";
 import { KeyBackupDialog } from "./components/KeyBackupDialog";
 import { RecordForm } from "./components/RecordForm";
 import { Setup } from "./components/Setup";
 import { Timeline } from "./components/Timeline";
+
+type Dialog = null | "form" | "export" | "backup" | "key" | "where" | "tech";
+interface Notice {
+  text: string;
+  action?: { label: string; onClick: () => void };
+  kind?: "info" | "error";
+}
 
 export function App() {
   const [status, setStatus] = useState<Status | null>(null);
@@ -17,15 +26,14 @@ export function App() {
   const [graph, setGraph] = useState<GraphData | null>(null);
   const [timeline, setTimeline] = useState<TimelineRow[]>([]);
   const [selected, setSelected] = useState<string | null>(null);
-  const [showForm, setShowForm] = useState(false);
-  const [showExport, setShowExport] = useState(false);
-  const [showKeyBackup, setShowKeyBackup] = useState(false);
-  const [showBackup, setShowBackup] = useState(false);
+  const [dialog, setDialog] = useState<Dialog>(null);
+  const [formType, setFormType] = useState<string | undefined>(undefined);
   const [version, setVersion] = useState(0);
   const [view, setView] = useState<"graph" | "timeline">("graph");
   const [milestonesOnly, setMilestonesOnly] = useState(false);
-  const [message, setMessage] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<Notice | null>(null);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
 
   const reload = useCallback(async () => {
     try {
@@ -41,13 +49,31 @@ export function App() {
       setTimeline(t);
       setVersion((v) => v + 1);
     } catch (e) {
-      setError((e as Error).message);
+      setNotice({ text: (e as Error).message, kind: "error" });
     }
   }, [projectId]);
 
   useEffect(() => {
     reload();
   }, [reload]);
+
+  // Keep the backup status fresh (automatic backups run in the background).
+  useEffect(() => {
+    if (!status?.initialized) return;
+    const t = window.setInterval(() => {
+      api.status().then(setStatus).catch(() => undefined);
+    }, 30000);
+    return () => window.clearInterval(t);
+  }, [status?.initialized]);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    const close = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setMenuOpen(false);
+    };
+    document.addEventListener("mousedown", close);
+    return () => document.removeEventListener("mousedown", close);
+  }, [menuOpen]);
 
   if (!status) return <div className="loading">Loading…</div>;
   if (!status.initialized) return <Setup onDone={reload} />;
@@ -59,24 +85,39 @@ export function App() {
     setProjectId(p.id);
   }
 
-  async function refresh() {
-    setMessage("Checking time proofs…");
+  async function checkProofs() {
+    setMenuOpen(false);
+    setNotice({ text: "Checking timestamps…" });
     try {
       const stats = await api.refreshAnchors();
-      setMessage(`Time proofs checked: ${stats.submitted} requested, ${stats.upgraded} confirmed, ${stats.still_pending} still pending.`);
+      setNotice({
+        text: `Timestamps checked: ${stats.submitted} requested, ${stats.upgraded} newly confirmed, ${stats.still_pending} still waiting for Bitcoin.`,
+      });
       await reload();
     } catch (e) {
-      setError((e as Error).message);
+      setNotice({ text: (e as Error).message, kind: "error" });
     }
   }
 
+  function openForm(type?: string) {
+    setFormType(type);
+    setDialog("form");
+  }
+
+  function openMenuItem(d: Dialog) {
+    setMenuOpen(false);
+    setDialog(d);
+  }
+
   const project = projects.find((p) => p.id === projectId);
+  const steps = graph?.nodes.length ?? 0;
   const btcOff = status.providers.btc === null;
+  const empty = graph !== null && steps === 0;
 
   return (
     <div className="app">
       <header className="topbar">
-        <div className="brand">Research record</div>
+        <div className="brand">Research history</div>
         <select value={projectId} onChange={(e) => setProjectId(e.target.value)} aria-label="Project">
           {projects.length === 0 && <option value="">No project</option>}
           {projects.map((p) => (
@@ -85,80 +126,90 @@ export function App() {
             </option>
           ))}
         </select>
-        <button className="secondary small" onClick={newProject}>
-          + Project
+        <button className="link small" onClick={newProject}>
+          + New project
         </button>
-        <div className="spacer" />
-        <span className="muted small" title="Author label (self-declared)">
-          {status.author_label} · {status.record_count} records
+        <span className="muted small" data-testid="step-count">
+          {steps} research {steps === 1 ? "step" : "steps"}
         </span>
-        <button
-          className={status.key_backup_done ? "secondary" : "secondary attention"}
-          onClick={() => setShowKeyBackup(true)}
-          title="Download a password-protected backup of your signing key"
-        >
-          Back up key…
+        <div className="spacer" />
+        <BackupPill status={status.backup} onClick={() => setDialog("backup")} />
+        <button className="secondary" onClick={() => setDialog("export")} disabled={steps === 0}>
+          Share…
         </button>
-        <button
-          className={status.backup_location ? "secondary" : "secondary attention"}
-          onClick={() => setShowBackup(true)}
-          title="Full backup: database, files and the encrypted signing key"
-        >
-          Backup…
+        <button className="primary" onClick={() => openForm()} disabled={!projectId} data-testid="new-record">
+          + Add research step
         </button>
-        <button className="secondary" onClick={refresh} title="Check pending and missing time proofs now">
-          Check time proofs
-        </button>
-        <button className="secondary" onClick={() => setShowExport(true)} disabled={timeline.length === 0}>
-          Export…
-        </button>
-        <button className="primary" onClick={() => setShowForm(true)} disabled={!projectId} data-testid="new-record">
-          New record
-        </button>
+        <div className="menu-wrap" ref={menuRef}>
+          <button className="secondary icon" aria-label="More" aria-expanded={menuOpen} data-testid="more-menu"
+            onClick={() => setMenuOpen(!menuOpen)}>
+            ⋯
+          </button>
+          {menuOpen && (
+            <div className="menu" role="menu">
+              <button role="menuitem" onClick={checkProofs}>Check timestamps now</button>
+              <button role="menuitem" onClick={() => openMenuItem("backup")}>Backup…</button>
+              <button role="menuitem" onClick={() => openMenuItem("where")}>Where is my data?</button>
+              <hr />
+              <button role="menuitem" onClick={() => openMenuItem("tech")}>Technical details</button>
+              <button role="menuitem" onClick={() => openMenuItem("key")}>Back up signing key only…</button>
+            </div>
+          )}
+        </div>
       </header>
       {btcOff && (
         <div className="banner muted small">Bitcoin anchor: not enabled. Third-party timestamps are active.</div>
       )}
-      {message && (
-        <div className="banner" onClick={() => setMessage(null)}>
-          {message}
-        </div>
-      )}
-      {error && (
-        <div className="banner error" onClick={() => setError(null)}>
-          {error}
-        </div>
-      )}
-      <nav className="viewbar">
-        <div className="tabs" role="tablist">
-          <button role="tab" aria-selected={view === "graph"} className={view === "graph" ? "tab active" : "tab"}
-            onClick={() => setView("graph")}>
-            Evolution graph
-          </button>
-          <button role="tab" aria-selected={view === "timeline"} className={view === "timeline" ? "tab active" : "tab"}
-            onClick={() => setView("timeline")} data-testid="tab-timeline">
-            Timeline
+      {notice && (
+        <div className={`banner ${notice.kind === "error" ? "error" : ""}`} data-testid="notice">
+          <span>{notice.text}</span>
+          {notice.action && (
+            <button className="secondary small" onClick={notice.action.onClick}>
+              {notice.action.label}
+            </button>
+          )}
+          <button className="link small dismiss" onClick={() => setNotice(null)} aria-label="Dismiss">
+            ✕
           </button>
         </div>
-        {view === "graph" && (
-          <label className="check small">
-            <input type="checkbox" checked={milestonesOnly} onChange={(e) => setMilestonesOnly(e.target.checked)}
-              data-testid="milestones-only" />
-            Milestones only
-          </label>
-        )}
-        <span className="legend small muted">
-          solid = revises · dashed = derived from · dotted = uses · T = third-party timestamp · B = Bitcoin anchor
-        </span>
-      </nav>
+      )}
+      {!empty && (
+        <nav className="viewbar">
+          <div className="tabs" role="tablist">
+            <button role="tab" aria-selected={view === "graph"} className={view === "graph" ? "tab active" : "tab"}
+              onClick={() => setView("graph")}>
+              History graph
+            </button>
+            <button role="tab" aria-selected={view === "timeline"} className={view === "timeline" ? "tab active" : "tab"}
+              onClick={() => setView("timeline")} data-testid="tab-timeline">
+              Timeline
+            </button>
+          </div>
+          {view === "graph" && (
+            <label className="check small">
+              <input type="checkbox" checked={milestonesOnly} onChange={(e) => setMilestonesOnly(e.target.checked)}
+                data-testid="milestones-only" />
+              Milestones only
+            </label>
+          )}
+          <LegendButton />
+        </nav>
+      )}
       <main className={`main ${selected ? "with-detail" : ""}`}>
         <section className="canvas">
-          {view === "timeline" ? (
+          {empty ? (
+            <EmptyState
+              projectTitle={project?.title ?? "your research"}
+              backup={status.backup}
+              onAdd={openForm}
+              onBackup={() => setDialog("backup")}
+            />
+          ) : view === "timeline" ? (
             <Timeline rows={timeline} onSelect={setSelected} />
           ) : graph ? (
             <Graph data={graph} selected={selected} onSelect={setSelected} milestonesOnly={milestonesOnly} />
           ) : (
-            <div className="empty">Loading graph…</div>
+            <div className="empty">Loading…</div>
           )}
         </section>
         {selected && (
@@ -174,7 +225,7 @@ export function App() {
           />
         )}
       </main>
-      {showForm && graph && (
+      {dialog === "form" && graph && (
         <div className="modal-backdrop">
           <div className="modal">
             <RecordForm
@@ -182,44 +233,55 @@ export function App() {
               nodeTypes={status.node_types}
               relationTypes={status.relation_types}
               existing={graph.nodes}
-              onCancel={() => setShowForm(false)}
+              initialType={formType}
+              onCancel={() => setDialog(null)}
               onCreated={async (id) => {
-                setShowForm(false);
+                setDialog(null);
                 setSelected(id);
                 await reload();
-                if (!status.backup_location) {
-                  setMessage(
-                    "Recorded. Now set a backup location (“Backup…”): a lost computer or key means lost records or a new identity.",
-                  );
+                const b = (await api.status()).backup;
+                if (b?.state === "ok") {
+                  setNotice({ text: "Saved. It is being timestamped and will be included in the next automatic backup." });
+                } else {
+                  setNotice({
+                    text: "Saved. Automatic backup is not set up yet — if this Mac is lost, this step would be lost too.",
+                    action: { label: "Set up backup", onClick: () => setDialog("backup") },
+                  });
                 }
               }}
             />
           </div>
         </div>
       )}
-      {showBackup && (
+      {dialog === "backup" && (
         <BackupDialog
-          defaultLocation={status.backup_location}
-          onClose={() => setShowBackup(false)}
-          onDone={(msg) => {
-            setShowBackup(false);
-            setMessage(msg);
+          status={status.backup}
+          onClose={() => setDialog(null)}
+          onChanged={(msg) => {
+            setDialog(null);
+            setNotice({ text: msg });
             reload();
           }}
         />
       )}
-      {showKeyBackup && (
+      {dialog === "key" && (
         <KeyBackupDialog
-          onClose={() => setShowKeyBackup(false)}
+          onClose={() => setDialog(null)}
           onDone={() => {
-            setShowKeyBackup(false);
-            setMessage("Key backup downloaded. Store it and its password separately.");
+            setDialog(null);
+            setNotice({ text: "Key backup downloaded. Store it and its password separately." });
             reload();
           }}
         />
       )}
-      {showExport && (
-        <ExportDialog rows={timeline} defaultTitle={project?.title ?? "evidence"} onClose={() => setShowExport(false)} />
+      {dialog === "where" && (
+        <WhereIsMyData status={status} onClose={() => setDialog(null)} onBackup={() => setDialog("backup")} />
+      )}
+      {dialog === "tech" && (
+        <TechnicalDetails status={status} onClose={() => setDialog(null)} onKeyBackup={() => setDialog("key")} />
+      )}
+      {dialog === "export" && (
+        <ExportDialog rows={timeline} defaultTitle={project?.title ?? "evidence"} onClose={() => setDialog(null)} />
       )}
     </div>
   );

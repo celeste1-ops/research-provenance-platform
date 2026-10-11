@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import secrets
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import sessionmaker
@@ -60,6 +60,7 @@ class AppContext:
     anchors: AnchorService
     ledger: Ledger
     session_token: str
+    autobackup: object = field(default=None, repr=False)
 
     @classmethod
     def create(
@@ -77,7 +78,14 @@ class AppContext:
         keystore = keystore or make_keystore(settings.keystore, settings.data_dir)
         anchors = AnchorService(sessions, providers if providers is not None else make_providers(settings))
         ledger = Ledger(sessions, blobs, keystore, anchors)
-        return cls(settings, engine, sessions, blobs, keystore, anchors, ledger, secrets.token_urlsafe(32))
+        ctx = cls(settings, engine, sessions, blobs, keystore, anchors, ledger, secrets.token_urlsafe(32))
+        from app.services.autobackup import AutoBackup
+
+        ctx.autobackup = AutoBackup(ctx)
+        ledger.listeners.append(ctx.autobackup.schedule)
+        return ctx
 
     def close(self) -> None:
+        if self.autobackup is not None:
+            self.autobackup.stop()
         self.engine.dispose()

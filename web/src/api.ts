@@ -1,4 +1,13 @@
-import type { ExportPreview, Graph, Project, RecordDetail, Status, TimelineRow } from "./types";
+import type {
+  BackupStatus,
+  BackupSuggestion,
+  ExportPreview,
+  Graph,
+  Project,
+  RecordDetail,
+  Status,
+  TimelineRow,
+} from "./types";
 
 // The per-launch session token is embedded in the page by the local server — never in a URL.
 function sessionToken(): string {
@@ -75,30 +84,39 @@ export const api = {
   verifyAll: () => request<{ ok: boolean; counts: Record<string, number> }>("POST", "/api/verify/all"),
   exportPreview: (body: { title: string; records: Record<string, string>; default: string }) =>
     request<ExportPreview>("POST", "/api/export/preview", body),
-  backup: (password: string, location?: string) => backupRequest(password, location),
+  backupDownload: (password: string) => downloadRequest("/api/backup", { password }),
+  backupStatus: () => request<BackupStatus>("GET", "/api/backup/status"),
+  backupSuggestions: () => request<BackupSuggestion[]>("GET", "/api/backup/suggestions"),
+  backupSettings: (location: string, password: string, create: boolean) =>
+    request<BackupStatus>("POST", "/api/backup/settings", { location, password, create }),
+  backupRun: () => request<{ ran: boolean; path: string; status: BackupStatus }>("POST", "/api/backup/run"),
   restore: (file: File, password: string) => {
     const form = new FormData();
     form.set("file", file, file.name);
     form.set("password", password);
-    return request<{ installation: string; records: number; verification: { ok: boolean } }>("POST", "/api/restore", form);
+    return request<{ installation: string; records: number; verification: { ok: boolean }; backup: BackupStatus }>(
+      "POST",
+      "/api/restore",
+      form,
+    );
   },
   exportBundle: (body: { title: string; records: Record<string, string>; default: string }) =>
     request<Blob>("POST", "/api/export", body),
 };
 
-export async function backupRequest(password: string, location?: string) {
-  const res = await fetch("/api/backup", {
+export async function downloadRequest(path: string, body: unknown) {
+  const res = await fetch(path, {
     method: "POST",
     headers: { "Content-Type": "application/json", "X-RPROV-Token": sessionToken() },
-    body: JSON.stringify({ password, location }),
+    body: JSON.stringify(body),
   });
   if (!res.ok) {
     const data = await res.json().catch(() => ({ detail: res.statusText }));
     throw new ApiError(res.status, typeof data.detail === "string" ? data.detail : JSON.stringify(data.detail));
   }
   const disposition = res.headers.get("content-disposition") ?? "";
-  const filename = /filename="([^"]+)"/.exec(disposition)?.[1] ?? "rprov-backup.zip";
-  return { blob: await res.blob(), path: res.headers.get("x-backup-path"), filename };
+  const filename = /filename="([^"]+)"/.exec(disposition)?.[1] ?? "download";
+  return { blob: await res.blob(), filename };
 }
 
 export function download(blob: Blob, filename: string) {

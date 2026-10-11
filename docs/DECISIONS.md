@@ -179,3 +179,65 @@ each section.
   dialog (a browser cannot hand a folder path to the local server); it is remembered and
   the button stays highlighted until one is set. After the first record the app reminds
   the author to set it (PRD S7).
+
+## Round 2: data durability and first-run experience
+
+Feedback after the first real run: the interface spoke to engineers, and "what if the Mac
+breaks?" had no good answer (a manual backup the author has to remember is not one). These
+decisions change presentation and backup only — not the record format, the chain, the
+verification rules or what leaves the machine for time proofs.
+
+- **D-030 · Automatic encrypted backup (PRD S7, refines D-028/D-029).** The author picks a
+  backup folder and a backup password once (first-run step 2, or later from the top bar).
+  After every change the app writes a new backup there, debounced by 20 seconds; the hourly
+  time-proof job also writes one when a proof was upgraded since the last backup. The
+  newest 10 backups of this installation are kept; older ones are removed. Files are
+  written to a `.partial` name, flushed and then renamed, so a crash never leaves a broken
+  backup under the real name. A failure (drive unplugged, folder gone) is shown in the top
+  bar and retried on the next change or hour; it never stops recording.
+- **D-031 · Backups are now fully encrypted (supersedes the "not encrypted" part of
+  D-028).** A backup file (`.rprovbackup`) is a short magic line, a JSON header (format,
+  KDF parameters, salt, nonce) and the D-028 zip encrypted with AES-256-GCM under a key
+  from scrypt (N = 2^17, r = 8, p = 1) of the backup password; the header is authenticated
+  as associated data, and an implausible N is refused before any work is done. Reason: the
+  folder is now usually a synced one (D-033) and therefore sits on someone else's servers;
+  titles and content must not be readable there. A wrong password and a damaged file give
+  the same error (GCM cannot tell them apart). The inner zip, its member checks (S4) and
+  the separately encrypted signing key are unchanged, and restore still accepts the older
+  unencrypted zips made before this change.
+- **D-032 · The backup password is kept in the system keychain.** Unattended backups need
+  it, and asking for it on every change would defeat "automatic". It is stored next to the
+  signing key (same keychain service family, item `backup-password:<installation>`), never
+  in the database or a file. It is needed again only to restore. After a restore the same
+  password is stored again, so backups to the same folder simply continue on the new Mac.
+- **D-033 · Synced folders and PRD rule 3 ("no cloud sync").** The app still uploads
+  nothing: writing a file into a local folder is a local operation, and the only network
+  traffic remains the time-proof requests (the providers-only network test is unchanged).
+  If the author chooses a folder that their own iCloud Drive, Dropbox, Google Drive or
+  OneDrive client syncs, that client — a service the author already uses and pays for, if
+  at all — moves an encrypted file the provider cannot read. This is the closest fit to the
+  PRD's intent (no accounts, no service of ours, content never readable outside the Mac)
+  while answering S7's "data loss is the most realistic risk". The app offers such folders
+  and external drives (`/Volumes/*` on another device) as suggestions, labels where a
+  folder really is, and warns when the folder is on the same disk as the records, because
+  such a backup does not survive a lost or broken Mac.
+- **D-034 · Plain names in the interface.** "Record" becomes "research step" in the
+  interface ("Add research step", "Save step", "+ Connect to an earlier step", "Mark as a
+  milestone", "This is older material I'm adding now"); "Export" becomes "Share…". The
+  fixed source labels (Verified record / Author statement / Later additions) and the two
+  separate time-proof lines are unchanged (rule 2 and 4), with one plain sentence under each
+  proof saying what it means. Record IDs, hashes and signatures move into a collapsed
+  "Technical details" block; the key-only backup, "Check timestamps now" and installation
+  details move into a "⋯" menu.
+- **D-035 · Step counts leave out the genesis record and later additions.** The top bar
+  counts research steps (entries) in the current project. A fresh install therefore shows
+  "0 research steps" instead of "1 records", which read as a bug. The total record count,
+  including genesis, links, notes, milestones and retractions, is still shown under
+  Technical details; the chain itself is unchanged.
+- **D-036 · First run and empty project.** First run is two steps: name and project, then
+  automatic backup (skippable; skipping keeps a reminder in the top bar, in the empty state
+  and after each save). A third path restores from a backup. An empty project shows what
+  the tool does and one card per kind of step; choosing a card opens the form with that kind
+  selected. The graph legend is shown on request ("How to read the graph"), and "Where is my
+  data?" explains in plain words where data lives, what the timestamp services receive
+  (only a fingerprint, so they cannot give anything back) and how to restore on a new Mac.

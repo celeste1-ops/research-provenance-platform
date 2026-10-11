@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 
 from app.demo import load_demo
-from tests.e2e.server import LiveServer
+from tests.e2e.server import LiveServer, wait_for_step_count
 
 pytestmark = pytest.mark.e2e
 
@@ -109,29 +109,125 @@ def test_200_nodes_render_within_a_second(tmp_path, browser):
 
 
 def test_backup_and_restore_in_the_browser(tmp_path, browser):
+    """Automatic encrypted backup is set up from the top bar; a fresh install restores from it."""
     folder = tmp_path / "backups"
     folder.mkdir()
     with LiveServer(tmp_path / "a") as a:
         load_demo(a.ctx)
         count = a.ctx.ledger.record_count()
-        page = browser.new_page()
+        page = browser.new_page(viewport={"width": 1400, "height": 900})
         page.goto(a.url)
-        page.get_by_role("button", name="Backup…").click()
+        pill = page.get_by_test_id("backup-pill")
+        assert "Backup not set up" in pill.inner_text()
+        pill.click()
         dlg = page.get_by_test_id("backup-dialog")
-        dlg.get_by_label("Password for the key (at least 8 characters)").fill("backup password 1")
-        dlg.get_by_placeholder("/Volumes/Backup/rprov").fill(str(folder))
-        dlg.get_by_role("button", name="Create backup").click()
-        page.get_by_text("Backup written to").wait_for()
+        dlg.get_by_label("Backup folder").fill(str(folder))
+        dlg.get_by_label("Backup password (at least 8 characters)").fill("backup password 1")
+        dlg.get_by_label("Repeat the password").fill("backup password 1")
+        dlg.get_by_role("button", name="Turn on automatic backup").click()
+        page.get_by_test_id("notice").get_by_text("Automatic backup is on").wait_for()
+        # The test folder is on the same disk as the records: the app says it would not survive a lost Mac.
+        assert "Backup is on this Mac only" in pill.inner_text()
+        pill.click()
+        dlg = page.get_by_test_id("backup-dialog")
+        assert "same disk" in dlg.inner_text()
+        dlg.get_by_role("button", name="Close").click()
         page.close()
     (backup,) = list(folder.iterdir())
+    assert backup.name.endswith(".rprovbackup")
+    assert backup.read_bytes().startswith(b"RPROV-BACKUP-ENC/1\n")
+    assert b"Formula" not in backup.read_bytes()  # nothing readable without the password
     with LiveServer(tmp_path / "b") as b:
-        page = browser.new_page()
+        page = browser.new_page(viewport={"width": 1400, "height": 900})
         page.goto(b.url)
-        page.get_by_role("button", name="Restore from a backup instead").click()
+        page.get_by_role("button", name="Restore from a backup").click()
         form = page.get_by_test_id("restore-form")
         form.get_by_label("Backup file").set_input_files(str(backup))
+        form.get_by_label("Backup password").fill("wrong password!")
+        form.get_by_role("button", name="Restore my research").click()
+        form.get_by_text("wrong backup password").wait_for()
+        assert b.ctx.ledger.record_count() == 0
         form.get_by_label("Backup password").fill("backup password 1")
-        form.get_by_role("button", name="Restore").click()
-        page.get_by_text(f"Demo author (fictional) · {count} records").wait_for()
+        form.get_by_role("button", name="Restore my research").click()
+        page.get_by_test_id("graph").locator(".record-node").nth(13).wait_for()
+        wait_for_step_count(page, "14 research steps")
         assert b.ctx.ledger.record_count() == count
+        # Same folder and password: automatic backups simply continue on the new install.
+        assert "Backup is on this Mac only" in page.get_by_test_id("backup-pill").inner_text()
+        page.close()
+
+
+def test_first_run_with_automatic_backup(tmp_path, browser):
+    """Onboarding: name + project, then a backup folder; the first backup is written immediately."""
+    folder = tmp_path / "backup-target"
+    with LiveServer(tmp_path / "srv") as srv:
+        page = browser.new_page(viewport={"width": 1400, "height": 900})
+        page.goto(srv.url)
+        page.get_by_placeholder("Name or pen name").fill("New Researcher")
+        page.get_by_role("button", name="Start").click()
+        setup = page.get_by_test_id("backup-setup")
+        setup.get_by_label("Backup folder").fill(str(folder))  # created if needed
+        setup.get_by_label("Backup password (at least 8 characters)").fill("first password")
+        setup.get_by_label("Repeat the password").fill("first passwort")
+        setup.get_by_role("button", name="Turn on automatic backup").click()
+        setup.get_by_text("The two passwords are not the same.").wait_for()
+        setup.get_by_label("Repeat the password").fill("first password")
+        setup.get_by_role("button", name="Turn on automatic backup").click()
+        page.get_by_test_id("empty-state").wait_for()
+        assert len(list(folder.glob("*.rprovbackup"))) == 1
+        wait_for_step_count(page, "0 research steps")
+        # No project name given: a default one is created so the first step can be added right away.
+        assert page.get_by_label("Project").locator("option:checked").inner_text() == "My research"
+        page.close()
+
+
+def test_empty_state_and_help_panels(tmp_path, browser):
+    with LiveServer(tmp_path) as srv:
+        srv.ctx.ledger.init_identity("Helper")
+        srv.ctx.ledger.create_project("FSF")
+        page = browser.new_page(viewport={"width": 1400, "height": 900})
+        page.goto(srv.url)
+        empty = page.get_by_test_id("empty-state")
+        empty.wait_for()
+        assert "Record the first step of FSF" in empty.inner_text()
+        assert "Automatic backup is not on yet" in empty.inner_text()
+        wait_for_step_count(page, "0 research steps")
+        assert page.get_by_role("button", name="Share…").is_disabled()
+
+        # Picking a kind of step opens the form with that kind already chosen.
+        page.get_by_test_id("start-experiment").click()
+        form = page.get_by_test_id("record-form")
+        assert form.get_by_role("radio", name="Experiment").is_checked()
+        assert form.get_by_role("button", name="+ Connect to an earlier step").is_disabled()
+        form.locator("input[name=title]").fill("Run 1")
+        page.get_by_test_id("submit-record").click()
+        page.get_by_test_id("detail").wait_for()
+        wait_for_step_count(page, "1 research step")
+        assert srv.ctx.ledger.record_count() == 2  # genesis + the step; only the step is counted
+
+        # The legend is there on request, not always on screen.
+        assert page.get_by_test_id("legend").count() == 0
+        page.get_by_test_id("legend-button").click()
+        legend = page.get_by_test_id("legend")
+        assert "Third-party timestamp" in legend.inner_text() and "Bitcoin anchor" in legend.inner_text()
+        legend.get_by_role("button", name="Close legend").click()
+        assert page.get_by_test_id("legend").count() == 0
+
+        # Technical actions live in the More menu.
+        page.get_by_test_id("more-menu").click()
+        items = [i.inner_text() for i in page.get_by_role("menuitem").all()]
+        assert items == ["Check timestamps now", "Backup…", "Where is my data?", "Technical details",
+                         "Back up signing key only…"]
+        page.get_by_role("menuitem", name="Where is my data?").click()
+        where = page.get_by_test_id("where-is-my-data")
+        text = where.inner_text()
+        assert str(srv.ctx.settings.data_dir) in text
+        assert "Not set up yet" in text and "only receive a fingerprint" in text
+        where.get_by_role("button", name="Close").click()
+
+        page.get_by_test_id("more-menu").click()
+        page.get_by_role("menuitem", name="Technical details").click()
+        tech = page.get_by_test_id("technical-details")
+        assert srv.ctx.ledger.installation in tech.inner_text()
+        assert "2 — 1 research step, plus" in tech.inner_text()
         page.close()

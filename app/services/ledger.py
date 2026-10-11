@@ -80,6 +80,7 @@ class Ledger:
         self.anchors = anchors
         self._write_lock = WRITE_LOCK
         self._key: Ed25519PrivateKey | None = None
+        self.listeners: list = []  # called with the new record ID after each append (e.g. auto-backup)
 
     # ------------------------------------------------------------------ identity
 
@@ -239,7 +240,17 @@ class Ledger:
         with self._write_lock:
             rid = self._append_locked(kind, payload, project_id, list(files))
         self.anchors.submit_for(rid)  # after commit; failures only affect the proof
+        self._notify(rid)
         return rid
+
+    def _notify(self, rid: str) -> None:
+        for listener in list(self.listeners):
+            try:
+                listener(rid)
+            except Exception:  # noqa: BLE001 - a listener never breaks recording
+                import logging
+
+                logging.getLogger("rprov.ledger").exception("listener failed")
 
     def _require(self, record_id: str, kinds: tuple[str, ...] | None, what: str) -> RecordRow:
         if not R.is_record_id(record_id):

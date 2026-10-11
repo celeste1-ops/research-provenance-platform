@@ -63,61 +63,72 @@ export function Detail({ id, version, onClose, onSelect, entries, relationTypes,
 
       <section className="src src-verified" data-source="verified" data-testid="section-verified">
         <h3 className="src-tag">Verified record</h3>
-        <ProofLine proof={v.timestamps.tsa} />
-        <ProofLine proof={v.timestamps.btc} />
-        <p className="small">{v.earliest_verified ? v.earliest_verified.text : "No timestamp yet — no time is shown."}</p>
-        <dl>
-          <dt>Record ID</dt>
-          <dd className="mono">{v.record_id}</dd>
-          <dt>Signature</dt>
-          <dd>{v.signature === "valid" ? "valid (same key as all other records)" : v.signature}</dd>
-          {v.project_title && (
-            <>
-              <dt>Project (as recorded)</dt>
-              <dd>{v.project_title}</dd>
-            </>
-          )}
-          {v.external && (
-            <>
-              <dt>External reference</dt>
-              <dd>
-                {Object.entries(v.external)
-                  .filter(([k]) => !["note", "kind", "evidence_level"].includes(k))
-                  .map(([k, val]) => (
-                    <div key={k}>
-                      {k}: <span className="mono">{val}</span>
-                    </div>
-                  ))}
-                {v.external.evidence_level && <div className="muted small">{v.external.evidence_level}</div>}
-                {v.external.note && (
-                  <div className={v.external.note.startsWith("External reference") ? "warning" : "muted small"}>
-                    {v.external.note}
-                  </div>
-                )}
-              </dd>
-            </>
-          )}
-          {v.content_hashes.map((h) => (
-            <div key={h.name} className="hash-row">
-              <dt>{h.name}</dt>
-              <dd>
-                <span className="mono">{h.sha256}</span> · {h.size} bytes
-                {h.name !== "body.md" && (
-                  <>
-                    {" "}·{" "}
-                    <a href={`/api/records/${detail.id}/content?file=${encodeURIComponent(h.name)}`}>download</a>
-                  </>
-                )}
-              </dd>
-            </div>
-          ))}
-        </dl>
         {body !== null && (
           <div className="body-view">
             <Markdown text={body} />
           </div>
         )}
+        {v.external && (
+          <div className="external small">
+            {Object.entries(v.external)
+              .filter(([k]) => !["note", "kind", "evidence_level"].includes(k))
+              .map(([k, val]) => (
+                <div key={k}>
+                  {k === "repo_url" ? "Repository" : k === "commit" ? "Commit" : k.toUpperCase()}:{" "}
+                  <span className="mono">{val}</span>
+                </div>
+              ))}
+            {v.external.evidence_level && <div className="muted">{v.external.evidence_level}</div>}
+            {v.external.note && (
+              <div className={v.external.note.startsWith("External reference") ? "warning" : "muted"}>
+                {v.external.note}
+              </div>
+            )}
+          </div>
+        )}
+        {v.content_hashes.filter((h) => h.name !== "body.md").length > 0 && (
+          <ul className="files small">
+            {v.content_hashes
+              .filter((h) => h.name !== "body.md")
+              .map((h) => (
+                <li key={h.name}>
+                  📎 <a href={`/api/records/${detail.id}/content?file=${encodeURIComponent(h.name)}`}>{h.name}</a>{" "}
+                  <span className="muted">({h.size} bytes)</span>
+                </li>
+              ))}
+          </ul>
+        )}
+        <div className="proofs">
+          <ProofLine proof={v.timestamps.tsa} />
+          <p className="proof-help small">{proofHelp(v.timestamps.tsa)}</p>
+          <ProofLine proof={v.timestamps.btc} />
+          <p className="proof-help small">{proofHelp(v.timestamps.btc)}</p>
+        </div>
+        <p className="small">{v.earliest_verified ? v.earliest_verified.text : "No timestamp yet — no time is shown."}</p>
         <p className="note">{v.note}</p>
+        <details className="tech small">
+          <summary>Technical details</summary>
+          <dl>
+            <dt>Record ID</dt>
+            <dd className="mono">{v.record_id}</dd>
+            <dt>Signature</dt>
+            <dd>{v.signature === "valid" ? "valid (same key as all other records)" : v.signature}</dd>
+            {v.project_title && (
+              <>
+                <dt>Project (as recorded)</dt>
+                <dd>{v.project_title}</dd>
+              </>
+            )}
+            {v.content_hashes.map((h) => (
+              <div key={h.name} className="hash-row">
+                <dt>{h.name}</dt>
+                <dd>
+                  <span className="mono">sha256 {h.sha256}</span> · {h.size} bytes
+                </dd>
+              </div>
+            ))}
+          </dl>
+        </details>
       </section>
 
       <section className="src src-author" data-source="author" data-testid="section-author">
@@ -180,4 +191,17 @@ export function Detail({ id, version, onClose, onSelect, entries, relationTypes,
         relationTypes={relationTypes} onChanged={onChanged} />
     </aside>
   );
+}
+
+// One plain sentence under each proof status. The two kinds of proof stay separate.
+function proofHelp(p: { kind: string; state: string; time: string | null }): string {
+  if (p.kind === "tsa") {
+    if (p.state === "confirmed") return `An independent timestamp service signed that this step existed at ${p.time}.`;
+    if (p.state === "not_enabled") return "Turned off.";
+    return "Not received yet — the app keeps trying automatically (e.g. when you are back online).";
+  }
+  if (p.state === "confirmed") return "Written into the public Bitcoin blockchain — checkable without trusting any company.";
+  if (p.state === "pending") return "Waiting for the Bitcoin network; usually confirms within a few hours. Nothing to do.";
+  if (p.state === "not_enabled") return "Turned off.";
+  return "Not submitted yet — the app keeps trying automatically.";
 }

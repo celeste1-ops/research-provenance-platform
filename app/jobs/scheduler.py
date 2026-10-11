@@ -12,8 +12,9 @@ INTERVAL_SECONDS = 3600
 
 
 class AnchorScheduler:
-    def __init__(self, anchors, interval: float = INTERVAL_SECONDS):
+    def __init__(self, anchors, interval: float = INTERVAL_SECONDS, after=None):
         self.anchors = anchors
+        self.after = after  # e.g. automatic backup once proofs have been refreshed
         self.interval = interval
         self._stop = threading.Event()
         self._thread = threading.Thread(target=self._run, name="rprov-anchor-refresh", daemon=True)
@@ -28,6 +29,8 @@ class AnchorScheduler:
 
     def run_once(self) -> dict:
         stats = self.anchors.refresh(force=False)
+        if self.after is not None:
+            self.after()
         self.runs += 1
         log.info("time-proof check: %s", stats)
         return stats
