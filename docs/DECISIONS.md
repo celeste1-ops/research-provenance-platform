@@ -241,3 +241,17 @@ verification rules or what leaves the machine for time proofs.
   selected. The graph legend is shown on request ("How to read the graph"), and "Where is my
   data?" explains in plain words where data lives, what the timestamp services receive
   (only a fingerprint, so they cannot give anything back) and how to restore on a new Mac.
+
+## Round 3: plain words, practice space, recovery code
+
+- **D-037 · Plain names for the two stamps in the app (PRD §9 table, rule 4).** The PRD
+  lists the interface text "Third-party timestamp: verified" and "Bitcoin anchor: pending /
+  confirmed". At the author's request the app now says **"Date stamp ✓"** and **"Public
+  stamp: waiting / done"** (also "not yet", "off"), with D and P as the small icons. Rule 4's
+  intent is kept: the two proofs keep separate names, separate lines, separate status and
+  separate columns, and nothing merges them into one "verified time". Every place a stamp
+  is shown has a "?" whose one sentence names the formal term, and the Share dialog and the
+  record's Technical details say which formal name each stamp has. Reports, `VERIFY.md`,
+  `verify.py` and the API's `text` field keep the formal names unchanged, because they are
+  read by third parties and the evidence bundle must not change. Other plain words: "Add a
+  step", "Map", "List", "Key steps only" (milestone), "Share", "Settings" (was "⋯").

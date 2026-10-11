@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { api } from "../api";
+import { HOME_NOTE } from "../labels";
 import { BackupSetup, RestoreForm } from "./BackupDialog";
 
 // First run: (1) your name + first project, (2) automatic backup. Or restore instead.
@@ -37,17 +38,14 @@ export function Setup({ onDone }: { onDone: () => void }) {
             <h1>Keep a verifiable history of your research</h1>
             <ul className="intro">
               <li>
-                <b>Add research steps</b> as you go — ideas, hypotheses, experiments, code, figures, papers — and link
+                <b>Add steps</b> as you go — ideas, hypotheses, experiments, code, figures, papers — and link
                 each one to the earlier steps it builds on.
               </li>
               <li>
-                <b>Every step gets a timestamp automatically</b>, so you can later show it existed by that date and
+                <b>Every step gets a date stamp automatically</b>, so you can later show it existed by that date and
                 hasn't been changed since.
               </li>
-              <li>
-                <b>Your research stays on this Mac.</b> Only a fingerprint (hash) of each step is sent out to get the
-                timestamps — never the content.
-              </li>
+              <li data-testid="home-note-setup">{HOME_NOTE}</li>
             </ul>
             <form onSubmit={start}>
               <label>
@@ -82,7 +80,7 @@ export function Setup({ onDone }: { onDone: () => void }) {
             <h1>Turn on automatic backup</h1>
             <p>
               Your research lives on this Mac. If the Mac is lost or breaks, a backup is what brings it back — the
-              timestamps alone can't. Choose a folder once; after that every new step is backed up automatically.
+              stamps alone can't. Choose a folder once; after that every new step is backed up automatically.
             </p>
             <BackupSetup onDone={onDone} />
             <p className="small center">
@@ -99,7 +97,7 @@ export function Setup({ onDone }: { onDone: () => void }) {
             <h1>Restore your research</h1>
             <p>
               Choose a backup file (<span className="mono">.rprovbackup</span>) and enter its password. Your steps,
-              files, timestamps and signing key come back exactly as they were.
+              files, stamps and signing key come back exactly as they were.
             </p>
             <RestoreForm onDone={onDone} />
             <p className="small center">

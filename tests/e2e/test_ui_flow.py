@@ -55,9 +55,9 @@ def test_p0_flow_in_the_browser(tmp_path, browser):
         page.get_by_test_id("backup-setup").wait_for()
         page.get_by_role("button", name="Skip for now").click()
         page.get_by_test_id("empty-state").wait_for()
-        wait_for_step_count(page, "0 research steps")  # genesis is not a step
+        wait_for_step_count(page, "0 steps")  # genesis is not a step
         assert page.get_by_test_id("backup-pill").inner_text().strip().endswith("Backup not set up")
-        assert "Bitcoin anchor: not enabled" not in page.content()  # mock Bitcoin anchor is on here
+        assert "Public stamp (Bitcoin): off" not in page.content()  # mock Bitcoin anchor is on here
 
         # 3–5. Record an idea; both proofs appear separately within a second.
         _new_record(page, "Idea", "First formula", "E = m c^2")
@@ -65,15 +65,15 @@ def test_p0_flow_in_the_browser(tmp_path, browser):
         detail = page.get_by_test_id("detail")
         detail.wait_for()
         verified = page.get_by_test_id("section-verified")
-        verified.locator("[data-proof=tsa]", has_text="Third-party timestamp: verified").wait_for()
-        assert "Bitcoin anchor: pending" in verified.inner_text()
+        verified.locator("[data-proof=tsa]", has_text="Date stamp ✓").wait_for()
+        assert "Public stamp: waiting" in verified.inner_text()
         assert "E = m c^2" in verified.inner_text()  # the content itself is part of the verified record
 
         # Saving without a backup folder says so, with a way to set it up.
         assert "Automatic backup is not set up yet" in page.get_by_test_id("notice").inner_text()
 
         # Key backup (More menu): password-protected, opens with the password, matches the genesis key.
-        page.get_by_test_id("more-menu").click()
+        page.get_by_test_id("settings-menu").click()
         page.get_by_role("menuitem", name="Back up signing key only…").click()
         kb = page.get_by_test_id("key-backup-dialog")
         kb.get_by_label("Password (at least 8 characters)").fill("correct horse battery")
@@ -97,7 +97,7 @@ def test_p0_flow_in_the_browser(tmp_path, browser):
         rel_row.locator("select").nth(0).select_option("revises")
         rel_row.locator("select").nth(1).select_option(label="#1 First formula")
         form.locator("textarea").first.fill("the experiment failed, so the hypothesis changed")
-        form.get_by_label("Mark as a milestone").check()
+        form.get_by_label("Mark as a key step").check()
         form.get_by_label("This is older material I'm adding now").check()
         form.get_by_placeholder("Claimed date: 2025, 2025-11 or 2025-11-03").fill("2025-11")
         page.get_by_test_id("submit-record").click()
@@ -110,7 +110,7 @@ def test_p0_flow_in_the_browser(tmp_path, browser):
         assert "2025-11" in s["author"] and "2025-11" not in s["verified"]
         assert "Local clock time" in s["author"] and "Local clock time" not in s["verified"]
         assert "revises" in s["author"] and "revises" not in s["verified"]
-        assert s["verified"].count("Third-party timestamp:") == 1 and s["verified"].count("Bitcoin anchor:") == 1
+        assert s["verified"].count("Date stamp") == 1 and s["verified"].count("Public stamp") == 1
         snapshot = {
             "section_order": [
                 h.inner_text().strip()
@@ -148,8 +148,8 @@ def test_p0_flow_in_the_browser(tmp_path, browser):
         page.get_by_test_id("section-verified").get_by_text("External reference, code content not saved").wait_for()
 
         # 8. Export with preview, then verify the downloaded bundle independently.
-        wait_for_step_count(page, "3 research steps")
-        page.get_by_role("button", name="Share…").click()
+        wait_for_step_count(page, "3 steps")
+        page.get_by_role("button", name="Share", exact=True).click()
         dialog = page.get_by_test_id("export-dialog")
         dialog.get_by_test_id("export-warnings").wait_for()
         warnings = dialog.get_by_test_id("export-warnings").inner_text()

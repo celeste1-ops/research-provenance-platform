@@ -6,11 +6,13 @@ import { Detail } from "./components/Detail";
 import { EmptyState } from "./components/EmptyState";
 import { ExportDialog } from "./components/ExportDialog";
 import { Graph } from "./components/Graph";
-import { LegendButton, TechnicalDetails, WhereIsMyData } from "./components/InfoPanels";
+import { Help } from "./components/Help";
+import { Legend, TechnicalDetails, WhereIsMyData } from "./components/InfoPanels";
 import { KeyBackupDialog } from "./components/KeyBackupDialog";
 import { RecordForm } from "./components/RecordForm";
 import { Setup } from "./components/Setup";
 import { Timeline } from "./components/Timeline";
+import { HELP, HOME_NOTE } from "./labels";
 
 type Dialog = null | "form" | "export" | "backup" | "key" | "where" | "tech";
 interface Notice {
@@ -87,11 +89,11 @@ export function App() {
 
   async function checkProofs() {
     setMenuOpen(false);
-    setNotice({ text: "Checking timestamps…" });
+    setNotice({ text: "Checking stamps…" });
     try {
       const stats = await api.refreshAnchors();
       setNotice({
-        text: `Timestamps checked: ${stats.submitted} requested, ${stats.upgraded} newly confirmed, ${stats.still_pending} still waiting for Bitcoin.`,
+        text: `Stamps checked: ${stats.submitted} requested, ${stats.upgraded} newly done, ${stats.still_pending} public stamps still waiting.`,
       });
       await reload();
     } catch (e) {
@@ -130,24 +132,30 @@ export function App() {
           + New project
         </button>
         <span className="muted small" data-testid="step-count">
-          {steps} research {steps === 1 ? "step" : "steps"}
+          {steps} {steps === 1 ? "step" : "steps"}
         </span>
         <div className="spacer" />
         <BackupPill status={status.backup} onClick={() => setDialog("backup")} />
-        <button className="secondary" onClick={() => setDialog("export")} disabled={steps === 0}>
-          Share…
-        </button>
-        <button className="primary" onClick={() => openForm()} disabled={!projectId} data-testid="new-record">
-          + Add research step
-        </button>
+        <span className="with-help">
+          <button className="secondary" onClick={() => setDialog("export")} disabled={steps === 0}>
+            Share
+          </button>
+          <Help id="share" label="Share" align="right">{HELP.share}</Help>
+        </span>
+        <span className="with-help">
+          <button className="primary" onClick={() => openForm()} disabled={!projectId} data-testid="new-record">
+            + Add a step
+          </button>
+          <Help id="add-step" label="a step" align="right">{HELP.addStep}</Help>
+        </span>
         <div className="menu-wrap" ref={menuRef}>
-          <button className="secondary icon" aria-label="More" aria-expanded={menuOpen} data-testid="more-menu"
+          <button className="secondary" aria-expanded={menuOpen} data-testid="settings-menu"
             onClick={() => setMenuOpen(!menuOpen)}>
-            ⋯
+            ⚙ Settings
           </button>
           {menuOpen && (
             <div className="menu" role="menu">
-              <button role="menuitem" onClick={checkProofs}>Check timestamps now</button>
+              <button role="menuitem" onClick={checkProofs}>Check stamps now</button>
               <button role="menuitem" onClick={() => openMenuItem("backup")}>Backup…</button>
               <button role="menuitem" onClick={() => openMenuItem("where")}>Where is my data?</button>
               <hr />
@@ -158,7 +166,7 @@ export function App() {
         </div>
       </header>
       {btcOff && (
-        <div className="banner muted small">Bitcoin anchor: not enabled. Third-party timestamps are active.</div>
+        <div className="banner muted small">Public stamp (Bitcoin): off. Date stamps are on.</div>
       )}
       {notice && (
         <div className={`banner ${notice.kind === "error" ? "error" : ""}`} data-testid="notice">
@@ -178,21 +186,27 @@ export function App() {
           <div className="tabs" role="tablist">
             <button role="tab" aria-selected={view === "graph"} className={view === "graph" ? "tab active" : "tab"}
               onClick={() => setView("graph")}>
-              History graph
+              Map
             </button>
+            <Help id="map" label="the map" wide>
+              <Legend />
+            </Help>
             <button role="tab" aria-selected={view === "timeline"} className={view === "timeline" ? "tab active" : "tab"}
               onClick={() => setView("timeline")} data-testid="tab-timeline">
-              Timeline
+              List
             </button>
+            <Help id="list" label="the list">{HELP.list}</Help>
           </div>
           {view === "graph" && (
-            <label className="check small">
-              <input type="checkbox" checked={milestonesOnly} onChange={(e) => setMilestonesOnly(e.target.checked)}
-                data-testid="milestones-only" />
-              Milestones only
-            </label>
+            <span className="with-help">
+              <label className="check small">
+                <input type="checkbox" checked={milestonesOnly} onChange={(e) => setMilestonesOnly(e.target.checked)}
+                  data-testid="milestones-only" />
+                Key steps only
+              </label>
+              <Help id="key-steps" label="Key steps only">{HELP.keySteps}</Help>
+            </span>
           )}
-          <LegendButton />
         </nav>
       )}
       <main className={`main ${selected ? "with-detail" : ""}`}>
@@ -225,6 +239,12 @@ export function App() {
           />
         )}
       </main>
+      <footer className="footbar small" data-testid="home-note">
+        <span>{HOME_NOTE}</span>
+        <button className="link small" onClick={() => setDialog("where")}>
+          Where is my data?
+        </button>
+      </footer>
       {dialog === "form" && graph && (
         <div className="modal-backdrop">
           <div className="modal">
@@ -241,7 +261,7 @@ export function App() {
                 await reload();
                 const b = (await api.status()).backup;
                 if (b?.state === "ok") {
-                  setNotice({ text: "Saved. It is being timestamped and will be included in the next automatic backup." });
+                  setNotice({ text: "Saved. It gets its date stamp in a few seconds and goes into the next automatic backup." });
                 } else {
                   setNotice({
                     text: "Saved. Automatic backup is not set up yet — if this Mac is lost, this step would be lost too.",

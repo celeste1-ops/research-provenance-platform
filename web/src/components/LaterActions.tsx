@@ -54,7 +54,7 @@ export function LaterActions({ detail, node, entries, relationTypes, onChanged }
         </button>
         <button className="secondary small" disabled={busy}
           onClick={() => run(() => api.createMilestone(detail.id, node?.milestone ? "unset" : "set"))}>
-          {node?.milestone ? "Unmark milestone" : "Mark as milestone"}
+          {node?.milestone ? "Unmark key step" : "Mark as key step"}
         </button>
         <button className="secondary small" onClick={() => setMode(mode === "statement" ? null : "statement")}>
           Add statement…
@@ -68,14 +68,14 @@ export function LaterActions({ detail, node, entries, relationTypes, onChanged }
       {mode === "relation" && (
         <div className="group">
           <div className="row">
-            <span className="muted">this record</span>
+            <span className="muted">this step</span>
             <select value={rel} onChange={(e) => setRel(e.target.value)}>
               {relationTypes.map((t) => (
                 <option key={t} value={t}>{REL_LABELS[t] ?? t}</option>
               ))}
             </select>
-            <select value={target} onChange={(e) => setTarget(e.target.value)} aria-label="Earlier record">
-              <option value="">choose an earlier record…</option>
+            <select value={target} onChange={(e) => setTarget(e.target.value)} aria-label="Earlier step">
+              <option value="">choose an earlier step…</option>
               {[...older].reverse().map((e) => (
                 <option key={e.id} value={e.id}>#{e.seq} {e.title}</option>
               ))}
@@ -117,7 +117,7 @@ export function LaterActions({ detail, node, entries, relationTypes, onChanged }
         </div>
       )}
       {error && <p className="error small">{error}</p>}
-      <p className="note">Each action adds a new record with its own signature and timestamps. Nothing is changed.</p>
+      <p className="note">Each action is added as a new entry with its own signature and stamps. Nothing already saved is changed.</p>
     </section>
   );
 }

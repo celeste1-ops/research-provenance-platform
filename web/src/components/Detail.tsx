@@ -4,6 +4,7 @@ import type { GraphNode, RecordDetail } from "../types";
 import { Changes } from "./Changes";
 import { LaterActions, WithdrawRelation } from "./LaterActions";
 import { Markdown } from "./Markdown";
+import { STAMP_NAMES } from "../labels";
 import { ProofLine } from "./ProofBadge";
 
 interface Props {
@@ -104,13 +105,25 @@ export function Detail({ id, version, onClose, onSelect, entries, relationTypes,
           <ProofLine proof={v.timestamps.btc} />
           <p className="proof-help small">{proofHelp(v.timestamps.btc)}</p>
         </div>
-        <p className="small">{v.earliest_verified ? v.earliest_verified.text : "No timestamp yet — no time is shown."}</p>
+        <p className="small" data-testid="earliest">
+          {v.earliest_verified
+            ? `Proven to exist by ${v.earliest_verified.time} (from the ${
+                v.earliest_verified.from === v.timestamps.tsa.label ? "date stamp" : "public stamp"
+              })`
+            : "No stamp yet — no time is shown."}
+        </p>
         <p className="note">{v.note}</p>
         <details className="tech small">
           <summary>Technical details</summary>
           <dl>
             <dt>Record ID</dt>
             <dd className="mono">{v.record_id}</dd>
+            <dt>Stamps, as named in reports</dt>
+            <dd>
+              {STAMP_NAMES.tsa} = {v.timestamps.tsa.label}
+              {v.timestamps.tsa.provider && ` (${v.timestamps.tsa.provider})`} · {STAMP_NAMES.btc} ={" "}
+              {v.timestamps.btc.label}
+            </dd>
             <dt>Signature</dt>
             <dd>{v.signature === "valid" ? "valid (same key as all other records)" : v.signature}</dd>
             {v.project_title && (

@@ -12,6 +12,7 @@ import {
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import type { Graph as GraphData, GraphNode } from "../types";
+import { TYPE_LABELS } from "../labels";
 import { ProofIcon } from "./ProofBadge";
 
 const COL_W = 210;
@@ -20,17 +21,6 @@ const LEFT = 150;
 const TOP = 70;
 const NODE_W = 180;
 
-const TYPE_LABELS: Record<string, string> = {
-  idea: "Idea",
-  note: "Note",
-  claim: "Claim / hypothesis",
-  document: "Document",
-  code: "Code",
-  experiment: "Experiment",
-  dataset: "Dataset",
-  figure: "Figure",
-  publication: "Publication",
-};
 const DASH: Record<string, string | undefined> = { revises: undefined, derived_from: "7 4", uses: "2 4" };
 
 type RecordNodeData = { node: GraphNode; selected: boolean };

@@ -19,13 +19,13 @@ BTC_LABEL = "Bitcoin anchor"
 NODE_TYPE_LABELS = {
     "idea": "Idea",
     "note": "Note",
-    "claim": "Claim / hypothesis",
+    "claim": "Hypothesis / claim",
     "document": "Document",
     "code": "Code",
     "experiment": "Experiment",
-    "dataset": "Dataset",
+    "dataset": "Data",
     "figure": "Figure",
-    "publication": "Publication",
+    "publication": "Paper",
 }
 REL_LABELS = {"revises": "revises", "derived_from": "derived from", "uses": "uses"}
 CODE_NOT_SAVED = "External reference, code content not saved"
@@ -182,7 +182,7 @@ def _record_title(snap: Snapshot, rid: str) -> str:
         verb = "Added" if p["op"] == "add" else "Withdrew"
         return f"{verb} relation: {_short(snap, p['from'])} {REL_LABELS.get(p['rel'], p['rel'])} {_short(snap, p['to'])}"
     if kind == "milestone":
-        return f"{'Marked' if p['op'] == 'set' else 'Unmarked'} milestone: {_short(snap, p['target'])}"
+        return f"{'Marked' if p['op'] == 'set' else 'Unmarked'} key step: {_short(snap, p['target'])}"
     if kind == "statement":
         return f"Statement on {_short(snap, p['target'])}"
     if kind == "retraction":
@@ -300,7 +300,7 @@ def record_detail(snap: Snapshot, rid: str, verification: dict | None = None) ->
                 }
             )
         if p.get("milestone"):
-            author_items.append({"field": "milestone", "text": "Marked as a milestone when recorded", "note": declared_text})
+            author_items.append({"field": "milestone", "text": "Marked as a key step when recorded", "note": declared_text})
     elif row.kind == "genesis":
         verified["public_key"] = p["public_key"]
         author_items.append({"field": "author_label", "text": f"Author label: {p['author_label']}",

@@ -1,19 +1,9 @@
 import { useState } from "react";
 import { api } from "../api";
 import type { GraphNode } from "../types";
+import { TYPE_LABELS } from "../labels";
 import { MarkdownEditor } from "./MarkdownEditor";
 
-const TYPE_LABELS: Record<string, string> = {
-  idea: "Idea",
-  note: "Note",
-  claim: "Hypothesis / claim",
-  document: "Document",
-  code: "Code",
-  experiment: "Experiment",
-  dataset: "Data",
-  figure: "Figure",
-  publication: "Paper",
-};
 const REL_LABELS: Record<string, string> = {
   revises: "is a new version of (revises)",
   derived_from: "grew out of (derived from)",
@@ -100,7 +90,7 @@ export function RecordForm({ projectId, nodeTypes, relationTypes, existing, onCr
 
   return (
     <form className="record-form" onSubmit={submit} data-testid="record-form">
-      <h2>Add a research step</h2>
+      <h2>Add a step</h2>
       <fieldset className="types">
         <legend>What kind of step is it?</legend>
         {nodeTypes.map((t) => (
@@ -226,7 +216,7 @@ export function RecordForm({ projectId, nodeTypes, relationTypes, existing, onCr
 
       <label className="check">
         <input type="checkbox" checked={milestone} onChange={(e) => setMilestone(e.target.checked)} /> Mark as a
-        milestone <span className="muted">(an important step — shown in “Milestones only”)</span>
+        key step <span className="muted">(an important step — shown in “Key steps only”)</span>
       </label>
 
       <label className="check">

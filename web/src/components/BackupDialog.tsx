@@ -99,7 +99,7 @@ export function BackupPill({ status, onClick }: { status: BackupStatus | null; o
   const st = status?.state ?? "off";
   const text =
     st === "ok"
-      ? `Backed up · ${timeAgo(status?.last_backup)}`
+      ? `Last backup: ${timeAgo(status?.last_backup)} ✓`
       : st === "same-disk"
         ? "Backup is on this Mac only"
         : st === "error"

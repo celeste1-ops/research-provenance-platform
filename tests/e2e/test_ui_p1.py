@@ -50,9 +50,9 @@ def test_timeline_view(demo_page):
     table.wait_for()
     assert table.locator("tbody tr").count() == srv.ctx.ledger.record_count()
     headers = table.locator("thead").inner_text()
-    assert "Third-party timestamp" in headers and "Bitcoin anchor" in headers and "unverified" in headers
+    assert "Date stamp" in headers and "Public stamp" in headers and "unverified" in headers
     row = table.get_by_test_id(f"row-{ids['link1']}")
-    assert "Relation (later)" in row.inner_text()
+    assert "Link (added later)" in row.inner_text()
     row.click()
     page.get_by_test_id("detail").wait_for()
 
@@ -69,15 +69,15 @@ def test_changes_and_later_actions(demo_page):
     # Append-only actions from the sidebar: milestone and statement become new records.
     before = srv.ctx.ledger.record_count()
     actions = page.get_by_test_id("later-actions")
-    actions.get_by_role("button", name="Mark as milestone").click()
-    actions.get_by_role("button", name="Unmark milestone").wait_for()
+    actions.get_by_role("button", name="Mark as key step").click()
+    actions.get_by_role("button", name="Unmark key step").wait_for()
     actions.get_by_role("button", name="Add statement…").click()
     actions.get_by_placeholder("Additional note or correction").fill("The 0.2 slope is a rough first guess.")
     actions.get_by_role("button", name="Add statement", exact=True).click()
     page.get_by_test_id("section-later").get_by_text("The 0.2 slope is a rough first guess.").wait_for()
     assert srv.ctx.ledger.record_count() == before + 2
     later = page.get_by_test_id("section-later").inner_text()
-    assert "Marked milestone" in later
+    assert "Marked key step" in later
     assert "The 0.2 slope" not in page.get_by_test_id("section-verified").inner_text()
 
 
@@ -150,7 +150,7 @@ def test_backup_and_restore_in_the_browser(tmp_path, browser):
         form.get_by_label("Backup password").fill("backup password 1")
         form.get_by_role("button", name="Restore my research").click()
         page.get_by_test_id("graph").locator(".record-node").nth(13).wait_for()
-        wait_for_step_count(page, "14 research steps")
+        wait_for_step_count(page, "14 steps")
         assert b.ctx.ledger.record_count() == count
         # Same folder and password: automatic backups simply continue on the new install.
         assert "Backup is on this Mac only" in page.get_by_test_id("backup-pill").inner_text()
@@ -175,7 +175,7 @@ def test_first_run_with_automatic_backup(tmp_path, browser):
         setup.get_by_role("button", name="Turn on automatic backup").click()
         page.get_by_test_id("empty-state").wait_for()
         assert len(list(folder.glob("*.rprovbackup"))) == 1
-        wait_for_step_count(page, "0 research steps")
+        wait_for_step_count(page, "0 steps")
         # No project name given: a default one is created so the first step can be added right away.
         assert page.get_by_label("Project").locator("option:checked").inner_text() == "My research"
         page.close()
@@ -191,8 +191,9 @@ def test_empty_state_and_help_panels(tmp_path, browser):
         empty.wait_for()
         assert "Record the first step of FSF" in empty.inner_text()
         assert "Automatic backup is not on yet" in empty.inner_text()
-        wait_for_step_count(page, "0 research steps")
-        assert page.get_by_role("button", name="Share…").is_disabled()
+        wait_for_step_count(page, "0 steps")
+        assert page.get_by_role("button", name="Share", exact=True).is_disabled()
+        assert "Only a fingerprint is sent out to get a date stamp" in page.get_by_test_id("home-note").inner_text()
 
         # Picking a kind of step opens the form with that kind already chosen.
         page.get_by_test_id("start-experiment").click()
@@ -202,21 +203,34 @@ def test_empty_state_and_help_panels(tmp_path, browser):
         form.locator("input[name=title]").fill("Run 1")
         page.get_by_test_id("submit-record").click()
         page.get_by_test_id("detail").wait_for()
-        wait_for_step_count(page, "1 research step")
+        wait_for_step_count(page, "1 step")
         assert srv.ctx.ledger.record_count() == 2  # genesis + the step; only the step is counted
 
-        # The legend is there on request, not always on screen.
+        # Each stamp has a "?" that explains it in one sentence, with the formal name used in reports.
+        page.get_by_test_id("help-stamp-tsa").click()
+        assert "Third-party timestamp" in page.get_by_test_id("help-stamp-tsa-text").inner_text()
+        page.keyboard.press("Escape")
+        page.get_by_test_id("help-stamp-btc").click()
+        assert "Bitcoin anchor" in page.get_by_test_id("help-stamp-btc-text").inner_text()
+        page.keyboard.press("Escape")
+        assert page.get_by_test_id("help-stamp-btc-text").count() == 0
+
+        # The legend (line types, D/P icons) is behind the "?" next to Map, not always on screen.
         assert page.get_by_test_id("legend").count() == 0
-        page.get_by_test_id("legend-button").click()
+        page.get_by_test_id("help-map").click()
         legend = page.get_by_test_id("legend")
-        assert "Third-party timestamp" in legend.inner_text() and "Bitcoin anchor" in legend.inner_text()
-        legend.get_by_role("button", name="Close legend").click()
+        assert "Date stamp" in legend.inner_text() and "Public stamp" in legend.inner_text()
+        page.locator(".brand").click()  # a click anywhere else closes it
         assert page.get_by_test_id("legend").count() == 0
+        for hid in ("add-step", "share", "list", "key-steps"):
+            page.get_by_test_id(f"help-{hid}").click()
+            assert len(page.get_by_test_id(f"help-{hid}-text").inner_text()) > 20
+            page.keyboard.press("Escape")
 
         # Technical actions live in the More menu.
-        page.get_by_test_id("more-menu").click()
+        page.get_by_test_id("settings-menu").click()
         items = [i.inner_text() for i in page.get_by_role("menuitem").all()]
-        assert items == ["Check timestamps now", "Backup…", "Where is my data?", "Technical details",
+        assert items == ["Check stamps now", "Backup…", "Where is my data?", "Technical details",
                          "Back up signing key only…"]
         page.get_by_role("menuitem", name="Where is my data?").click()
         where = page.get_by_test_id("where-is-my-data")
@@ -225,7 +239,7 @@ def test_empty_state_and_help_panels(tmp_path, browser):
         assert "Not set up yet" in text and "only receive a fingerprint" in text
         where.get_by_role("button", name="Close").click()
 
-        page.get_by_test_id("more-menu").click()
+        page.get_by_test_id("settings-menu").click()
         page.get_by_role("menuitem", name="Technical details").click()
         tech = page.get_by_test_id("technical-details")
         assert srv.ctx.ledger.installation in tech.inner_text()

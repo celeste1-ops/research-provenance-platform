@@ -65,12 +65,16 @@ export function ExportDialog({ rows, defaultTitle, onClose }: Props) {
   const setAll = (lvl: Level) => setLevels(Object.fromEntries(entries.map((r) => [r.id, lvl])));
 
   return (
-    <div className="modal-backdrop" role="dialog" aria-modal="true" aria-label="Export evidence bundle">
+    <div className="modal-backdrop" role="dialog" aria-modal="true" aria-label="Share">
       <div className="modal wide" data-testid="export-dialog">
-        <h2>Export evidence bundle</h2>
+        <h2>Share</h2>
         <p className="small">
-          A zip with a web report, a checker (<code>verify.py</code>) and manual instructions. The reader needs neither
-          this app nor trust in you.
+          Makes one zip file to send: a web report, a checking program (<code>verify.py</code>) and step-by-step
+          instructions. The reader needs neither this app nor trust in you.
+        </p>
+        <p className="note">
+          The report uses the formal names: the date stamp is called “Third-party timestamp” and the public stamp
+          “Bitcoin anchor”.
         </p>
         <label>
           Bundle name
@@ -140,7 +144,7 @@ export function ExportDialog({ rows, defaultTitle, onClose }: Props) {
             Cancel
           </button>
           <button className="primary" onClick={doExport} disabled={busy || !preview} data-testid="do-export">
-            Export
+            Make the zip
           </button>
         </div>
       </div>

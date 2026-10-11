@@ -1,37 +1,25 @@
-import { useState } from "react";
 import type { Status } from "../types";
 import { timeAgo } from "../util";
 
-// Graph legend, on request instead of always on screen.
-export function LegendButton() {
-  const [open, setOpen] = useState(false);
+// How to read the map: lines, star and the two stamp icons. Shown behind the "?" next to Map.
+export function Legend() {
   return (
-    <div className="legend-wrap">
-      <button className="link small" onClick={() => setOpen(!open)} aria-expanded={open} data-testid="legend-button">
-        How to read the graph
-      </button>
-      {open && (
-        <div className="popover" role="dialog" aria-label="Legend" data-testid="legend">
-          <div className="popover-head">
-            <b>How to read the graph</b>
-            <button className="link" onClick={() => setOpen(false)} aria-label="Close legend">
-              ✕
-            </button>
-          </div>
-          <p className="small">Each box is a research step, left to right in the order you added them. Arrows point from an earlier step to a later one.</p>
-          <ul className="legend-list small">
-            <li><svg width="40" height="8"><line x1="0" y1="4" x2="40" y2="4" stroke="#3b4a63" strokeWidth="2" /></svg> <span><b>revises</b> — a new version of</span></li>
-            <li><svg width="40" height="8"><line x1="0" y1="4" x2="40" y2="4" stroke="#3b4a63" strokeWidth="2" strokeDasharray="7 4" /></svg> <span><b>derived from</b> — grew out of</span></li>
-            <li><svg width="40" height="8"><line x1="0" y1="4" x2="40" y2="4" stroke="#3b4a63" strokeWidth="2" strokeDasharray="2 4" /></svg> <span><b>uses</b> — builds on</span></li>
-            <li><span className="star">★</span> <span>gold border — a milestone you marked</span></li>
-            <li><span className="proof-icon on">T</span> <span><b>Third-party timestamp</b> (FreeTSA) — arrives in seconds; shows the step existed at that time</span></li>
-            <li><span className="proof-icon pending">B</span> <span><b>Bitcoin anchor</b> — independent of any company; dashed while waiting, confirms within a few hours</span></li>
-            <li><span className="proof-icon off">T</span> <span>empty — no timestamp yet (the app keeps trying)</span></li>
-          </ul>
-          <p className="note">“added …” on an arrow means you linked the steps later. Grey arrows were withdrawn.</p>
-        </div>
-      )}
-    </div>
+    <span className="legend" data-testid="legend">
+      <b>How to read the map</b>
+      <span className="block small">
+        Each box is a step, left to right in the order you added them. Arrows point from an earlier step to a later one.
+      </span>
+      <ul className="legend-list small">
+        <li><svg width="40" height="8"><line x1="0" y1="4" x2="40" y2="4" stroke="#3b4a63" strokeWidth="2" /></svg> <span><b>revises</b> — a new version of</span></li>
+        <li><svg width="40" height="8"><line x1="0" y1="4" x2="40" y2="4" stroke="#3b4a63" strokeWidth="2" strokeDasharray="7 4" /></svg> <span><b>derived from</b> — grew out of</span></li>
+        <li><svg width="40" height="8"><line x1="0" y1="4" x2="40" y2="4" stroke="#3b4a63" strokeWidth="2" strokeDasharray="2 4" /></svg> <span><b>uses</b> — builds on</span></li>
+        <li><span className="star">★</span> <span>gold border — a key step you marked</span></li>
+        <li><span className="proof-icon on">D</span> <span><b>Date stamp</b> — arrives in seconds; shows the step existed at that time</span></li>
+        <li><span className="proof-icon pending">P</span> <span><b>Public stamp</b> (Bitcoin) — dashed while waiting, done within a few hours</span></li>
+        <li><span className="proof-icon off">D</span> <span>empty — no stamp yet (the app keeps trying)</span></li>
+      </ul>
+      <span className="block note">“added …” on an arrow means you linked the steps later. Grey arrows were withdrawn.</span>
+    </span>
   );
 }
 
@@ -61,15 +49,16 @@ export function WhereIsMyData({ status, onClose, onBackup }: { status: Status; o
             <button className="link" onClick={onBackup}>Set up backup</button>
           </p>
         )}
-        <h3>Timestamps prove time — they don't store anything</h3>
+        <h3>Stamps prove time — they don't store anything</h3>
         <p className="small">
-          FreeTSA and the Bitcoin network only receive a fingerprint (hash) of each step. From a fingerprint nobody can
-          read or rebuild your content — so they also can't give it back. That is what backups are for.
+          The date stamp service (FreeTSA) and the Bitcoin network only receive a fingerprint (hash) of each step. From a
+          fingerprint nobody can read or rebuild your content — so they can't give it back either, not even through
+          Bitcoin. Only a backup can bring your files back.
         </p>
         <h3>If this Mac is lost</h3>
         <p className="small">
           Install the app on the new Mac and choose <b>Restore from a backup</b> on the first screen. You need the backup
-          file and its password. Your steps, files, timestamps and signing key come back as they were.
+          file and its password. Your steps, files, stamps and signing key come back as they were.
         </p>
       </div>
     </div>
@@ -99,8 +88,11 @@ export function TechnicalDetails({ status, onClose, onKeyBackup }: { status: Sta
           </dd>
           <dt>Data folder</dt>
           <dd className="mono">{status.data_dir}</dd>
-          <dt>Timestamp services</dt>
-          <dd>Third-party timestamp: {status.providers.tsa ?? "off"} · Bitcoin anchor: {status.providers.btc ?? "not enabled"}</dd>
+          <dt>Stamp services</dt>
+          <dd>
+            Date stamp (third-party timestamp): {status.providers.tsa ?? "off"} · Public stamp (Bitcoin anchor):{" "}
+            {status.providers.btc ?? "off"}
+          </dd>
         </dl>
         <p className="small">
           The signing key is part of every full backup. To keep a separate copy of just the key:{" "}

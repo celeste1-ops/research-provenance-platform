@@ -1,12 +1,14 @@
 import type { TimelineRow } from "../types";
+import { HELP, TYPE_LABELS, stampState } from "../labels";
+import { Help } from "./Help";
 import { ProofIcon } from "./ProofBadge";
 
 const KIND_LABELS: Record<string, string> = {
-  genesis: "Genesis",
-  entry: "Entry",
-  link: "Relation (later)",
-  milestone: "Milestone change",
-  statement: "Statement",
+  genesis: "Start (genesis)",
+  entry: "Step",
+  link: "Link (added later)",
+  milestone: "Key step change",
+  statement: "Note (added later)",
   retraction: "Retraction",
 };
 
@@ -19,8 +21,12 @@ export function Timeline({ rows, onSelect }: { rows: TimelineRow[]; onSelect: (i
         <thead>
           <tr>
             <th>#</th>
-            <th>Third-party timestamp</th>
-            <th>Bitcoin anchor</th>
+            <th>
+              Date stamp <Help id="list-tsa" label="a date stamp">{HELP.dateStamp}</Help>
+            </th>
+            <th>
+              Public stamp <Help id="list-btc" label="a public stamp">{HELP.publicStamp}</Help>
+            </th>
             <th>
               Local time <span className="unverified">(unverified)</span>
             </th>
@@ -35,15 +41,15 @@ export function Timeline({ rows, onSelect }: { rows: TimelineRow[]; onSelect: (i
             <tr key={r.id} onClick={() => onSelect(r.id)} className="clickable" data-testid={`row-${r.id}`}>
               <td>{r.seq}</td>
               <td data-proof="tsa">
-                <ProofIcon proof={r.tsa} /> {r.tsa.state === "confirmed" ? r.tsa.time : r.tsa.text.split(": ")[1]}
+                <ProofIcon proof={r.tsa} /> {r.tsa.state === "confirmed" ? r.tsa.time : stampState(r.tsa)}
               </td>
               <td data-proof="btc">
-                <ProofIcon proof={r.btc} /> {r.btc.state === "confirmed" ? r.btc.time : r.btc.text.split(": ")[1]}
+                <ProofIcon proof={r.btc} /> {r.btc.state === "confirmed" ? r.btc.time : stampState(r.btc)}
               </td>
               <td className="unverified">{r.local_time.value}</td>
               <td>
                 {KIND_LABELS[r.kind] ?? r.kind}
-                {r.node_type && <span className="muted"> · {r.node_type}</span>}
+                {r.node_type && <span className="muted"> · {TYPE_LABELS[r.node_type] ?? r.node_type}</span>}
               </td>
               <td>{r.title}</td>
               <td className="small">

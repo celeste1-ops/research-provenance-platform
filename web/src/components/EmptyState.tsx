@@ -1,3 +1,4 @@
+import { HOME_NOTE } from "../labels";
 import type { BackupStatus } from "../types";
 
 export const STEP_TYPES: { type: string; label: string; hint: string }[] = [
@@ -40,21 +41,19 @@ export function EmptyState({
         </div>
         <ol className="how">
           <li>
-            <b>Add a research step</b> — write it down or attach files.
+            <b>Add a step</b> — write it down or attach files.
           </li>
           <li>
             <b>Link it to earlier steps</b> — “new version of”, “grew out of”, or “builds on”.
           </li>
           <li>
-            <b>Timestamps happen automatically</b> — nothing to do.
+            <b>Date stamps happen automatically</b> — nothing to do.
           </li>
           <li>
             <b>Watch the history grow</b> — and share it as a report anyone can check.
           </li>
         </ol>
-        <p className="note">
-          Your research stays on this Mac. Only a fingerprint (hash) of each step is sent out to get timestamps.
-        </p>
+        <p className="note" data-testid="home-note-empty">{HOME_NOTE}</p>
         {backup?.state !== "ok" && (
           <div className="callout">
             {backup?.state === "same-disk" ? (
