@@ -7,8 +7,9 @@ from pathlib import Path
 
 from jinja2 import Environment, FileSystemLoader
 from markdown_it import MarkdownIt
-from markupsafe import Markup
+from markupsafe import Markup, escape
 
+from app.i18n import current, tr
 from app.report.svg import render_graph_svg
 from provenance_core.jcs import parse_json_strict
 from provenance_core.replay import replay
@@ -40,12 +41,26 @@ TYPE_LABELS = {
     "idea": "Idea", "note": "Note", "claim": "Claim / hypothesis", "document": "Document", "code": "Code",
     "experiment": "Experiment", "dataset": "Dataset", "figure": "Figure", "publication": "Publication",
 }
+# Short words the report prints next to a record (kind, type, disclosure, proof state). In English
+# they are the plain codes; the Chinese report translates them (DECISIONS D-046).
+WORDS = [
+    "entry", "genesis", "link", "milestone", "statement", "retraction", "record",
+    *TYPE_LABELS, "full", "structure", "existence",
+    "verified", "confirmed", "pending", "none", "invalid", "unchecked",
+]
+LATER_LABELS = ["Relation added", "Relation withdrawn", "Milestone set", "Milestone unset", "Statement",
+                "Statement (correction)", "Retracted"]
 
 _md = MarkdownIt("commonmark", {"html": False}).disable("image")
 
 
 def _markdown(text: str) -> Markup:
     return Markup(_md.render(text))  # raw HTML disabled; images disabled (no network requests)
+
+
+def _trusted(text: str, /, **params) -> Markup:
+    """The app's own words that contain markup (<b>, <code>); inserted values are escaped."""
+    return Markup(tr(text, **{k: escape(v) for k, v in params.items()}))
 
 
 def _env() -> Environment:
@@ -56,11 +71,17 @@ def _env() -> Environment:
         lstrip_blocks=True,
     )
     env.filters["short"] = lambda rid: rid[:12]
+    env.filters["word"] = lambda code: tr(code) if code in WORDS else code
+    env.globals.update(t=tr, th=_trusted, lang=current())
     return env
 
 
 def _date(time: str | None) -> str:
     return time[:10] if time else ""
+
+
+def rel_label(rel: str) -> str:
+    return tr(REL_LABELS.get(rel, "other relation"))
 
 
 def build_model(plan, meta, mats, contents, report, trust) -> dict:
@@ -78,14 +99,15 @@ def build_model(plan, meta, mats, contents, report, trust) -> dict:
         if ev:
             return {"time": ev[0], "from": ev[1], "verified": True}
         local = payloads.get(rid, {}).get("local_time")
-        return {"time": local, "from": "local clock (unverified)", "verified": False}
+        return {"time": local, "from": tr("local clock (unverified)"), "verified": False}
 
     def title_of(rid: str) -> str:
         e = state.entries.get(rid)
         if e:
             return e.title
-        kind = state.kinds.get(rid, "record")
-        return f"hidden {kind} record #{state.seqs.get(rid, '?')}" if rid in state.hidden else kind
+        kind = tr(state.kinds.get(rid, "record"))
+        return tr("hidden {kind} record #{seq}", kind=kind, seq=state.seqs.get(rid, "?")) \
+            if rid in state.hidden else kind
 
     nodes = []
     for e in sorted(state.entries.values(), key=lambda e: e.seq):
@@ -102,10 +124,11 @@ def build_model(plan, meta, mats, contents, report, trust) -> dict:
                 "active": edge.active}
         if edge.origin == "link":
             w = when(edge.added_by)
-            item["added"] = _date(w["time"]) + ("" if w["verified"] else " (unverified)")
+            item["added"] = _date(w["time"]) if w["verified"] else tr("{date} (unverified)", date=_date(w["time"]))
         if edge.withdrawn_by:
             w = when(edge.withdrawn_by)
-            item["withdrawn"] = _date(w["time"]) + ("" if w["verified"] else " (unverified)")
+            item["withdrawn"] = _date(w["time"]) if w["verified"] else tr("{date} (unverified)",
+                                                                            date=_date(w["time"]))
         edges.append(item)
 
     timeline = []
@@ -113,27 +136,28 @@ def build_model(plan, meta, mats, contents, report, trust) -> dict:
         res = results[r.id]
         p = payloads.get(r.id)
         if p is None:
-            title = "Hidden record (existence only)"
+            title = tr("Hidden record (existence only)")
         elif r.kind == "entry":
             title = p["title"]
         elif r.kind == "genesis":
-            title = "Genesis (signing key)"
+            title = tr("Genesis (signing key)")
         elif r.kind == "link":
-            title = f"{'Added' if p['op'] == 'add' else 'Withdrew'} relation: {title_of(p['from'])} " \
-                    f"{REL_LABELS.get(p['rel'], 'other relation')} {title_of(p['to'])}"
+            title = tr("Added relation: {a} {rel} {b}" if p["op"] == "add" else "Withdrew relation: {a} {rel} {b}",
+                       a=title_of(p["from"]), rel=rel_label(p["rel"]), b=title_of(p["to"]))
         elif r.kind == "milestone":
-            title = f"{'Marked' if p['op'] == 'set' else 'Unmarked'} milestone: {title_of(p['target'])}"
+            title = tr("Marked milestone: {target}" if p["op"] == "set" else "Unmarked milestone: {target}",
+                       target=title_of(p["target"]))
         elif r.kind == "statement":
-            title = f"Statement on {title_of(p['target'])}"
+            title = tr("Statement on {target}", target=title_of(p["target"]))
         else:
-            title = f"Retracted: {title_of(p['target'])}"
+            title = tr("Retracted: {target}", target=title_of(p["target"]))
         rels = []
         if p and r.kind == "entry":
-            rels = [f"{REL_LABELS.get(x['rel'], 'other relation')} {title_of(x['to'])}" for x in p["relations"]]
+            rels = [tr("{rel} {target}", rel=rel_label(x["rel"]), target=title_of(x["to"])) for x in p["relations"]]
         timeline.append({
             "seq": r.seq, "id": r.id, "kind": r.kind, "node_type": (p or {}).get("node_type"),
             "title": title, "tsa": res.tsa, "btc": res.btc, "local_time": (p or {}).get("local_time"),
-            "relations": rels, "status": STATUS_LABELS[res.status], "status_key": res.status,
+            "relations": rels, "status": tr(STATUS_LABELS[res.status]), "status_key": res.status,
             "disclosure": plan.levels[r.id],
         })
 
@@ -148,10 +172,10 @@ def build_model(plan, meta, mats, contents, report, trust) -> dict:
              "disclosure": plan.levels[r.id], "res": res, "ev": res.earliest_verified(),
              "author": [], "later": [], "body_html": None, "content_hashes": [], "external": None}
         declared = when(r.id)
-        declared_note = f"Author declared on {_date(declared['time'])}" + (
-            "" if declared["verified"] else " (unverified date)")
+        declared_note = tr("Author declared on {date}" if declared["verified"]
+                           else "Author declared on {date} (unverified date)", date=_date(declared["time"]))
         if r.kind == "entry":
-            d["node_type"] = TYPE_LABELS.get(p["node_type"], "Other")
+            d["node_type"] = tr(TYPE_LABELS.get(p["node_type"], "Other"))
             d["project"] = p["project"]["title"]
             content = p.get("content") or {}
             if content.get("body"):
@@ -160,10 +184,10 @@ def build_model(plan, meta, mats, contents, report, trust) -> dict:
             if p.get("external"):
                 ext = dict(p["external"])
                 if "commit" in ext:
-                    ext["note"] = ("Code archive attached." if content.get("files")
-                                   else "External reference, code content not saved")
+                    ext["note"] = tr("Code archive attached." if content.get("files")
+                                     else "External reference, code content not saved")
                 else:
-                    ext["note"] = "Evidence level L2 (third-party reference)"
+                    ext["note"] = tr("Evidence level L2 (third-party reference)")
                 d["external"] = ext
             cont = contents.get(r.id) or {}
             if "body" in cont:
@@ -172,39 +196,42 @@ def build_model(plan, meta, mats, contents, report, trust) -> dict:
                 d["author"].append({"text": p["author_statement"], "note": declared_note})
             if p.get("import"):
                 imp = p["import"]
-                lvl = "L2 (third-party reference)" if imp["level"] == "L2" else "L1 (author statement only)"
-                refs = (" — references: " + ", ".join(imp["references"])) if imp["references"] else ""
-                d["author"].append({"text": f"Claimed date: {imp['claimed_date']} ({imp['precision']}), "
-                                            f"evidence level {lvl}{refs}", "note": declared_note})
+                lvl = tr("L2 (third-party reference)" if imp["level"] == "L2" else "L1 (author statement only)")
+                text = tr("Claimed date: {date} ({precision}), evidence level {level}", date=imp["claimed_date"],
+                          precision=tr(imp["precision"]), level=lvl)
+                if imp["references"]:
+                    text = tr("{text} — references: {refs}", text=text, refs=", ".join(imp["references"]))
+                d["author"].append({"text": text, "note": declared_note})
             for rel in p["relations"]:
-                d["author"].append({"text": f"Relation: {REL_LABELS.get(rel['rel'], 'other relation')} "
-                                            f"“{title_of(rel['to'])}”", "note": declared_note})
+                d["author"].append({"text": tr("Relation: {rel} “{target}”", rel=rel_label(rel["rel"]),
+                                               target=title_of(rel["to"])), "note": declared_note})
             if p.get("milestone"):
-                d["author"].append({"text": "Marked as a milestone when recorded", "note": declared_note})
+                d["author"].append({"text": tr("Marked as a milestone when recorded"), "note": declared_note})
             e = state.entries.get(r.id)
             for add_id in (e.additions if e else []):
                 ap = payloads.get(add_id, {})
                 w = when(add_id)
                 kind = state.kinds[add_id]
                 text = ap.get("text") or ap.get("statement") or ap.get("reason") or ""
-                label = {"link": "Relation " + ("added" if ap.get("op") == "add" else "withdrawn"),
-                         "milestone": "Milestone " + ("set" if ap.get("op") == "set" else "unset"),
-                         "statement": "Statement" + (" (correction)" if ap.get("corrects") else ""),
-                         "retraction": "Retracted"}.get(kind, kind)
+                label = tr({"link": "Relation added" if ap.get("op") == "add" else "Relation withdrawn",
+                            "milestone": "Milestone set" if ap.get("op") == "set" else "Milestone unset",
+                            "statement": "Statement (correction)" if ap.get("corrects") else "Statement",
+                            "retraction": "Retracted"}.get(kind, kind))
                 d["later"].append({"label": label, "text": text, "date": _date(w["time"]),
                                    "verified": w["verified"], "id": add_id})
         else:
             text = p.get("text") or p.get("statement") or p.get("reason")
             if text:
                 d["author"].append({"text": text, "note": declared_note})
-        d["author"].append({"text": f"Local clock time: {p['local_time']}", "note": "self-reported, unverified"})
+        d["author"].append({"text": tr("Local clock time: {time}", time=p["local_time"]),
+                            "note": tr("self-reported, unverified")})
         details.append(d)
 
     return {
         "meta": meta, "plan": plan, "report": report, "counts": report.counts, "trust": trust,
         "graph_svg": Markup(render_graph_svg(nodes, edges)), "timeline": timeline, "details": details,
-        "proves": PROVES, "does_not_prove": DOES_NOT_PROVE, "source_note": SOURCE_NOTE,
-        "status_labels": STATUS_LABELS, "hidden_count": sum(1 for v in plan.levels.values() if v == "existence"),
+        "proves": [tr(x) for x in PROVES], "does_not_prove": [tr(x) for x in DOES_NOT_PROVE],
+        "source_note": tr(SOURCE_NOTE), "status_labels": {k: tr(v) for k, v in STATUS_LABELS.items()}, "hidden_count": sum(1 for v in plan.levels.values() if v == "existence"),
     }
 
 
@@ -215,7 +242,8 @@ def render_report(*, plan, meta, mats, contents, report, trust) -> str:
 def render_verify_md(*, plan, meta, mats, certs, uses_mock: bool) -> str:
     example = next((r for r in plan.chain if plan.levels[r.id] == "full"), None) or plan.chain[-1]
     env = _env()
-    return env.get_template("VERIFY.md.j2").render(
+    name = "VERIFY.zh.md.j2" if current() == "zh" else "VERIFY.md.j2"  # same commands, two languages
+    return env.get_template(name).render(
         plan=plan, meta=meta, example=example, mats=mats, uses_mock=uses_mock,
         has_body=example.id in mats and (mats[example.id].content or {}).get("body") is not None,
     )

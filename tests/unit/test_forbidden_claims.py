@@ -8,6 +8,8 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
+import pytest
+
 ROOT = Path(__file__).resolve().parent.parent.parent
 
 FORBIDDEN = [
@@ -52,10 +54,13 @@ def test_no_forbidden_claims_in_sources():
     assert {k: v for k, v in problems.items() if v} == {}
 
 
-def test_no_forbidden_claims_in_generated_report(tmp_path):
+@pytest.mark.parametrize("lang", ["en", "zh"])
+def test_no_forbidden_claims_in_generated_report(tmp_path, lang):
+    from app.i18n import language
     from tests.sample import make_sample
 
-    s = make_sample(tmp_path)
+    with language(lang):
+        s = make_sample(tmp_path)
     for name in ("report.html", "VERIFY.md"):
         assert _hits(s.files[name].decode()) == [], name
 

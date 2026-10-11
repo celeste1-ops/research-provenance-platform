@@ -406,6 +406,27 @@ def refresh_anchors(request: Request):
     return ctx(request).anchors.refresh(force=True)
 
 
+class PreferencesIn(BaseModel):
+    language: str
+
+
+@router.get("/preferences")
+def get_preferences(request: Request):
+    from app import preferences
+
+    return {"language": preferences.language(real(request).settings.data_dir)}
+
+
+@router.post("/preferences")
+def set_preferences(body: PreferencesIn, request: Request):
+    """Remembered for the menu bar / tray menu and as the default report language (D-046)."""
+    from app import preferences
+    from app.i18n import normalize
+
+    prefs = preferences.save(real(request).settings.data_dir, language=normalize(body.language))
+    return {"language": prefs["language"]}
+
+
 @router.post("/network/check")
 def network_check(request: Request):
     """“Check stamp services” (D-045): only on request, and only random values are sent."""
@@ -435,6 +456,7 @@ class ExportIn(BaseModel):
     title: str = "evidence"
     records: dict[str, str] = Field(default_factory=dict)  # record ID -> full | structure | existence
     default: str = "existence"
+    language: str | None = None  # of report.html and VERIFY.md; the interface's language if not given (D-046)
 
 
 @router.post("/export/preview")
@@ -452,6 +474,7 @@ def export_preview(body: ExportIn, request: Request):
 def export_bundle(body: ExportIn, request: Request):
     import os
 
+    from app.i18n import current, language
     from app.services.export import build_bundle_files, bundle_filename, plan_export, write_zip
 
     c = ctx(request)
@@ -459,7 +482,8 @@ def export_bundle(body: ExportIn, request: Request):
         plan = plan_export(c.ledger, body.title, body.records, body.default)
     except LedgerError as exc:
         raise _bad(exc) from None
-    data = write_zip(build_bundle_files(c.ledger, c.anchors, plan))
+    with language(body.language or current()):
+        data = write_zip(build_bundle_files(c.ledger, c.anchors, plan))
     name = bundle_filename(plan.title)
     exports = c.settings.data_dir / "exports"
     exports.mkdir(exist_ok=True)

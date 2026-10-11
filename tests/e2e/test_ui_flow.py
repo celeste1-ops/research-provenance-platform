@@ -175,7 +175,7 @@ def test_p0_flow_in_the_browser(tmp_path, browser):
         dialog.get_by_test_id("export-warnings").wait_for()
         warnings = dialog.get_by_test_id("export-warnings").inner_text()
         assert "hashes" in warnings and "chain.json" in warnings
-        dialog.locator("select").first.select_option("full")
+        dialog.locator("table select").first.select_option("full")
         with page.expect_download() as dl:
             dialog.get_by_test_id("do-export").click()
         zip_path = tmp_path / "exported.zip"

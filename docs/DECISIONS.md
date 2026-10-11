@@ -480,3 +480,37 @@ verification rules or what leaves the machine for time proofs.
      time limit; the result says in plain words what works (date stamps, public stamps
      starting, finished public stamps being checked) and that nothing is lost while a
      service is unreachable.
+
+- **D-046 · Chinese and English.** The author asked for both languages and a switch. PRD §7
+  rule 5 applies to both: no Chinese text may claim more than the English does.
+  1. *One button, the whole app.* "中文 / English" in the top bar (and on the welcome page)
+     switches the interface, the texts the server writes (record views, backup folder
+     advice, service check results, error messages), the menu bar / tray menu and, by
+     default, the exported report. The first choice follows the browser's language. The
+     choice is stored in the browser and in `<data>/preferences.json`, so the desktop
+     menu can read it before any page is open and a second browser follows it.
+  2. *English text as the key.* Every text is written in English in the code; Chinese
+     comes from `web/src/locales/zh.ts` (interface) and `app/locales/zh.py` (server and
+     report). The interface sends its language with each request (`X-RPROV-Lang`). Error
+     messages are written in English where they arise and translated where they leave
+     the server, by matching them against the catalogue's error patterns; values inside
+     them are kept. tests/unit/test_i18n.py fails when a text has no Chinese version, a
+     translation loses a placeholder or a tag, or a Chinese text makes a forbidden claim.
+  3. *Only the app's own words.* Titles, notes, reasons, file names and project names are
+     never translated. Values are inserted after the template's markup is read, so an
+     author's text can never become markup, and Chinese spacing (a space between Chinese
+     and Latin letters) is only added to the app's own words and where a value meets
+     them, never inside the value.
+  4. *The report.* `report.html` and `VERIFY.md` are written in the language chosen in
+     the export dialog (default: the interface's). The Chinese "what it proves / does
+     not prove" text follows PRD §2. Records, hashes, signatures and proofs are the same
+     whatever the language; only the words around them change. `VERIFY.zh.md.j2` gives
+     exactly the same commands as the English guide (a test compares them). `verify.py`,
+     its failure codes and the core library's messages stay English: they are the one
+     checking program any reader runs.
+  5. *Installer.* The Windows installer shows Simplified Chinese on a Chinese Windows and
+     English elsewhere, without asking; the official Inno Setup translation is kept in
+     `packaging/windows/` (Inno Setup 6.5 or later). The app's name stays "Research
+     History" in both languages.
+  6. *Developer messages stay English* (wrong `RPROV_*` settings, a missing keystore
+     backend), as do the logs.

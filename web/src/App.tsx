@@ -13,8 +13,10 @@ import { RecordForm } from "./components/RecordForm";
 import { ServiceCheckDialog } from "./components/ServiceCheck";
 import { Setup } from "./components/Setup";
 import { Timeline } from "./components/Timeline";
-import { HELP, homeNote } from "./labels";
+import { help, homeNote } from "./labels";
 import { dev, setDevice } from "./device";
+import { chosenHere, lang, setLang, t, tn, tx, type Lang } from "./i18n";
+import { LangSwitch } from "./components/LangSwitch";
 
 type Dialog = null | "form" | "export" | "backup" | "key" | "where" | "tech" | "services" | "practice-reset";
 const SPACE_KEY = "rprov-space";
@@ -52,6 +54,7 @@ export function App() {
   const [milestonesOnly, setMilestonesOnly] = useState(false);
   const [notice, setNotice] = useState<Notice | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [uiLang, setUiLang] = useState<Lang>(lang);
   const menuRef = useRef<HTMLDivElement>(null);
 
   const reload = useCallback(async () => {
@@ -115,7 +118,7 @@ export function App() {
     setSpaceState(next);
     setNotice(
       next === "real"
-        ? { text: "You are now in My research. Steps you save here are permanent — they can't be changed or deleted." }
+        ? { text: t("You are now in My research. Steps you save here are permanent — they can't be changed or deleted.") }
         : null,
     );
   }
@@ -124,37 +127,58 @@ export function App() {
     setDialog(null);
     setMenuOpen(false);
     setSelected(null);
-    setNotice({ text: sample ? "Filling practice with the sample research…" : "Starting practice over…" });
+    setNotice({ text: sample ? t("Filling practice with the sample research…") : t("Starting practice over…") });
     try {
       await api.practiceReset(sample);
       setProjectId("");
       setGraph(null);
-      setNotice({ text: sample ? "Practice now holds the fictional sample research. Look around freely." : "Practice is empty again." });
+      setNotice({ text: sample ? t("Practice now holds the fictional sample research. Look around freely.") : t("Practice is empty again.") });
       await reload();
     } catch (e) {
       setNotice({ text: (e as Error).message, kind: "error" });
     }
   }
 
+  // Switching language redraws the interface (key below) and asks the server for its texts again.
+  function changeLang(next: Lang) {
+    setLang(next);
+    setUiLang(next);
+    api.setPreferences({ language: next }).catch(() => undefined);
+    void reload();
+  }
+
+  // The language is shared with the menu bar / tray menu (D-046): a choice made in another browser
+  // wins over this browser's guess, and a first guess is remembered for the menu.
+  useEffect(() => {
+    api.preferences()
+      .then((p) => {
+        if (!p.language) api.setPreferences({ language: lang() }).catch(() => undefined);
+        else if (p.language !== lang() && !chosenHere()) changeLang(p.language);
+      })
+      .catch(() => undefined);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const practice = space === "practice";
   const spaceSwitch = (
-    <div className="space-switch" role="group" aria-label="Space">
+    <div className="space-switch" role="group" aria-label={t("Space")}>
       <button aria-pressed={!practice} className={!practice ? "on" : ""} onClick={() => switchSpace("real")}
         data-testid="space-real">
-        My research
+        {t("My research")}
       </button>
       <button aria-pressed={practice} className={practice ? "on" : ""} onClick={() => switchSpace("practice")}
         data-testid="space-practice">
-        Practice
+        {t("Practice")}
       </button>
     </div>
   );
 
-  if (!status) return <div className="loading">Loading…</div>;
-  if (!status.initialized) return <Setup onDone={reload} onPractice={() => switchSpace("practice")} />;
+  if (!status) return <div className="loading">{t("Loading…")}</div>;
+  if (!status.initialized)
+    return <Setup key={uiLang} onDone={reload} onPractice={() => switchSpace("practice")} onLang={changeLang} />;
 
   async function newProject() {
-    const title = window.prompt("Name of the new research project");
+    const title = window.prompt(t("Name of the new research project"));
     if (!title) return;
     const p = await api.createProject(title);
     setProjectId(p.id);
@@ -162,11 +186,15 @@ export function App() {
 
   async function checkProofs() {
     setMenuOpen(false);
-    setNotice({ text: "Checking stamps…" });
+    setNotice({ text: t("Checking stamps…") });
     try {
       const stats = await api.refreshAnchors();
       setNotice({
-        text: `Stamps checked: ${stats.submitted} requested, ${stats.upgraded} newly done, ${stats.still_pending} public stamps still waiting.`,
+        text: t("Stamps checked: {requested} requested, {done} newly done, {waiting} public stamps still waiting.", {
+          requested: stats.submitted,
+          done: stats.upgraded,
+          waiting: stats.still_pending,
+        }),
       });
       await reload();
     } catch (e) {
@@ -190,12 +218,12 @@ export function App() {
   const empty = graph !== null && steps === 0;
 
   return (
-    <div className={`app space-${space}`}>
+    <div className={`app space-${space}`} key={uiLang}>
       <header className="topbar">
-        <div className="brand">Research history</div>
+        <div className="brand">{t("Research history")}</div>
         {spaceSwitch}
-        <select value={projectId} onChange={(e) => setProjectId(e.target.value)} aria-label="Project">
-          {projects.length === 0 && <option value="">No project</option>}
+        <select value={projectId} onChange={(e) => setProjectId(e.target.value)} aria-label={t("Project")}>
+          {projects.length === 0 && <option value="">{t("No project")}</option>}
           {projects.map((p) => (
             <option key={p.id} value={p.id}>
               {p.title}
@@ -203,67 +231,67 @@ export function App() {
           ))}
         </select>
         <button className="link small" onClick={newProject}>
-          + New project
+          {t("+ New project")}
         </button>
         <span className="muted small" data-testid="step-count">
-          {steps} {steps === 1 ? "step" : "steps"}
+          {tn(steps, "{n} step", "{n} steps")}
         </span>
         <div className="spacer" />
         {!practice && <BackupPill status={status.backup} onClick={() => setDialog("backup")} />}
         <span className="with-help">
           <button className="secondary" onClick={() => setDialog("export")} disabled={steps === 0}>
-            Share
+            {t("Share")}
           </button>
-          <Help id="share" label="Share" align="right">{HELP.share}</Help>
+          <Help id="share" label={t("Share")} align="right">{help("share")}</Help>
         </span>
         <span className="with-help">
           <button className="primary" onClick={() => openForm()} disabled={!projectId} data-testid="new-record">
-            + Add a step
+            {t("+ Add a step")}
           </button>
-          <Help id="add-step" label="a step" align="right">{HELP.addStep}</Help>
+          <Help id="add-step" label={t("a step")} align="right">{help("addStep")}</Help>
         </span>
         <div className="menu-wrap" ref={menuRef}>
           <button className="secondary" aria-expanded={menuOpen} data-testid="settings-menu"
             onClick={() => setMenuOpen(!menuOpen)}>
-            ⚙ Settings
+            ⚙ {t("Settings")}
           </button>
           {menuOpen && (
             <div className="menu" role="menu">
-              <button role="menuitem" onClick={checkProofs}>Check stamps now</button>
-              <button role="menuitem" onClick={() => openMenuItem("services")}>Check stamp services…</button>
-              {!practice && <button role="menuitem" onClick={() => openMenuItem("backup")}>Backup…</button>}
-              <button role="menuitem" onClick={() => openMenuItem("where")}>Where is my data?</button>
+              <button role="menuitem" onClick={checkProofs}>{t("Check stamps now")}</button>
+              <button role="menuitem" onClick={() => openMenuItem("services")}>{t("Check stamp services…")}</button>
+              {!practice && <button role="menuitem" onClick={() => openMenuItem("backup")}>{t("Backup…")}</button>}
+              <button role="menuitem" onClick={() => openMenuItem("where")}>{t("Where is my data?")}</button>
               <hr />
-              <button role="menuitem" onClick={() => openMenuItem("tech")}>Technical details</button>
+              <button role="menuitem" onClick={() => openMenuItem("tech")}>{t("Technical details")}</button>
               {!practice && (
-                <button role="menuitem" onClick={() => openMenuItem("key")}>Back up signing key only…</button>
+                <button role="menuitem" onClick={() => openMenuItem("key")}>{t("Back up signing key only…")}</button>
               )}
               {practice && (
                 <>
-                  <button role="menuitem" onClick={() => openMenuItem("practice-reset")}>Start practice over…</button>
-                  <button role="menuitem" onClick={() => resetPractice(true)}>Fill practice with sample research</button>
+                  <button role="menuitem" onClick={() => openMenuItem("practice-reset")}>{t("Start practice over…")}</button>
+                  <button role="menuitem" onClick={() => resetPractice(true)}>{t("Fill practice with sample research")}</button>
                 </>
               )}
             </div>
           )}
         </div>
+        <LangSwitch value={uiLang} onChange={changeLang} />
       </header>
       {practice && (
         <div className="practice-banner" data-testid="practice-banner">
-          <b>Practice:</b> nothing here goes into your real record. Try anything.
+          {tx("<b>Practice:</b> nothing here goes into your real record. Try anything.", { b: (s) => <b>{s}</b> })}
           <button className="link small" onClick={() => switchSpace("real")}>
-            Back to My research
+            {t("Back to My research")}
           </button>
         </div>
       )}
       {!practice && status.backup?.other_copy && status.backup.state !== "paused" && (
         <div className="banner error small" data-testid="other-copy-banner">
           <span>
-            Another copy of this research (another {dev()}?) is also backing up into your backup folder. Use only one {dev()} to
-            add steps.
+            {t("Another copy of this research (another {device}?) is also backing up into your backup folder. Use only one {device} to add steps.", { device: dev() })}
           </span>
           <button className="secondary small" onClick={() => setDialog("backup")}>
-            What to do
+            {t("What to do")}
           </button>
         </div>
       )}
@@ -273,7 +301,7 @@ export function App() {
         </div>
       )}
       {btcOff && (
-        <div className="banner muted small">Public stamp (Bitcoin): off. Date stamps are on.</div>
+        <div className="banner muted small">{t("Public stamp (Bitcoin): off. Date stamps are on.")}</div>
       )}
       {notice && (
         <div className={`banner ${notice.kind === "error" ? "error" : ""}`} data-testid="notice">
@@ -283,7 +311,7 @@ export function App() {
               {notice.action.label}
             </button>
           )}
-          <button className="link small dismiss" onClick={() => setNotice(null)} aria-label="Dismiss">
+          <button className="link small dismiss" onClick={() => setNotice(null)} aria-label={t("Dismiss")}>
             ✕
           </button>
         </div>
@@ -293,25 +321,25 @@ export function App() {
           <div className="tabs" role="tablist">
             <button role="tab" aria-selected={view === "graph"} className={view === "graph" ? "tab active" : "tab"}
               onClick={() => setView("graph")}>
-              Map
+              {t("Map")}
             </button>
-            <Help id="map" label="the map" wide>
+            <Help id="map" label={t("the map")} wide>
               <Legend />
             </Help>
             <button role="tab" aria-selected={view === "timeline"} className={view === "timeline" ? "tab active" : "tab"}
               onClick={() => setView("timeline")} data-testid="tab-timeline">
-              List
+              {t("List")}
             </button>
-            <Help id="list" label="the list">{HELP.list}</Help>
+            <Help id="list" label={t("the list")}>{help("list")}</Help>
           </div>
           {view === "graph" && (
             <span className="with-help">
               <label className="check small">
                 <input type="checkbox" checked={milestonesOnly} onChange={(e) => setMilestonesOnly(e.target.checked)}
                   data-testid="milestones-only" />
-                Key steps only
+                {t("Key steps only")}
               </label>
-              <Help id="key-steps" label="Key steps only">{HELP.keySteps}</Help>
+              <Help id="key-steps" label={t("Key steps only")}>{help("keySteps")}</Help>
             </span>
           )}
         </nav>
@@ -320,7 +348,7 @@ export function App() {
         <section className="canvas">
           {empty ? (
             <EmptyState
-              projectTitle={project?.title ?? "your research"}
+              projectTitle={project?.title ?? t("your research")}
               backup={status.backup}
               onAdd={openForm}
               onBackup={() => setDialog("backup")}
@@ -332,7 +360,7 @@ export function App() {
           ) : graph ? (
             <Graph data={graph} selected={selected} onSelect={setSelected} milestonesOnly={milestonesOnly} />
           ) : (
-            <div className="empty">Loading…</div>
+            <div className="empty">{t("Loading…")}</div>
           )}
         </section>
         {selected && (
@@ -352,7 +380,7 @@ export function App() {
       <footer className="footbar small" data-testid="home-note">
         <span>{homeNote()}</span>
         <button className="link small" onClick={() => setDialog("where")}>
-          Where is my data?
+          {t("Where is my data?")}
         </button>
       </footer>
       {dialog === "form" && graph && (
@@ -372,18 +400,18 @@ export function App() {
                 await reload();
                 const b = (await api.status()).backup;
                 if (practice) {
-                  setNotice({ text: "Saved in practice. It is not part of your real record." });
+                  setNotice({ text: t("Saved in practice. It is not part of your real record.") });
                 } else if (b?.state === "paused") {
                   setNotice({
-                    text: "Saved. Automatic backup is paused since the restore — confirm the folder to resume it.",
-                    action: { label: "Review backup", onClick: () => setDialog("backup") },
+                    text: t("Saved. Automatic backup is paused since the restore — confirm the folder to resume it."),
+                    action: { label: t("Review backup"), onClick: () => setDialog("backup") },
                   });
                 } else if (b?.state === "ok") {
-                  setNotice({ text: "Saved. It gets its date stamp in a few seconds and goes into the next automatic backup." });
+                  setNotice({ text: t("Saved. It gets its date stamp in a few seconds and goes into the next automatic backup.") });
                 } else {
                   setNotice({
-                    text: `Saved. Automatic backup is not set up yet — if this ${dev()} is lost, this step would be lost too.`,
-                    action: { label: "Set up backup", onClick: () => setDialog("backup") },
+                    text: t("Saved. Automatic backup is not set up yet — if this {device} is lost, this step would be lost too.", { device: dev() }),
+                    action: { label: t("Set up backup"), onClick: () => setDialog("backup") },
                   });
                 }
               }}
@@ -407,7 +435,7 @@ export function App() {
           onClose={() => setDialog(null)}
           onDone={() => {
             setDialog(null);
-            setNotice({ text: "Key backup downloaded. Store it and its password separately." });
+            setNotice({ text: t("Key backup downloaded. Store it and its password separately.") });
             reload();
           }}
         />
@@ -420,23 +448,22 @@ export function App() {
       )}
       {dialog === "services" && <ServiceCheckDialog onClose={() => setDialog(null)} />}
       {dialog === "export" && (
-        <ExportDialog rows={timeline} defaultTitle={project?.title ?? "evidence"} onClose={() => setDialog(null)}
+        <ExportDialog rows={timeline} defaultTitle={project?.title ?? t("evidence")} onClose={() => setDialog(null)}
           practice={practice} />
       )}
       {dialog === "practice-reset" && (
-        <div className="modal-backdrop" role="dialog" aria-modal="true" aria-label="Start practice over">
+        <div className="modal-backdrop" role="dialog" aria-modal="true" aria-label={t("Start practice over")}>
           <div className="modal" data-testid="practice-reset">
-            <h2>Start practice over?</h2>
+            <h2>{t("Start practice over?")}</h2>
             <p>
-              All practice steps and the practice signing key are thrown away and you get an empty practice space.
-              Your real record is not touched.
+              {t("All practice steps and the practice signing key are thrown away and you get an empty practice space. Your real record is not touched.")}
             </p>
             <div className="actions">
               <button className="secondary" onClick={() => setDialog(null)}>
-                Cancel
+                {t("Cancel")}
               </button>
               <button className="primary" onClick={() => resetPractice(false)}>
-                Start over
+                {t("Start over")}
               </button>
             </div>
           </div>

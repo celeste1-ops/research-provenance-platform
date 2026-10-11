@@ -1,6 +1,6 @@
 # Build the Windows installer (DECISIONS D-044). Run from the repository root in PowerShell 7:
 #   pwsh packaging/build_windows.ps1
-# Needs: uv, Node.js 22+, Inno Setup 6 (choco install innosetup).
+# Needs: uv, Node.js 22+, Inno Setup 6.5+ (choco install innosetup).
 $ErrorActionPreference = "Stop"
 Set-Location (Split-Path $PSScriptRoot -Parent)
 

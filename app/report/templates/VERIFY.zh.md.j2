@@ -1,0 +1,96 @@
+# 怎样核对这个证据包
+
+证据包：**{{ meta.title }}** · 格式 `{{ meta.format }}` · 安装 `{{ meta.installation }}` 的第 0–{{ plan.max_seq }} 条记录
+作者名（自我声明）：{{ meta.author_label }} · 导出于 {{ meta.exported_local_time }}（本机时钟，未核实）
+
+你不需要原来的程序，也不需要相信作者。
+
+## 自动核对
+
+```bash
+pip install "cryptography>=44" "rfc3161-client>=1.0.6"
+python3 verify.py .            # 或者：python3 verify.py provenance-….zip
+python3 verify.py . --json     # 机器可读的结果
+```
+
+退出码为 0 表示没有记录未通过。每条记录的结果是 *pass*（通过）、*pass (Bitcoin anchor
+pending)*（通过，比特币时间锚定等待中）、*warning*（警告）或 *fail*（未通过），并附上原因代码。
+两种时间分开报告；作者陈述和声称的日期永远不算作已验证的时间。
+（`verify.py` 的输出是英文。）
+
+{% if uses_mock %}
+> **测试用的证据包。** 这个证据包里的第三方签名时间证明来自模拟测试机构
+> （`certs/mock-tsa-root.pem`），默认谁都不信任它。只用于测试：
+> `python3 verify.py . --tsa-root certs/mock-tsa-root.pem`，下面第 3 步改用
+> `-CAfile certs/mock-tsa-root.pem -untrusted certs/mock-tsa.pem`。
+
+{% endif %}
+## 手工核对
+
+`chain.json` 列出了从第 0 条到第 {{ plan.max_seq }} 条的所有记录 ID；对每个 `<id>` 重复下面的步骤。
+下面用作例子的记录：`{{ example.id }}`（第 {{ example.seq }} 条）。
+
+### 1. 内容、payload、manifest
+
+```bash
+{% if has_body %}
+sha256sum content/<id>/body.md     # 和 payloads/<id>.json 里的 content.body.sha256 比较
+{% else %}
+sha256sum content/<id>/body.md     # （只有全部公开的步骤才有）和 payloads/<id>.json 里的 content.body.sha256 比较
+{% endif %}
+sha256sum content/<id>/files/*     # 每个都要和 content.files[].sha256 一致
+sha256sum payloads/<id>.json       # 和 manifests/<id>.json 里的 payload_sha256 比较
+sha256sum manifests/<id>.json      # 结果必须等于 <id>
+```
+
+还要检查链：每个 `manifests/<id>.json` 里的 `seq` 从 0 开始连续递增、没有缺口，
+`prev` 是前一条记录的 ID。
+
+### 2. 签名
+
+需要 OpenSSL 3（macOS 自带的 LibreSSL 可能不支持；`brew install openssl@3`）。
+
+```bash
+echo -n <id> | xxd -r -p > id.bin
+openssl pkeyutl -verify -pubin -inkey identity/public_key.pem -rawin -in id.bin -sigfile signatures/<id>.sig
+```
+
+`identity/public_key.pem` 必须就是创世记录（第 0 条）里写的那把钥匙：
+即 `payloads/{{ plan.chain[0].id }}.json` 的 `public_key` 字段。
+
+### 3. 第三方签名时间证明（RFC 3161）
+
+每个时间证明来自两家时间戳机构之一：FreeTSA，或者连不上 FreeTSA 时用的 DigiCert。
+证明里写着签发者（`openssl ts -reply -in proofs/<id>.tsr -text | grep TSA`）。FreeTSA 的：
+
+```bash
+openssl ts -verify -data manifests/<id>.json -in proofs/<id>.tsr \
+  -CAfile certs/freetsa-cacert.pem -untrusted certs/freetsa-tsa.crt
+```
+
+DigiCert 的（有记录由 DigiCert 签发时，才会有 `certs/digicert-tsa-chain.pem`）：
+
+```bash
+openssl ts -verify -data manifests/<id>.json -in proofs/<id>.tsr \
+  -CAfile certs/digicert-trusted-root-g4.pem -untrusted certs/digicert-tsa-chain.pem
+```
+
+信任一个根证书之前，先比较它的指纹
+（`openssl x509 -in certs/<root>.pem -noout -fingerprint -sha256`）和机构公布的是否一致。
+应有的值：FreeTSA `{{ meta.trusted_tsa_roots['freetsa-cacert.pem'] }}`，
+DigiCert Trusted Root G4 `{{ meta.trusted_tsa_roots['digicert-trusted-root-g4.pem'] }}`。
+
+### 4. 比特币时间锚定（OpenTimestamps）
+
+```bash
+pip install opentimestamps-client
+ots verify manifests/<id>.json.ots     # .ots 文件就在 manifest 旁边
+```
+
+完整核对需要一个比特币节点（精简节点就够）；没有的话，就和至少两个公开的区块浏览器上的
+区块头比较。“等待中”的锚定不算未通过。
+
+## 核对通过说明什么
+
+它说明每条记录最晚在它的已验证时间已经存在、之后没有被改过、记录的先后顺序，以及所有记录
+都是同一把签名钥匙签的。它不说明作者是谁、作者是不是第一个、为什么这样改，也不说明内容是对的。

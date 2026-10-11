@@ -2,7 +2,8 @@
 
 Starts the same local server as ``make run`` (127.0.0.1 only), opens the browser, and puts
 an icon in the macOS menu bar / Windows notification area with "Open Research History"
-and "Quit". There is no console window, so everything is logged to ``<data>/logs/app.log``.
+and "Quit" (in Chinese when that is the language chosen in the app, or else the system's —
+D-046). There is no console window, so everything is logged to ``<data>/logs/app.log``.
 
 Only one copy runs per data folder (app.instance; ``make run`` takes the same lock): a
 second start just opens the browser at the running copy's address.
@@ -14,6 +15,7 @@ from __future__ import annotations
 import argparse
 import logging
 import logging.handlers
+import os
 import sys
 import threading
 import time
@@ -95,23 +97,72 @@ def tray_image(size: int = 64):
     return img
 
 
-def run_tray(url: str, on_quit) -> bool:
+MENU = {
+    "en": {"open": f"Open {APP_NAME}", "quit": "Quit"},
+    "zh": {"open": f"打开 {APP_NAME}", "quit": "退出"},
+}
+
+
+def system_language() -> str:
+    """'zh' when the system's first language is Chinese (used until one is chosen in the app)."""
+    names = [os.environ.get(k, "") for k in ("LC_ALL", "LC_MESSAGES", "LANG")]
+    try:
+        if sys.platform == "darwin":
+            from Foundation import NSLocale  # pyobjc, which the menu bar icon needs anyway
+
+            names += [str(x) for x in NSLocale.preferredLanguages()[:1]]
+        elif sys.platform == "win32":
+            import ctypes
+
+            lang_id = ctypes.windll.kernel32.GetUserDefaultUILanguage()
+            names.append("zh" if lang_id & 0x3FF == 0x04 else "en")  # LANG_CHINESE
+    except Exception:  # noqa: BLE001
+        pass
+    first = next((n for n in names if n and n not in ("C", "POSIX") and not n.startswith("C.")), "")
+    return "zh" if first.lower().startswith("zh") else "en"
+
+
+def menu_language(data_dir: Path) -> str:
+    from app import preferences
+
+    return preferences.language(data_dir) or system_language()
+
+
+def run_tray(url: str, on_quit, data_dir: Path) -> bool:
     """Show the icon and block until Quit. Returns False if no tray is available here."""
     try:
         import pystray
     except Exception:  # noqa: BLE001 - e.g. no display: run without an icon
         log.warning("no menu bar / tray icon available; quit with Ctrl+C or by ending the process")
         return False
+    from app import preferences
+
+    lang = [menu_language(data_dir)]
 
     def quit_app(icon, _item):
         on_quit()
         icon.stop()
 
     menu = pystray.Menu(
-        pystray.MenuItem(f"Open {APP_NAME}", lambda _icon, _item: open_browser(url), default=True),
-        pystray.MenuItem("Quit", quit_app),
+        pystray.MenuItem(lambda _item: MENU[lang[0]]["open"], lambda _icon, _item: open_browser(url), default=True),
+        pystray.MenuItem(lambda _item: MENU[lang[0]]["quit"], quit_app),
     )
     icon = pystray.Icon("research-history", tray_image(), f"{APP_NAME} — {url}", menu)
+
+    def relabel(prefs: dict) -> None:  # the language was switched in the app
+        new = prefs.get("language") if prefs.get("language") in MENU else lang[0]
+        if new == lang[0]:
+            return
+        lang[0] = new
+        if sys.platform == "darwin":
+            from PyObjCTools import AppHelper  # menus may only change on the main thread
+
+            AppHelper.callAfter(icon.update_menu)
+        elif sys.platform == "win32":
+            icon.update_menu()
+        # elsewhere (development only) the new labels show after the next restart
+
+    preferences.on_change(relabel)
     try:
         icon.run()
     except Exception:  # noqa: BLE001
@@ -169,7 +220,7 @@ def main(argv: list[str] | None = None) -> int:
             stop_server(server, thread, ctx)
 
     try:
-        if args.no_tray or not run_tray(url, quit_app):
+        if args.no_tray or not run_tray(url, quit_app, settings.data_dir):
             while thread.is_alive():
                 thread.join(0.5)
     except KeyboardInterrupt:

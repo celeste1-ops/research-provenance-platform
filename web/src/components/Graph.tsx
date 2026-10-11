@@ -13,7 +13,8 @@ import {
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import type { Graph as GraphData, GraphNode } from "../types";
-import { TYPE_LABELS } from "../labels";
+import { typeLabel } from "../labels";
+import { t } from "../i18n";
 import { ProofIcon } from "./ProofBadge";
 
 const COL_W = 210;
@@ -42,14 +43,14 @@ function RecordNode({ data }: NodeProps<Node<RecordNodeData>>) {
       <div className="node-meta">
         <span className={n.date.verified ? "" : "unverified"} title={n.date.from}>
           {n.date.time.slice(0, 10)}
-          {!n.date.verified && " (unverified)"}
+          {!n.date.verified && ` (${t("unverified")})`}
         </span>
         <span className="icons">
           <ProofIcon proof={n.tsa} />
           <ProofIcon proof={n.btc} />
         </span>
       </div>
-      {n.retracted && <div className="retracted-tag">retracted</div>}
+      {n.retracted && <div className="retracted-tag">{t("retracted")}</div>}
       <Handle type="source" position={Position.Right} />
     </div>
   );
@@ -115,10 +116,10 @@ export function Graph({ data, selected, onSelect, milestonesOnly = false }: Prop
   const { nodes, onNodesChange } = useStableNodes(drawn.nodes);
   const edges = drawn.edges;
   if (data.nodes.length === 0) {
-    return <div className="empty">No records yet. Use “New record” to make the first one.</div>;
+    return <div className="empty">{t("No records yet. Use “New record” to make the first one.")}</div>;
   }
   if (milestonesOnly && data.milestone_view.nodes.length === 0) {
-    return <div className="empty">No milestones yet. Mark important records as milestones.</div>;
+    return <div className="empty">{t("No milestones yet. Mark important records as milestones.")}</div>;
   }
   return (
     <div className="graph" data-testid="graph">
@@ -151,14 +152,14 @@ export function Graph({ data, selected, onSelect, milestonesOnly = false }: Prop
 function milestoneLayout(data: GraphData, selected: string | null): { nodes: Node[]; edges: Edge[] } {
   const keep = new Set(data.milestone_view.nodes);
   const kept = data.nodes.filter((n) => keep.has(n.id));
-  const rows = data.rows.filter((t) => kept.some((n) => n.node_type === t));
+  const rows = data.rows.filter((row) => kept.some((n) => n.node_type === row));
   const base = layout({ ...data, nodes: kept, rows, edges: [] }, selected);
   const edges: Edge[] = data.milestone_view.connectors.map((c, i) => ({
     id: `m${i}`,
     source: c.from,
     target: c.to,
     type: "default",
-    label: c.hidden === 0 ? "directly related" : `${c.hidden} in between`,
+    label: c.hidden === 0 ? t("directly related") : t("{n} in between", { n: c.hidden }),
     labelStyle: { fontSize: 11, fill: "#1e3a8a" },
     labelBgStyle: { fill: "#ffffff", fillOpacity: 0.9 },
     style: { stroke: "#5b6b8c", strokeWidth: 1.6, strokeDasharray: "6 5" },
@@ -173,12 +174,12 @@ function layout(data: GraphData, selected: string | null): { nodes: Node[]; edge
   const sorted = [...data.nodes].sort((a, b) => a.seq - b.seq);
   const rowOf = new Map(data.rows.map((t, i) => [t, i]));
   const nodes: Node[] = [];
-  data.rows.forEach((t, i) => {
+  data.rows.forEach((row, i) => {
     nodes.push({
-      id: `lane-${t}`,
+      id: `lane-${row}`,
       type: "lane",
       position: { x: 0, y: TOP + i * ROW_H + 18 },
-      data: { text: TYPE_LABELS[t] ?? `Other: ${t}` },
+      data: { text: typeLabel(row) },
       selectable: false,
       draggable: false,
     });
@@ -189,7 +190,7 @@ function layout(data: GraphData, selected: string | null): { nodes: Node[]; edge
       id: `date-${n.id}`,
       type: "date",
       position: { x, y: 0 },
-      data: { text: n.date.time.slice(0, 10), sub: `#${n.seq}${n.date.verified ? "" : " · unverified"}` },
+      data: { text: n.date.time.slice(0, 10), sub: `#${n.seq}${n.date.verified ? "" : ` · ${t("unverified")}`}` },
       selectable: false,
       draggable: false,
     });
@@ -205,8 +206,8 @@ function layout(data: GraphData, selected: string | null): { nodes: Node[]; edge
     const grey = !e.active;
     const color = grey ? "#b5bac4" : "#3b4a63";
     let label: string | undefined;
-    if (e.withdrawn) label = `withdrawn ${e.withdrawn.time.slice(0, 10)}`;
-    else if (e.origin === "link" && e.added) label = `added ${e.added.time.slice(0, 10)}`;
+    if (e.withdrawn) label = t("withdrawn {date}", { date: e.withdrawn.time.slice(0, 10) });
+    else if (e.origin === "link" && e.added) label = t("added {date}", { date: e.added.time.slice(0, 10) });
     return {
       id: e.id,
       source: e.from,

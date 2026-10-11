@@ -11,15 +11,32 @@ from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.api.routes import router
 from app.api.security import LocalOnlyMiddleware
 from app.config import Settings
+from app.i18n import set_language, tr_message
 from app.instance import InstanceLock
 from app.services.context import AppContext
 from app.services.spaces import Spaces
 
 log = logging.getLogger("rprov")
+
+
+class LanguageMiddleware:
+    """Texts the server writes follow the interface language the request names (D-046)."""
+
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+        value = next((v.decode("latin-1") for k, v in scope.get("headers", []) if k == b"x-rprov-lang"), None)
+        set_language(value)
+        await self.app(scope, receive, send)
 
 
 def create_app(ctx: AppContext, *, start_jobs: bool = False) -> FastAPI:
@@ -51,13 +68,20 @@ def create_app(ctx: AppContext, *, start_jobs: bool = False) -> FastAPI:
         allowed_origins=ctx.settings.allowed_origins(),
         token=ctx.session_token,
     )
+    app.add_middleware(LanguageMiddleware)
     app.include_router(router)
+
+    @app.exception_handler(StarletteHTTPException)
+    async def http_error(request: Request, exc: StarletteHTTPException):
+        # Error messages are written in English where they are raised; translated on the way out.
+        detail = tr_message(exc.detail) if isinstance(exc.detail, str) else exc.detail
+        return JSONResponse({"detail": detail}, status_code=exc.status_code, headers=getattr(exc, "headers", None))
 
     @app.exception_handler(Exception)
     async def log_unexpected(request: Request, exc: Exception):
         # Unexpected errors go to the log with their traceback (the desktop app has no console).
         log.error("unexpected error on %s %s", request.method, request.url.path, exc_info=exc)
-        return JSONResponse({"detail": "internal error (see the app log)"}, status_code=500)
+        return JSONResponse({"detail": tr_message("internal error (see the app log)")}, status_code=500)
     dist: Path = ctx.settings.web_dist
 
     def index() -> HTMLResponse:

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
+import { t } from "../i18n";
 
 // A small "?" next to a word; click it for a one-sentence explanation.
 export function Help({
@@ -36,7 +37,7 @@ export function Help({
       <button
         type="button"
         className="help-btn"
-        aria-label={`What is ${label}?`}
+        aria-label={t("What is {label}?", { label })}
         aria-expanded={open}
         data-testid={`help-${id}`}
         onClick={(e) => {

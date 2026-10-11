@@ -252,3 +252,8 @@ ul.plain { list-style: none; padding: 0; margin: 0; }
 /* Backup folder check: room for the label and a three-line warning, so nothing jumps */
 .location-check-slot { min-height: 5.2em; display: flow-root; }
 .location-check-slot .location-check { margin: 4px 0; }
+
+/* Language switch (D-046) */
+.setup-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.lang-switch { white-space: nowrap; }
+.row .grow { flex: 1; }

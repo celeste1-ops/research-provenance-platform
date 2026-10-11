@@ -77,8 +77,12 @@ def check_stamp_services(settings: Settings) -> dict:
     from provenance_core.providers.diagnostics import run_checks
 
     tsas = [("FreeTSA", public_tsa(settings, "freetsa")), ("DigiCert", public_tsa(settings, "digicert"))]
-    checks = run_checks(tsas, timeout=settings.network_timeout)
-    return {"checks": [c.to_dict() for c in checks], "in_use": services_in_use(settings)}
+    from app.i18n import tr_message
+
+    checks = [c.to_dict() for c in run_checks(tsas, timeout=settings.network_timeout)]
+    for c in checks:
+        c["detail"] = tr_message(c["detail"])  # written in English by the checks (D-046)
+    return {"checks": checks, "in_use": services_in_use(settings)}
 
 
 def services_in_use(settings: Settings) -> dict:

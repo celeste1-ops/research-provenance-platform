@@ -10,6 +10,8 @@ from __future__ import annotations
 
 from xml.sax.saxutils import escape
 
+from app.i18n import tr
+
 COL_W = 178
 ROW_H = 96
 NODE_W = 152
@@ -36,10 +38,10 @@ def _short(text: str, n: int) -> str:
 
 
 def _icon(x: float, y: float, letter: str, state: str) -> str:
-    title = {"confirmed": "confirmed", "pending": "pending", "none": "none", "not_enabled": "not enabled"}.get(
+    title = tr({"confirmed": "confirmed", "pending": "pending", "none": "none", "not_enabled": "not enabled"}.get(
         state, state
-    )
-    name = "Third-party timestamp" if letter == "T" else "Bitcoin anchor"
+    ))
+    name = tr("Third-party timestamp" if letter == "T" else "Bitcoin anchor")
     if state == "confirmed":
         circle = f'<circle cx="{x}" cy="{y}" r="7" class="ic-on"/>'
         text_cls = "ic-t-on"
@@ -50,7 +52,7 @@ def _icon(x: float, y: float, letter: str, state: str) -> str:
         circle = f'<circle cx="{x}" cy="{y}" r="7" class="ic-off"/>'
         text_cls = "ic-t-off"
     return (
-        f"<g><title>{name}: {escape(title)}</title>{circle}"
+        f"<g><title>{escape(tr('{label}: {state}', label=name, state=title))}</title>{circle}"
         f'<text x="{x}" y="{y + 3.5}" class="{text_cls}" text-anchor="middle">{letter}</text></g>'
     )
 
@@ -59,7 +61,7 @@ def render_graph_svg(nodes: list[dict], edges: list[dict]) -> str:
     """nodes: id, seq, title, node_type, milestone, retracted, date (YYYY-MM-DD or ''),
     tsa_state, btc_state. edges: from (older), to (newer), rel, origin, added, withdrawn."""
     if not nodes:
-        return '<p class="muted">No disclosed entries to draw.</p>'
+        return f'<p class="muted">{escape(tr("No disclosed entries to draw."))}</p>'
     nodes = sorted(nodes, key=lambda n: n["seq"])
     known = list(TYPE_LABELS)
     present = [t for t in known if any(n["node_type"] == t for n in nodes)]
@@ -72,7 +74,7 @@ def render_graph_svg(nodes: list[dict], edges: list[dict]) -> str:
     height = TOP + len(present) * ROW_H + 40
     out = [
         f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {width} {height}" width="{width}" height="{height}" '
-        f'role="img" aria-label="Evolution graph">',
+        f'role="img" aria-label="{escape(tr("Evolution graph"))}">',
         "<defs>"
         '<marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">'
         '<path d="M0,0 L10,5 L0,10 z" class="arrowhead"/></marker>'
@@ -84,7 +86,7 @@ def render_graph_svg(nodes: list[dict], edges: list[dict]) -> str:
         y = TOP + i * ROW_H
         out.append(f'<rect x="0" y="{y - 8}" width="{width}" height="{ROW_H - 4}" class="lane{i % 2}"/>')
         out.append(
-            f'<text x="12" y="{y + NODE_H / 2 + 4}" class="lane-label">{escape(TYPE_LABELS.get(t, "Other: " + t))}</text>'
+            f'<text x="12" y="{y + NODE_H / 2 + 4}" class="lane-label">{escape(tr(TYPE_LABELS[t]) if t in TYPE_LABELS else tr("Other: {type}", type=t))}</text>'
         )
     for col, n in enumerate(nodes):
         x = LEFT + col * COL_W
@@ -106,13 +108,13 @@ def render_graph_svg(nodes: list[dict], edges: list[dict]) -> str:
         attrs = f' stroke-dasharray="{dash}"' if dash else ""
         cls = "edge-grey" if grey else "edge"
         marker = "arrow-grey" if grey else "arrow"
-        rel_text = {"revises": "revises", "derived_from": "derived from", "uses": "uses"}.get(e["rel"], "other relation")
+        rel_text = tr({"revises": "revises", "derived_from": "derived from", "uses": "uses"}.get(e["rel"], "other relation"))
         out.append(f'<path d="{d}" class="{cls}"{attrs} marker-end="url(#{marker})"><title>{escape(rel_text)}</title></path>')
         label = ""
         if e.get("withdrawn"):
-            label = f"withdrawn {e['withdrawn']}"
+            label = tr("withdrawn {date}", date=e["withdrawn"])
         elif e.get("origin") == "link" and e.get("added"):
-            label = f"added {e['added']}"
+            label = tr("added {date}", date=e["added"])
         if label:
             lx, ly = (sx + tx) / 2, (sy + ty) / 2 - 6
             out.append(f'<text x="{lx}" y="{ly}" class="edge-label" text-anchor="middle">{escape(label)}</text>')
@@ -127,7 +129,7 @@ def render_graph_svg(nodes: list[dict], edges: list[dict]) -> str:
         out.append(f'<rect x="{x}" y="{y}" width="{NODE_W}" height="{NODE_H}" rx="7"/>')
         title = ("★ " if n.get("milestone") else "") + n["title"]
         out.append(f'<text x="{x + 9}" y="{y + 20}" class="node-title">{escape(_short(title, 22))}</text>')
-        sub = "retracted" if n.get("retracted") else (n["date"] or "no verified time")
+        sub = tr("retracted") if n.get("retracted") else (n["date"] or tr("no verified time"))
         out.append(f'<text x="{x + 9}" y="{y + 38}" class="node-sub">{escape(sub)}</text>')
         out.append(_icon(x + NODE_W - 34, y + NODE_H - 13, "T", n.get("tsa_state", "none")))
         out.append(_icon(x + NODE_W - 15, y + NODE_H - 13, "B", n.get("btc_state", "none")))

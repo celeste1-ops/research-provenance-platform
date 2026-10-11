@@ -1,4 +1,4 @@
-; Windows installer (Inno Setup 6) — DECISIONS D-044.
+; Windows installer (Inno Setup 6.5 or later) — DECISIONS D-044, D-046.
 ; Installs for the current user only (no administrator rights), adds a Start menu entry
 ; and an uninstaller. Your data lives in %USERPROFILE%\.rprov and is never touched by
 ; installing, upgrading or uninstalling.
@@ -35,9 +35,17 @@ SolidCompression=yes
 WizardStyle=modern
 CloseApplications=yes
 RestartApplications=no
+; Chinese on a Chinese Windows, English everywhere else (D-046); no language question.
+ShowLanguageDialog=no
+
+[Languages]
+Name: "en"; MessagesFile: "compiler:Default.isl"
+; The official Simplified Chinese messages (jrsoftware/issrc, Files/Languages), kept here byte for
+; byte (UTF-8, no BOM) so the build does not depend on which languages the compiler shipped with.
+Name: "zh"; MessagesFile: "ChineseSimplified.isl"
 
 [Tasks]
-Name: "desktopicon"; Description: "Create a desktop shortcut"; GroupDescription: "Shortcuts:"; Flags: unchecked
+Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
 
 [Files]
 Source: "..\..\dist\{#MyAppName}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
@@ -51,4 +59,4 @@ Name: "{autoprograms}\{#MyAppName}"; Filename: "{app}\{#MyAppExe}"
 Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExe}"; Tasks: desktopicon
 
 [Run]
-Filename: "{app}\{#MyAppExe}"; Description: "Start {#MyAppName} now"; Flags: nowait postinstall skipifsilent
+Filename: "{app}\{#MyAppExe}"; Description: "{cm:LaunchProgram,{#MyAppName}}"; Flags: nowait postinstall skipifsilent
