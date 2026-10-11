@@ -29,6 +29,14 @@ label.check { display: flex; align-items: center; gap: 8px; font-weight: 400; }
 label.check input { width: auto; margin: 0; }
 button { cursor: pointer; border-radius: 6px; padding: 6px 12px; border: 1px solid var(--line); background: #fff; }
 button:disabled { opacity: .5; cursor: default; }
+/* Everything that can be clicked shows it: a pointer, and a change under the mouse. */
+button:not(:disabled):not(.link):hover { border-color: var(--accent); }
+button.primary:not(:disabled):hover { filter: brightness(1.1); }
+button.link:hover, .link:hover { color: #1d3fa0; }
+label.check, select, summary, .pill { cursor: pointer; }
+.pill:hover { border-color: var(--accent); }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
 button.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
 button.secondary { background: #fff; }
 button.small, .small button { padding: 3px 8px; font-size: 13px; }
@@ -44,12 +52,43 @@ button.link, .link { background: none; border: 0; padding: 0; color: var(--accen
 .loading, .empty { padding: 40px; color: var(--muted); text-align: center; }
 
 .app { display: flex; flex-direction: column; height: 100vh; }
-.topbar { display: flex; align-items: center; gap: 10px; padding: 10px 16px; background: var(--panel); border-bottom: 1px solid var(--line); }
-.topbar select { width: auto; min-width: 120px; max-width: 220px; flex-shrink: 1; }
-.topbar button { white-space: nowrap; }
-.topbar .space-switch, .topbar .with-help, .topbar .menu-wrap { flex-shrink: 0; }
-.brand { font-weight: 700; margin-right: 6px; }
+/* Row 1 — where am I. */
+.appbar { display: flex; align-items: center; gap: 14px; padding: 10px 18px; background: #fff; border-bottom: 1px solid var(--line); }
+.appbar button { white-space: nowrap; }
+.appbar .space-switch, .appbar .menu-wrap { flex-shrink: 0; }
+.brand { display: inline-flex; align-items: center; gap: 8px; font-weight: 700; font-size: 15.5px; white-space: nowrap; }
+.project-picker { display: inline-flex; align-items: center; gap: 10px; padding-left: 14px; border-left: 1px solid var(--line);
+  min-width: 0; }
+.project-picker select { width: auto; min-width: 140px; max-width: 260px; font-weight: 600; border-color: transparent;
+  background-color: #f3f5f9; }
+.project-picker select:hover { border-color: var(--line); }
 .spacer { flex: 1; }
+button.ghost { background: none; border-color: transparent; color: var(--ink); display: inline-flex; align-items: center; gap: 6px; }
+button.ghost:hover, button.ghost[aria-expanded="true"] { background: #f2f4f7; border-color: var(--line); }
+
+/* Row 2 — what can I do. */
+.toolbar { display: flex; align-items: center; gap: 12px; padding: 8px 18px; background: var(--panel); border-bottom: 1px solid var(--line); }
+.toolbar button { white-space: nowrap; display: inline-flex; align-items: center; gap: 6px; }
+.toolbar button.primary { padding: 7px 16px; font-weight: 600; box-shadow: 0 1px 2px rgba(47, 91, 211, 0.3); }
+.icon { flex-shrink: 0; }
+.logo { flex-shrink: 0; }
+/* The three views look like what they are: buttons side by side, the chosen one filled. */
+.segmented { display: inline-flex; padding: 3px; gap: 2px; background: #e9edf4; border-radius: 10px; }
+.segmented button { border: 0; background: none; padding: 5px 14px; border-radius: 7px; color: #3b4352; font-weight: 500; }
+.segmented button:hover { background: rgba(255, 255, 255, 0.7); color: var(--accent); }
+.segmented button.on, .segmented button.on:hover { background: #fff; color: var(--accent); font-weight: 600;
+  box-shadow: 0 1px 3px rgba(16, 24, 40, 0.15); }
+label.toggle { display: inline-flex; align-items: center; gap: 6px; margin: 0; padding: 4px 10px; border: 1px solid var(--line);
+  border-radius: 99px; background: #fff; font-weight: 400; cursor: pointer; }
+label.toggle:hover { border-color: var(--accent); }
+label.toggle input { width: auto; margin: 0; accent-color: var(--accent); }
+.views-help { display: block; line-height: 1.6; margin-bottom: 8px; }
+/* How to use the view in front of you, until the person says "Got it". */
+.view-tip { position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%); z-index: 5; display: flex; align-items: center;
+  gap: 12px; padding: 7px 14px; background: rgba(30, 34, 40, 0.86); color: #fff; border-radius: 99px; font-size: 13px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18); white-space: nowrap; }
+.view-tip .link { color: #b9cbff; font-weight: 600; }
+.view-tip .link:hover { color: #fff; }
 .banner { padding: 6px 16px; background: #fffbe6; border-bottom: 1px solid var(--line); font-size: 13px; cursor: default; }
 .banner.error { background: #fdecea; }
 .main { flex: 1; display: grid; grid-template-columns: 1fr; min-height: 0; }
@@ -58,6 +97,7 @@ button.link, .link { background: none; border: 0; padding: 0; color: var(--accen
 .graph { position: absolute; inset: 0; }
 
 .record-node { background: #fff; border: 1.2px solid #8c95a6; border-radius: 8px; padding: 8px 10px; font-size: 12.5px; cursor: pointer; }
+.record-node:hover { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(47, 91, 211, 0.18); }
 .record-node.selected { box-shadow: 0 0 0 3px rgba(47, 91, 211, .35); }
 .record-node.milestone { border: 3px solid #c58b00; background: #fffaf0; }
 .record-node.retracted { background: #f3f4f6; border-style: dashed; }
@@ -124,17 +164,12 @@ dt { color: var(--muted); } dd { margin: 0; }
 .card { background: var(--panel); border-radius: 12px; padding: 24px 28px; width: min(560px, 100%); box-shadow: 0 4px 24px rgba(0, 0, 0, .08); }
 .dropzone label.link { display: inline; margin: 0; font-weight: 400; }
 button.attention { border-color: var(--warn); color: var(--warn); }
-.viewbar { display: flex; align-items: center; gap: 16px; padding: 6px 16px; background: var(--panel); border-bottom: 1px solid var(--line); }
-.viewbar label.check { margin: 0; }
-.tabs { display: flex; gap: 4px; }
-.tab { border: 0; background: none; padding: 6px 10px; border-bottom: 2px solid transparent; border-radius: 0; color: var(--muted); }
-.tab.active { color: var(--ink); border-bottom-color: var(--accent); font-weight: 600; }
 .timeline { position: absolute; inset: 0; overflow: auto; padding: 12px 16px; }
 .timeline table { border-collapse: collapse; width: 100%; font-size: 13px; background: #fff; }
 .timeline th, .timeline td { border-bottom: 1px solid var(--line); padding: 6px 8px; text-align: left; vertical-align: top; }
 .timeline th { background: #f2f4f7; position: sticky; top: 0; z-index: 2; }
 .timeline td .proof-icon { margin-right: 4px; }
-tr.clickable { cursor: pointer; } tr.clickable:hover { background: #f6f8fc; }
+tr.clickable { cursor: pointer; } tr.clickable:hover { background: #eef3ff; box-shadow: inset 3px 0 0 var(--accent); }
 .tag-verified, .tag-author { display: inline-block; font-size: 10.5px; padding: 1px 6px; border-radius: 99px; margin-right: 3px; }
 .tag-verified { background: #c6e6d4; color: #14532d; } .tag-author { background: #f6deb0; color: #6b4300; }
 .src-changes { background: #f6f7f9; } .src-changes .src-tag { color: var(--muted); }
@@ -163,6 +198,8 @@ button.big { padding: 10px 22px; font-size: 16px; margin-top: 6px; }
 button.icon { padding: 4px 10px; font-size: 18px; line-height: 1; }
 .menu { position: absolute; right: 0; top: calc(100% + 6px); background: #fff; border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 8px 24px rgba(0,0,0,.12); min-width: 230px; padding: 4px; z-index: 40; }
 .menu button { display: block; width: 100%; text-align: left; border: 0; background: none; padding: 7px 10px; border-radius: 6px; }
+.menu-section { padding: 8px 10px 3px; font-size: 11px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); }
+.menu-section:first-child { padding-top: 4px; }
 .menu button:hover { background: #f2f4f7; }
 .menu hr { border: 0; border-top: 1px solid var(--line); margin: 4px 0; }
 .banner { display: flex; align-items: center; gap: 10px; }
@@ -205,7 +242,6 @@ ul.files { list-style: none; padding: 0; margin: 6px 0; }
 .with-help { display: inline-flex; align-items: center; }
 .block { display: block; margin: 4px 0; }
 .legend { display: block; }
-.tabs { align-items: center; }
 .footbar { display: flex; align-items: center; gap: 10px; padding: 5px 16px; border-top: 1px solid var(--line); background: var(--panel); color: var(--muted); }
 
 /* Two spaces (D-038): practice looks clearly different everywhere. */
@@ -215,8 +251,9 @@ ul.files { list-style: none; padding: 0; margin: 6px 0; }
 .space-switch button + button { border-left: 1px solid var(--line); }
 .space-switch button.on { background: var(--accent); color: #fff; }
 .space-practice .space-switch button.on { background: #c26a00; }
-.space-practice .topbar { background: #fff4e3; border-bottom-color: #efc98d; }
-.space-practice .viewbar, .space-practice .footbar { background: #fffaf2; }
+.space-practice .appbar { background: #fff4e3; border-bottom-color: #efc98d; }
+.space-practice .toolbar, .space-practice .footbar { background: #fffaf2; }
+.space-practice .project-picker select { background-color: #fff; }
 .space-practice .canvas { background: #fffdf8; }
 .space-practice button.primary { background: #c26a00; border-color: #c26a00; }
 .practice-banner { display: flex; align-items: center; gap: 10px; padding: 7px 16px; color: #6b4100; font-size: 14px; border-bottom: 1px solid #efc98d; background: repeating-linear-gradient(-45deg, #ffe8c4, #ffe8c4 12px, #fff1db 12px, #fff1db 24px); }
@@ -274,9 +311,11 @@ ul.plain { list-style: none; padding: 0; margin: 0; }
 .story-intro p { margin: 3px 0; }
 .story-para { margin: 8px 0; }
 .story-para .s-author { background: #fff6e5; border-bottom: 1px dashed #d9a441; }
-.story-para .ref { font-size: 11.5px; color: var(--muted); white-space: nowrap; }
+.story-para .ref { font-size: 11.5px; white-space: nowrap; color: var(--accent); text-decoration: none; border: 1px solid #c9d4f5;
+  border-radius: 99px; padding: 0 6px; background: #f5f8ff; }
+.story-para .ref:hover { background: var(--accent); border-color: var(--accent); color: #fff; }
 @media print {
-  .topbar, .viewbar, .footbar, .story-tools, .detail, .banner, .practice-banner { display: none !important; }
+  .appbar, .toolbar, .footbar, .view-tip, .story-tools, .detail, .banner, .practice-banner { display: none !important; }
   .story-view { max-width: none; padding: 0; }
   .story-scroll { position: static; overflow: visible; }
 }

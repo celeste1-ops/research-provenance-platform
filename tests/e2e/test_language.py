@@ -38,11 +38,11 @@ def test_switching_language_and_back(tmp_path, browser):
         page.goto(srv.url)
         node = page.get_by_test_id(f"node-{ids['formula1']}")
         node.wait_for()
-        expect(page.get_by_test_id("new-record")).to_have_text("+ Add a step")
+        expect(page.get_by_test_id("new-record")).to_have_text("Add a step")
         title = node.locator(".node-title").text_content()
 
         page.get_by_test_id("lang-switch").click()
-        expect(page.get_by_test_id("new-record")).to_have_text(ZH["+ Add a step"])
+        expect(page.get_by_test_id("new-record")).to_have_text(ZH["Add a step"])
         expect(page.locator("html")).to_have_attribute("lang", "zh-CN")
         expect(page.get_by_test_id("lang-switch")).to_have_text("English")
         node = page.get_by_test_id(f"node-{ids['formula1']}")
@@ -53,7 +53,7 @@ def test_switching_language_and_back(tmp_path, browser):
         assert remembered(srv, page, "zh")
 
         page.reload()
-        expect(page.get_by_test_id("new-record")).to_have_text(ZH["+ Add a step"])
+        expect(page.get_by_test_id("new-record")).to_have_text(ZH["Add a step"])
         share = page.get_by_role("button", name=ZH["Share"], exact=True)
         expect(share).to_be_enabled()
         share.click()
@@ -62,12 +62,12 @@ def test_switching_language_and_back(tmp_path, browser):
         # A second browser (nothing chosen there yet) follows the choice made in the first one.
         other = browser.new_context(locale="en-US").new_page()
         other.goto(srv.url)
-        expect(other.get_by_test_id("new-record")).to_have_text(ZH["+ Add a step"])
+        expect(other.get_by_test_id("new-record")).to_have_text(ZH["Add a step"])
         other.context.close()
 
         page.goto(srv.url)
         page.get_by_test_id("lang-switch").click()
-        expect(page.get_by_test_id("new-record")).to_have_text("+ Add a step")
+        expect(page.get_by_test_id("new-record")).to_have_text("Add a step")
         expect(page.locator("html")).to_have_attribute("lang", "en")
         assert remembered(srv, page, "en")
         context.close()

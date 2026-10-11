@@ -275,7 +275,7 @@ GitHub Actions 的 **Package** 工作流在每次推送时自动打两个安装�
 - **P0 已完成**：只追加的记录、签名、重放；第三方签名时间证明（RFC 3161）；导出证据包、`report.html`（含静态演化图）、`verify.py`、篡改测试；记录表单和演化图。
 - **P1 已完成**：比特币时间锚定（OpenTimestamps）和区块浏览器核对；「只看里程碑」视图；时间线视图；详情侧栏的完整分区（Verified record / Author statement / Later additions / Changes，以及在侧栏里追加关系、里程碑、说明、撤回）；备份与恢复；FSF 样例数据。
 - **第 4 轮（安装包）**：macOS（Apple 芯片）和 Windows 10/11 安装包，菜单栏/通知区域图标，只开一份；Windows 的备份位置建议和全套测试（含浏览器测试）在 GitHub Actions 上跑；日期章增加 DigiCert 作为备用；Settings → Check stamp services 检查各个时间证明服务能不能连上（见 DECISIONS D-043 – D-045）。
-- **v0.3.2**：钥匙串只用一个条目，新版本只问一次；程序开着时再打开一次会显示页面；文件可以拖到页面和表单上；dmg 窗口里有「拖到 Applications」的提示（DECISIONS D-052）。
+- **v0.3.2**：钥匙串只用一个条目，新版本只问一次；程序开着时再打开一次会显示页面；文件可以拖到页面和表单上；顶部改成两行、地图 / 清单 / 研究经过做成按钮（D-053）；dmg 窗口里有「拖到 Applications」的提示（DECISIONS D-052）。
 - **v0.3.1**：升级后钥匙串只问一次，不再每隔几秒就弹窗；被拒绝后不会自己重试，等你点「重试」（DECISIONS D-051）。
 - **第 5 轮（v0.3.0）**：中英文切换——界面、程序自己写的文字和错误提示、导出的报告和 VERIFY.md、菜单栏 / 托盘菜单、Windows 安装程序（见 DECISIONS D-046）；快速记一笔、从本机 git 仓库自动记录提交（D-047）；不用 AI 的「研究经过」（D-048）；盯住文件夹和收件箱（D-049）；可选的本机 AI 重新讲述（D-050）。
 - **需要在联网的 Mac 上完成**：`make freetsa-certs`、`make test-network`（AC-09：真实 FreeTSA 的 `.tsr` 用 `openssl ts -verify` 验证；真实 DigiCert 时间戳；真实 OpenTimestamps 日历和区块浏览器），以及 PRD 第 16 节的 4 项人工检查。

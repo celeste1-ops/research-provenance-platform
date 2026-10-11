@@ -698,3 +698,20 @@ verification rules or what leaves the machine for time proofs.
      onto Applications, then open it from Applications or Launchpad; the first time: Open
      Anyway" (`packaging/macos/`, drawn by `tools/dmg_background.py`, laid out with dmgbuild).
      Windows uses an ordinary installer, which needs no such step.
+
+- **D-053 · Two rows at the top: where am I, and what can I do.** The first row had grown to a
+  dozen controls with five "?" buttons, and Map / List / Story looked like plain words, so people
+  did not see they could be clicked. Now:
+  1. *Row 1, where am I:* the app's mark and name, the My research / Practice switch, the project
+     (the list ends with "+ New project…") and its number of steps; on the right the backup and
+     inbox status, Settings and the language.
+  2. *Row 2, what can I do:* the three views as one segmented control with icons (the chosen one
+     raised), one "?" that explains all three and holds the map's legend, "Key steps only" as a
+     toggle; on the right the actions — Quick note, Share and the primary Add a step — with
+     icons. Their explanations moved into tooltips.
+  3. *How to use the view in front of you* is a small line at the bottom of the canvas ("click a
+     step to open it · drag to move · scroll to zoom"; for the list and the story what clicking
+     does), until the person clicks "Got it".
+  4. *Settings is grouped:* Record automatically, Stamps, Your data, Practice, About.
+  5. Everything clickable shows it: a pointer, and a change under the mouse (steps on the map,
+     rows of the list, the story's step numbers as small chips, buttons, the backup pill).

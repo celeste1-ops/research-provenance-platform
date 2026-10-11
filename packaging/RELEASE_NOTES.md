@@ -4,6 +4,7 @@
 - **One keychain question per upgrade.** Everything the app keeps in the keychain is now in a single item, so a new version asks once — click **Always Allow**. (This first time, 0.3.2 asks once for each item older versions made, usually two or three, while it moves them into the single item.)
 - **Opening the app again shows its page.** If you closed the browser window, double-click Research History in Applications or Launchpad and the page opens again.
 - **Drag files in.** Drag files from the Finder or Explorer anywhere onto the "Add a step" form; dropped onto the main page, they open a new step with them attached.
+- **A clearer layout.** The top is now two rows: where you are (space, project, backup, settings) and what you can do (Map / List / Story as buttons with icons; Quick note, Share, Add a step). A short line at the bottom says how to use the view in front of you, and Settings is grouped.
 - **The disk image says what to do.** The window that opens with the `.dmg` shows an arrow and a short note: drag Research History onto Applications, then open it from there.
 
 **Fixed in v0.3.1**

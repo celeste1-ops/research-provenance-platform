@@ -283,12 +283,14 @@ def test_empty_state_and_help_panels(tmp_path, browser):
 
         # The legend (line types, D/P icons) is behind the "?" next to Map, not always on screen.
         assert page.get_by_test_id("legend").count() == 0
-        page.get_by_test_id("help-map").click()
+        page.get_by_test_id("help-map").click()  # one "?" explains all three views, with the map's legend
         legend = page.get_by_test_id("legend")
         assert "Date stamp" in legend.inner_text() and "Public stamp" in legend.inner_text()
+        views = page.get_by_test_id("help-map-text").inner_text()
+        assert "List" in views and "Story" in views and "no AI" in views
         page.locator(".brand").click()  # a click anywhere else closes it
         assert page.get_by_test_id("legend").count() == 0
-        for hid in ("add-step", "share", "list", "key-steps"):
+        for hid in ("key-steps",):
             page.get_by_test_id(f"help-{hid}").click()
             assert len(page.get_by_test_id(f"help-{hid}-text").inner_text()) > 20
             page.keyboard.press("Escape")
@@ -296,8 +298,10 @@ def test_empty_state_and_help_panels(tmp_path, browser):
         # Technical actions live in the More menu.
         page.get_by_test_id("settings-menu").click()
         items = [i.inner_text() for i in page.get_by_role("menuitem").all()]
-        assert items == ["Check stamps now", "Record from git…", "Watch a folder…", "Check stamp services…", "Backup…",
-                         "Where is my data?", "Technical details", "Back up signing key only…"]
+        assert items == ["Record from git…", "Watch a folder…", "Check stamps now", "Check stamp services…", "Backup…",
+                         "Back up signing key only…", "Where is my data?", "Technical details"]
+        sections = page.locator(".menu-section").all_inner_texts()  # grouped under headings
+        assert [x.lower() for x in sections] == ["record automatically", "stamps", "your data", "about"]
         page.get_by_role("menuitem", name="Where is my data?").click()
         where = page.get_by_test_id("where-is-my-data")
         text = where.inner_text()
