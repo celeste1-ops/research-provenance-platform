@@ -170,3 +170,20 @@ def test_adding_checks_its_input(ctx, project, repo, tmp_path):
     [source] = ctx.git.sources()
     ctx.git.remove(source["id"])
     assert ctx.git.sources() == [] and len(entries(ctx)) == 1  # the step stays, as every step does
+
+
+def test_the_code_copy_is_exactly_what_was_committed(tmp_path):
+    """Not converted by this computer's git settings (Git for Windows: LF -> CRLF), no filter
+    program run, and the same commit always gives the same zip."""
+    repo = GitRepo(tmp_path / "eol")
+    repo.git("config", "core.autocrlf", "true")
+    (repo.path / ".gitattributes").write_bytes(b"*.dat filter=lfs\n")  # a filter that must not run
+    repo.git("add", ".gitattributes")
+    sha = repo.commit("Model")
+    r = Repo(repo.path)
+    first = r.archive(sha, 10_000_000)
+    assert first == r.archive(sha, 10_000_000)
+    with zipfile.ZipFile(io.BytesIO(first)) as z:
+        assert z.read("model.py") == b"version = 1\n"
+        assert sorted(z.namelist()) == [".gitattributes", "model.py"]
+    assert r.archive(sha, 10) is None  # over the limit

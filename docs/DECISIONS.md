@@ -541,13 +541,17 @@ verification rules or what leaves the machine for time proofs.
      one per tag, untagged stretches per month (per year when that would make more than 48
      entries), each listing its commits and pointing at the newest; they `revises` each
      other in order. They are saved in the background because each waits for its stamps.
-  5. *Code copy is a choice.* "Keep a copy of the code with each step" attaches `git
-     archive` of the commit (zip, up to 50 MB; above that only the reference is kept). Off
-     by default: it stores the whole repository once per commit. Without it the entry is an
+  5. *Code copy is a choice.* "Keep a copy of the code with each step" attaches the
+     commit's files as a zip (up to 50 MB; above that only the reference is kept). Off by
+     default: it stores the whole repository once per commit. Without it the entry is an
      external reference and the interface says the code content was not saved (AC-16).
+     The zip holds every file exactly as committed (read with `ls-tree` and `cat-file`), not
+     `git archive`, which converts line endings by the computer's settings (found on Windows,
+     where LF became CRLF) and runs filter programs such as Git LFS that may use the
+     network. Fixed file dates make the same commit give the same zip everywhere.
   6. *Only local, read-only git.* The app runs the author's own `git` with rev-parse,
-     symbolic-ref, for-each-ref, log, merge-base, remote get-url and archive — never fetch,
-     pull or push — with `core.fsmonitor` off, no console window on Windows, and arguments
+     symbolic-ref, for-each-ref, log, merge-base, remote get-url, ls-tree and cat-file —
+     never fetch, pull or push — with `core.fsmonitor` off, no console window on Windows, and arguments
      checked (full hashes, existing branch names) so nothing can be read as an option.
      `repo_url` is the `origin` address with any password or token removed, or the folder
      path when there is no remote; like every entry field it stays local unless the author

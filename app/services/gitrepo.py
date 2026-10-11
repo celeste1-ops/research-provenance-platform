@@ -1,19 +1,21 @@
 """Reading a local git repository (DECISIONS D-047).
 
 The app runs the ``git`` program the author already has, and only commands that read the
-local repository: rev-parse, symbolic-ref, for-each-ref, log, merge-base, remote get-url and
-archive. Nothing here fetches, pulls or pushes, so nothing goes over the network. A date
+local repository: rev-parse, symbolic-ref, for-each-ref, log, merge-base, remote get-url,
+ls-tree and cat-file. Nothing here fetches, pulls or pushes, so nothing goes over the network. A date
 that git reports is what the author's computer wrote and can be changed later: callers show
 it only as the author's statement (PRD §7 "外部引用").
 """
 
 from __future__ import annotations
 
+import io
 import os
 import re
 import shutil
 import subprocess
 import sys
+import zipfile
 from dataclasses import dataclass
 from pathlib import Path
 from urllib.parse import urlsplit, urlunsplit
@@ -159,28 +161,53 @@ class Repo:
                          check=False).returncode == 0
 
     def archive(self, sha: str, limit: int) -> bytes | None:
-        """The files of one commit as a zip (``git archive``), or None if larger than ``limit``."""
+        """The files of one commit as a zip, exactly as committed, or None if larger than ``limit``.
+
+        Not ``git archive``: that converts line endings by this computer's settings (Git for
+        Windows turns LF into CRLF) and runs filter programs such as Git LFS, which may go over
+        the network. Here every file is read as stored, so the same commit always gives the
+        same bytes, on any computer, and no other program runs."""
         _check_sha(sha)
-        env = {**os.environ, "GIT_TERMINAL_PROMPT": "0", "GIT_OPTIONAL_LOCKS": "0"}
+        entries = []
+        for item in self._run("ls-tree", "-r", "-z", "--full-tree", sha).stdout.split(b"\0"):
+            if not item:
+                continue
+            meta, path = item.split(b"\t", 1)
+            mode, kind, obj = meta.split(b" ")
+            if kind == b"blob":  # submodules (commits of other repositories) are not files here
+                entries.append((mode, obj, path.decode("utf-8", "replace")))
+        out = io.BytesIO()
         flags = subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0
-        proc = subprocess.Popen([self.git, *_SAFE, "-C", str(self.path), "archive", "--format=zip", sha],
-                                stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, stdin=subprocess.DEVNULL,
-                                env=env, creationflags=flags)
-        chunks, size = [], 0
-        assert proc.stdout is not None
+        proc = subprocess.Popen([self.git, *_SAFE, "-C", str(self.path), "cat-file", "--batch"],
+                                stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+                                env={**os.environ, "GIT_OPTIONAL_LOCKS": "0"}, creationflags=flags)
+        assert proc.stdin is not None and proc.stdout is not None
+        total = 0
         try:
-            while chunk := proc.stdout.read(1 << 20):
-                size += len(chunk)
-                if size > limit:
-                    proc.kill()
-                    return None
-                chunks.append(chunk)
+            with zipfile.ZipFile(out, "w", compression=zipfile.ZIP_DEFLATED) as z:
+                for mode, obj, path in entries:
+                    proc.stdin.write(obj + b"\n")
+                    proc.stdin.flush()
+                    header = proc.stdout.readline().split()
+                    if len(header) != 3 or header[1] != b"blob":
+                        raise GitError("could not read a file of the commit")
+                    size = int(header[2])
+                    total += size
+                    if total > 4 * limit:  # far too big to compress below the limit
+                        return None
+                    data = proc.stdout.read(size)
+                    proc.stdout.read(1)  # the newline after each object
+                    info = zipfile.ZipInfo(path, date_time=(1980, 1, 1, 0, 0, 0))  # same commit, same bytes
+                    info.external_attr = (0o755 if mode == b"100755" else 0o644) << 16
+                    info.compress_type = zipfile.ZIP_DEFLATED
+                    z.writestr(info, data)
         finally:
-            proc.stdout.close()
+            proc.stdin.close()
+            proc.kill()
             proc.wait(timeout=TIMEOUT_SECONDS)
-        if proc.returncode != 0:
-            raise GitError("git archive failed")
-        return b"".join(chunks)
+            proc.stdout.close()
+        data = out.getvalue()
+        return data if len(data) <= limit else None
 
 
 def _check_sha(sha: str) -> str:
