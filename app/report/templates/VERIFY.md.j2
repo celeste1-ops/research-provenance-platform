@@ -1,0 +1,86 @@
+# How to verify this evidence bundle
+
+Bundle: **{{ meta.title }}** · format `{{ meta.format }}` · records 0–{{ plan.max_seq }} of installation `{{ meta.installation }}`
+Author label (self-declared): {{ meta.author_label }} · exported {{ meta.exported_local_time }} (local clock, unverified)
+
+You do not need the original app, and you do not need to trust the author.
+
+## Automatic
+
+```bash
+pip install "cryptography>=44" "rfc3161-client>=1.0.6"
+python3 verify.py .            # or: python3 verify.py provenance-….zip
+python3 verify.py . --json     # machine-readable
+```
+
+Exit code 0 means no record failed. Every record is reported as *pass*, *pass (Bitcoin anchor
+pending)*, *warning* or *fail* with a failure code. The two kinds of time are reported
+separately; author statements and claimed dates never count as verified times.
+
+{% if uses_mock %}
+> **Test bundle.** The third-party timestamps in this bundle come from the MOCK test
+> authority (`certs/mock-tsa-root.pem`), which nothing trusts by default. Only for testing:
+> `python3 verify.py . --tsa-root certs/mock-tsa-root.pem`, and use
+> `-CAfile certs/mock-tsa-root.pem -untrusted certs/mock-tsa.pem` in step 3 below.
+
+{% endif %}
+## By hand
+
+`chain.json` lists every record ID from seq 0 to {{ plan.max_seq }}; repeat the steps for each
+`<id>`. Example record used below: `{{ example.id }}` (seq {{ example.seq }}).
+
+### 1. Content, payload, manifest
+
+```bash
+{% if has_body %}
+sha256sum content/<id>/body.md     # compare with content.body.sha256 in payloads/<id>.json
+{% else %}
+sha256sum content/<id>/body.md     # (fully disclosed entries only) compare with content.body.sha256 in payloads/<id>.json
+{% endif %}
+sha256sum content/<id>/files/*     # each must match content.files[].sha256
+sha256sum payloads/<id>.json       # compare with payload_sha256 in manifests/<id>.json
+sha256sum manifests/<id>.json      # the result must equal <id>
+```
+
+Also check the chain: in every `manifests/<id>.json`, `seq` counts up from 0 without gaps and
+`prev` is the ID of the record before it.
+
+### 2. Signature
+
+Needs OpenSSL 3 (macOS's LibreSSL may not support it; `brew install openssl@3`).
+
+```bash
+echo -n <id> | xxd -r -p > id.bin
+openssl pkeyutl -verify -pubin -inkey identity/public_key.pem -rawin -in id.bin -sigfile signatures/<id>.sig
+```
+
+`identity/public_key.pem` must be the key written in the genesis record (seq 0):
+the `public_key` field of `payloads/{{ plan.chain[0].id }}.json`.
+
+### 3. Third-party timestamp (RFC 3161)
+
+```bash
+openssl ts -verify -data manifests/<id>.json -in proofs/<id>.tsr \
+  -CAfile certs/freetsa-cacert.pem -untrusted certs/freetsa-tsa.crt
+```
+
+Before trusting `certs/freetsa-cacert.pem`, compare its fingerprint with the one FreeTSA
+publishes (`openssl x509 -in certs/freetsa-cacert.pem -noout -fingerprint -sha256`); the
+expected value is `{{ meta.trusted_tsa_roots['freetsa-cacert.pem'] }}`.
+
+### 4. Bitcoin anchor (OpenTimestamps)
+
+```bash
+pip install opentimestamps-client
+ots verify manifests/<id>.json.ots     # the .ots file sits next to the manifest
+```
+
+Full verification needs a Bitcoin node (a pruned node is enough); otherwise compare the block
+header with at least two public block explorers. A pending anchor is not a failure.
+
+## What a successful check means
+
+It shows that each record existed no later than its verified time, has not been changed
+since, the order of the records, and that one signing key signed them all. It does not show
+who the author is, that they were first, why they made a change, or that the content is
+correct.

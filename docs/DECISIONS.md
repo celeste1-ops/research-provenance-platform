@@ -91,3 +91,28 @@ each section.
 - **D-015 · Retry policy for time proofs.** Failed submissions are retried with exponential
   backoff (1 min doubling to a 6 h cap); after 30 attempts the row is marked `failed` but the
   manual refresh still retries it. Pending Bitcoin anchors are re-checked hourly.
+
+## Evidence bundle and verify.py
+
+- **D-016 · verify.py trusts only what it carries.** The FreeTSA root is embedded in the
+  generated `verify.py` (with its fingerprint asserted); `certs/` in the bundle is for the
+  manual `openssl` commands only and is never used as a trust anchor by `verify.py`. A
+  reader who deliberately trusts another TSA root passes `--tsa-root PEM`.
+- **D-017 · Exit codes.** `verify.py` exits 0 when no record failed (warnings and pending
+  Bitcoin anchors allowed), 1 when any record failed, 2 when the bundle cannot be read.
+- **D-018 · How verify.py is built.** `tools/build_verify.py` concatenates the core modules
+  it needs (der, jcs, ots, proofs, records, signing, chain, verify, bundle, verify_cli),
+  strips the package-relative imports, refuses any import outside the standard library,
+  `cryptography` and `rfc3161-client`, and fails on duplicate top-level names. The Bitcoin
+  `.ots` reader is a standard-library implementation cross-checked against the official
+  `opentimestamps` library in the tests, so `opentimestamps` stays optional.
+- **D-019 · Selection semantics.** An export takes a disclosure level per record plus a
+  default for the rest. The bundle covers seq 0 up to the highest record that is disclosed
+  (or explicitly chosen); every other record in that range is "existence only". Non-entry
+  records cannot be "full" (they have no content) and are downgraded to "structure".
+- **D-020 · Markdown in report.html.** Rendered with markdown-it-py with raw HTML and images
+  disabled (images would trigger network requests); the report also carries a
+  `default-src 'none'` Content-Security-Policy, so it cannot load anything.
+- **D-021 · End-to-end tests use Playwright for Python.** They run inside pytest (`make
+  test`). Where the bundled Playwright browser build is missing (this cloud image), the
+  pre-installed Chromium is used via `executable_path`; CI installs the matching browser.

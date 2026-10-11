@@ -363,3 +363,44 @@ def verify_record(record_id: str, request: Request):
 def verify_all(request: Request):
     c = ctx(request)
     return report_json(verify_database(c.ledger, c.anchors))
+
+
+# ---------------------------------------------------------------- evidence bundle
+
+
+class ExportIn(BaseModel):
+    title: str = "evidence"
+    records: dict[str, str] = Field(default_factory=dict)  # record ID -> full | structure | existence
+    default: str = "existence"
+
+
+@router.post("/export/preview")
+def export_preview(body: ExportIn, request: Request):
+    from app.services.export import plan_export, preview
+
+    c = ctx(request)
+    try:
+        return preview(c.ledger, plan_export(c.ledger, body.title, body.records, body.default))
+    except LedgerError as exc:
+        raise _bad(exc) from None
+
+
+@router.post("/export")
+def export_bundle(body: ExportIn, request: Request):
+    import os
+
+    from app.services.export import build_bundle_files, bundle_filename, plan_export, write_zip
+
+    c = ctx(request)
+    try:
+        plan = plan_export(c.ledger, body.title, body.records, body.default)
+    except LedgerError as exc:
+        raise _bad(exc) from None
+    data = write_zip(build_bundle_files(c.ledger, c.anchors, plan))
+    name = bundle_filename(plan.title)
+    exports = c.settings.data_dir / "exports"
+    exports.mkdir(exist_ok=True)
+    os.chmod(exports, 0o700)
+    (exports / name).write_bytes(data)
+    return Response(data, media_type="application/zip",
+                    headers={"Content-Disposition": f'attachment; filename="{name}"'})
