@@ -242,7 +242,7 @@ bash packaging/build_macos.sh          # 在 Mac 上：dist/Research History.app
 #   ./packaging/build_windows.ps1; ./packaging/smoke_windows.ps1
 ```
 
-GitHub Actions 的 **Package** 工作流在每次推送时自动打两个安装包，并完整试一遍（安装、启动、建身份、存一步、导出、用导出的 verify.py 检查、卸载后数据还在）。发布新版本：把 `pyproject.toml` 里的 `version` 改成新版本号并提交，再推送同名标签（如 `git tag v0.3.0 && git push origin v0.3.0`），或者合并到 main 后在 GitHub 上打开 **Actions → Package → Run workflow**，分支选 main、勾上 **release** 再运行。工作流会建一个附带两个安装包和 `SHA256SUMS.txt` 的**草稿** Release，检查无误后在 GitHub 上点发布（用第二种方法时，点发布才会建出标签）。发布说明来自 `packaging/RELEASE_NOTES.md`（英文）；发布前改了它，用第二种方法再运行一次，草稿的说明会跟着更新，安装包不会变。在中国大陆下载 GitHub 可能很慢，可以把同样的文件另外放到国内网盘或对象存储，并附上 `SHA256SUMS.txt` 让大家对照。
+GitHub Actions 的 **Package** 工作流在每次推送时自动打两个安装包，并完整试一遍（安装、启动、建身份、存一步、导出、用导出的 verify.py 检查、卸载后数据还在）。发布新版本：把 `pyproject.toml` 里的 `version` 改成新版本号并提交，再推送同名标签（如 `git tag v0.3.0 && git push origin v0.3.0`），或者合并到 main 后在 GitHub 上打开 **Actions → Package → Run workflow**，分支选 main、勾上 **release** 再运行。工作流会建一个附带两个安装包和 `SHA256SUMS.txt` 的**草稿** Release，检查无误后在 GitHub 上点发布（用第二种方法时，点发布才会建出标签）。发布说明来自 `packaging/RELEASE_NOTES.md`（英文）。已经有草稿时再运行不会改动它；想重做草稿，先在 GitHub 上删掉它再运行。在中国大陆下载 GitHub 可能很慢，可以把同样的文件另外放到国内网盘或对象存储，并附上 `SHA256SUMS.txt` 让大家对照。
 
 **以后要签名的话需要什么：**
 
