@@ -1,0 +1,37 @@
+name: Live services
+
+# The tests marked "network" against the real FreeTSA, DigiCert, OpenTimestamps calendars and
+# block explorers (DECISIONS D-045), from GitHub's network. This shows the code works with each
+# real service; it does not show that every service can be reached from everywhere (use
+# Settings → Check stamp services for that). Real responses are kept as an artifact and checked
+# by the offline fixture test.
+on:
+  push:
+    branches: [main, "claude/**"]
+  schedule:
+    - cron: "17 3 * * 1"  # weekly: notices when a service changes its answers
+  workflow_dispatch:
+
+jobs:
+  network:
+    runs-on: ubuntu-latest
+    env:
+      RPROV_NETWORK_TESTS: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.12"
+      - run: uv sync --extra ots --extra desktop --locked
+      - name: Tests against the real services
+        run: uv run pytest -m network -o addopts="" -v
+      - name: Save real time-stamping responses
+        run: uv run python tools/capture_tsa_fixture.py
+      - name: The saved responses verify offline
+        run: uv run pytest tests/unit/test_tsa_der_order.py -o addopts="" -v
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: tsa-fixtures
+          path: tests/fixtures/tsa/
+          if-no-files-found: ignore
