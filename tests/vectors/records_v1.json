@@ -1,0 +1,159 @@
+{
+  "schema": "rprov.record/1",
+  "description": "Frozen vectors: record IDs and signatures must never change.",
+  "ed25519_seed_hex": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+  "installation": "6f2c1e2a-3b4d-4e5f-8a9b-0c1d2e3f4a5b",
+  "body_text_crlf": "# 数值实验 1\r\n\r\nResult: converged 🎉\r\n",
+  "body_sha256": "96d964ba2856307f7b2ea41edfd8f0ff83e24a24a5d06b542628a1e089a300e9",
+  "records": [
+    {
+      "kind": "genesis",
+      "seq": 0,
+      "payload": {
+        "nonce": "0000000000000000000000000000000000000000000000000000000000000000",
+        "local_time": "2026-10-12T14:00:00Z",
+        "ext": {},
+        "author_label": "Example Author",
+        "public_key": "03a107bff3ce10be1d70dd18e74bc09967e4d6309ba50d5f1ddc8664125531b8"
+      },
+      "manifest_jcs": "{\"installation\":\"6f2c1e2a-3b4d-4e5f-8a9b-0c1d2e3f4a5b\",\"kind\":\"genesis\",\"payload_sha256\":\"c74ea654152455c6d4a1db63f006ce17e2bb039f764f763fe6a89b9f91d69667\",\"prev\":null,\"schema\":\"rprov.record/1\",\"seq\":0}",
+      "payload_jcs": "{\"author_label\":\"Example Author\",\"ext\":{},\"local_time\":\"2026-10-12T14:00:00Z\",\"nonce\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"public_key\":\"03a107bff3ce10be1d70dd18e74bc09967e4d6309ba50d5f1ddc8664125531b8\"}",
+      "record_id": "90608e019624fd3da0f4e73d1ffbcc58c50fb8026499717e2788d744331fa65c",
+      "signature": "b501ed2e9520e4bec2061bcd58f73a52ab23484ac30a409e64ce17eac164457006c06771e62706d33170a06b825857cccf75fa3e654c9c41e37fd3cf87b69307"
+    },
+    {
+      "kind": "entry",
+      "seq": 1,
+      "payload": {
+        "nonce": "0101010101010101010101010101010101010101010101010101010101010101",
+        "local_time": "2026-10-12T14:01:00Z",
+        "ext": {},
+        "project": {
+          "id": "1d3e5f70-8a9b-4c1d-9e2f-3a4b5c6d7e8f",
+          "title": "FSF"
+        },
+        "node_type": "idea",
+        "title": "第一版公式",
+        "content": null,
+        "external": null,
+        "relations": [],
+        "author_statement": "灵感来自去年的笔记",
+        "milestone": false,
+        "import": null
+      },
+      "manifest_jcs": "{\"installation\":\"6f2c1e2a-3b4d-4e5f-8a9b-0c1d2e3f4a5b\",\"kind\":\"entry\",\"payload_sha256\":\"f0d2b6d951b8946673b21a43186a1588a4c5758908fb756d678065c8fb12089c\",\"prev\":\"90608e019624fd3da0f4e73d1ffbcc58c50fb8026499717e2788d744331fa65c\",\"schema\":\"rprov.record/1\",\"seq\":1}",
+      "payload_jcs": "{\"author_statement\":\"灵感来自去年的笔记\",\"content\":null,\"ext\":{},\"external\":null,\"import\":null,\"local_time\":\"2026-10-12T14:01:00Z\",\"milestone\":false,\"node_type\":\"idea\",\"nonce\":\"0101010101010101010101010101010101010101010101010101010101010101\",\"project\":{\"id\":\"1d3e5f70-8a9b-4c1d-9e2f-3a4b5c6d7e8f\",\"title\":\"FSF\"},\"relations\":[],\"title\":\"第一版公式\"}",
+      "record_id": "fff4208100f4cf32f312c5d424b3a80095521b036c02f6bbea20dbda40224c71",
+      "signature": "b7a0beb1e8a5247084b882871110130d6114ecab978795c20cd4a033e7485942fbfc301acf745f66828ab6f130ec1690538114d92984754c9c5f6940a9171a0a"
+    },
+    {
+      "kind": "entry",
+      "seq": 2,
+      "payload": {
+        "nonce": "0202020202020202020202020202020202020202020202020202020202020202",
+        "local_time": "2026-10-12T14:03:05Z",
+        "ext": {},
+        "project": {
+          "id": "1d3e5f70-8a9b-4c1d-9e2f-3a4b5c6d7e8f",
+          "title": "FSF"
+        },
+        "node_type": "experiment",
+        "title": "数值实验 1",
+        "content": {
+          "body": {
+            "sha256": "96d964ba2856307f7b2ea41edfd8f0ff83e24a24a5d06b542628a1e089a300e9",
+            "size": 41,
+            "media_type": "text/markdown"
+          },
+          "files": [
+            {
+              "sha256": "2236b4989592e6ce72adf96ba645c7a1b486744aca25334c60217c4d1da992d7",
+              "size": 8,
+              "media_type": "text/csv",
+              "name": "run1.csv"
+            }
+          ]
+        },
+        "external": null,
+        "relations": [
+          {
+            "to": "fff4208100f4cf32f312c5d424b3a80095521b036c02f6bbea20dbda40224c71",
+            "rel": "uses"
+          }
+        ],
+        "author_statement": null,
+        "milestone": true,
+        "import": null
+      },
+      "manifest_jcs": "{\"installation\":\"6f2c1e2a-3b4d-4e5f-8a9b-0c1d2e3f4a5b\",\"kind\":\"entry\",\"payload_sha256\":\"a1b44b2bef06b3dc0007615357c24051ae42f9577280f3883353a06399196d06\",\"prev\":\"fff4208100f4cf32f312c5d424b3a80095521b036c02f6bbea20dbda40224c71\",\"schema\":\"rprov.record/1\",\"seq\":2}",
+      "payload_jcs": "{\"author_statement\":null,\"content\":{\"body\":{\"media_type\":\"text/markdown\",\"sha256\":\"96d964ba2856307f7b2ea41edfd8f0ff83e24a24a5d06b542628a1e089a300e9\",\"size\":41},\"files\":[{\"media_type\":\"text/csv\",\"name\":\"run1.csv\",\"sha256\":\"2236b4989592e6ce72adf96ba645c7a1b486744aca25334c60217c4d1da992d7\",\"size\":8}]},\"ext\":{},\"external\":null,\"import\":null,\"local_time\":\"2026-10-12T14:03:05Z\",\"milestone\":true,\"node_type\":\"experiment\",\"nonce\":\"0202020202020202020202020202020202020202020202020202020202020202\",\"project\":{\"id\":\"1d3e5f70-8a9b-4c1d-9e2f-3a4b5c6d7e8f\",\"title\":\"FSF\"},\"relations\":[{\"rel\":\"uses\",\"to\":\"fff4208100f4cf32f312c5d424b3a80095521b036c02f6bbea20dbda40224c71\"}],\"title\":\"数值实验 1\"}",
+      "record_id": "553a9b402d9714310fdb59b06aa7876604b015535b24408bbc548270452429ee",
+      "signature": "3aa370fb86600cebfede3a52153eb11fe26b06dec07720112d439161ab7446f59e081bfca2cab924bd5ab5cbc23dea76421c16da472a060b2f38d5d7c2d32b03"
+    },
+    {
+      "kind": "link",
+      "seq": 3,
+      "payload": {
+        "nonce": "0303030303030303030303030303030303030303030303030303030303030303",
+        "local_time": "2026-10-13T09:00:00Z",
+        "ext": {},
+        "from": "553a9b402d9714310fdb59b06aa7876604b015535b24408bbc548270452429ee",
+        "to": "fff4208100f4cf32f312c5d424b3a80095521b036c02f6bbea20dbda40224c71",
+        "rel": "derived_from",
+        "op": "add",
+        "statement": "后来才意识到"
+      },
+      "manifest_jcs": "{\"installation\":\"6f2c1e2a-3b4d-4e5f-8a9b-0c1d2e3f4a5b\",\"kind\":\"link\",\"payload_sha256\":\"7f326d4c38b74690c5b069c827771cc595ed7652149b3559fe2c2953957d639f\",\"prev\":\"553a9b402d9714310fdb59b06aa7876604b015535b24408bbc548270452429ee\",\"schema\":\"rprov.record/1\",\"seq\":3}",
+      "payload_jcs": "{\"ext\":{},\"from\":\"553a9b402d9714310fdb59b06aa7876604b015535b24408bbc548270452429ee\",\"local_time\":\"2026-10-13T09:00:00Z\",\"nonce\":\"0303030303030303030303030303030303030303030303030303030303030303\",\"op\":\"add\",\"rel\":\"derived_from\",\"statement\":\"后来才意识到\",\"to\":\"fff4208100f4cf32f312c5d424b3a80095521b036c02f6bbea20dbda40224c71\"}",
+      "record_id": "cb8188c4c31fea8b91429db0b0020a7cad7184c05e1b89b4feb75dc1d59bec64",
+      "signature": "dcc3922049561624ebef4521acd03723f378a8be2d055244f5f62c421df20946e257e0caa2933762666f257bedcbf5d940d363d9b6269d6dd4de8c82e0fdf507"
+    },
+    {
+      "kind": "milestone",
+      "seq": 4,
+      "payload": {
+        "nonce": "0404040404040404040404040404040404040404040404040404040404040404",
+        "local_time": "2026-10-13T09:01:00Z",
+        "ext": {},
+        "target": "553a9b402d9714310fdb59b06aa7876604b015535b24408bbc548270452429ee",
+        "op": "unset"
+      },
+      "manifest_jcs": "{\"installation\":\"6f2c1e2a-3b4d-4e5f-8a9b-0c1d2e3f4a5b\",\"kind\":\"milestone\",\"payload_sha256\":\"0cb476152e6cbea278582fcddb2a5a07a213ee66afbf8547fbc8ea92fefc8386\",\"prev\":\"cb8188c4c31fea8b91429db0b0020a7cad7184c05e1b89b4feb75dc1d59bec64\",\"schema\":\"rprov.record/1\",\"seq\":4}",
+      "payload_jcs": "{\"ext\":{},\"local_time\":\"2026-10-13T09:01:00Z\",\"nonce\":\"0404040404040404040404040404040404040404040404040404040404040404\",\"op\":\"unset\",\"target\":\"553a9b402d9714310fdb59b06aa7876604b015535b24408bbc548270452429ee\"}",
+      "record_id": "2e02c3c5876e18bde33b83009172cf307eff8168e43100ba5a49d6b867130c53",
+      "signature": "321b627c32b0dad0a318445e8de9c00e9dbd6c50c8ce6c16c800b6a23aa4b713cf718b12025198e6a9dda1b18d5fa4e2cc6a2ae94c0e93d7e3da54301f8fbf07"
+    },
+    {
+      "kind": "statement",
+      "seq": 5,
+      "payload": {
+        "nonce": "0505050505050505050505050505050505050505050505050505050505050505",
+        "local_time": "2026-10-13T09:02:00Z",
+        "ext": {},
+        "target": "553a9b402d9714310fdb59b06aa7876604b015535b24408bbc548270452429ee",
+        "source": "author",
+        "text": "补充：参数取自文献",
+        "corrects": null
+      },
+      "manifest_jcs": "{\"installation\":\"6f2c1e2a-3b4d-4e5f-8a9b-0c1d2e3f4a5b\",\"kind\":\"statement\",\"payload_sha256\":\"700a6b6295c7caa2e83585548ab71ca90ae2b507dff07c4489e6993f574f8203\",\"prev\":\"2e02c3c5876e18bde33b83009172cf307eff8168e43100ba5a49d6b867130c53\",\"schema\":\"rprov.record/1\",\"seq\":5}",
+      "payload_jcs": "{\"corrects\":null,\"ext\":{},\"local_time\":\"2026-10-13T09:02:00Z\",\"nonce\":\"0505050505050505050505050505050505050505050505050505050505050505\",\"source\":\"author\",\"target\":\"553a9b402d9714310fdb59b06aa7876604b015535b24408bbc548270452429ee\",\"text\":\"补充：参数取自文献\"}",
+      "record_id": "1d1134f4aa718a394b9efbfd13d034c3f293cdf5ad1a06179331d718f5d680a4",
+      "signature": "81d59105cbf675eb53d5857df9f0ca149c1ca8ec5304990fe5e5737935459224685ef773d7ea52d39dae419310062cc57c3cf2644261478ade92873bcbae8405"
+    },
+    {
+      "kind": "retraction",
+      "seq": 6,
+      "payload": {
+        "nonce": "0606060606060606060606060606060606060606060606060606060606060606",
+        "local_time": "2026-10-13T09:03:00Z",
+        "ext": {},
+        "target": "553a9b402d9714310fdb59b06aa7876604b015535b24408bbc548270452429ee",
+        "reason": "实验设置有误"
+      },
+      "manifest_jcs": "{\"installation\":\"6f2c1e2a-3b4d-4e5f-8a9b-0c1d2e3f4a5b\",\"kind\":\"retraction\",\"payload_sha256\":\"6ac6da1a539f16a94b11aaf4a7361d4c1e44ab2c64108a93729a04e6557797fa\",\"prev\":\"1d1134f4aa718a394b9efbfd13d034c3f293cdf5ad1a06179331d718f5d680a4\",\"schema\":\"rprov.record/1\",\"seq\":6}",
+      "payload_jcs": "{\"ext\":{},\"local_time\":\"2026-10-13T09:03:00Z\",\"nonce\":\"0606060606060606060606060606060606060606060606060606060606060606\",\"reason\":\"实验设置有误\",\"target\":\"553a9b402d9714310fdb59b06aa7876604b015535b24408bbc548270452429ee\"}",
+      "record_id": "cb87ff10807683d290fd6506ebf44bc450336128097ff19e8a58c31beeffc512",
+      "signature": "cccf7b93bf6fcf0a33fd42030a535bd56942f58c6371ceaf470c08d82f3b4365c1bd1134634fae53accb4ba800c2281bd63bd3556b6020e9d2cbd6d548c91e0e"
+    }
+  ]
+}
