@@ -15,7 +15,7 @@ ROOT = Path(__file__).resolve().parent.parent.parent
 
 
 def _scanned_files() -> list[Path]:
-    files = [ROOT / "README.md"]
+    files = [ROOT / "README.md", ROOT / "packaging" / "RELEASE_NOTES.md"]
     files += sorted((ROOT / "web" / "src").rglob("*.ts*"))
     files += sorted((ROOT / "app" / "report").rglob("*"))
     files += [ROOT / "web" / "index.html", ROOT / "app" / "services" / "views.py",

@@ -1,4 +1,4 @@
-# 研究演化证据工具 · Research provenance (v0.1)
+# 研究演化证据工具 · Research provenance (v0.3)
 
 装在你自己电脑上的研究记录工具。它把研究过程中的想法、笔记、实验、代码、数据、图和发表记成**互相连接的记录**，给每条记录留下**签名**和**时间证明**，让「这个研究是怎么一步步变成现在这样的」看得见、查得到，别人也能自己检查。
 
@@ -28,7 +28,7 @@
 | --- | --- |
 | **Verified record**（可验证记录） | 有签名和时间证明，任何人都能自己检查。只说明记录当时已存在、之后没改过，不说明里面的话是真的。 |
 | **Author statement**（作者陈述） | 你自己说的：「为什么」、关系、导入旧材料时填的更早日期、本机时钟时间。系统只能证明「你在那天这样说过」。 |
-| AI 推断 | 第二版才有，v0.1 不产生。 |
+| AI 推断 | 可选：用你电脑上的模型重新讲述「研究经过」时才有，单独标出，不会存成记录，也不进证据包（见下面「用本机 AI 重新讲述」）。 |
 
 两种时间证明也永远分开显示，不会合并成一个笼统的「已验证时间」：
 
@@ -242,7 +242,7 @@ bash packaging/build_macos.sh          # 在 Mac 上：dist/Research History.app
 #   ./packaging/build_windows.ps1; ./packaging/smoke_windows.ps1
 ```
 
-GitHub Actions 的 **Package** 工作流在每次推送时自动打两个安装包，并完整试一遍（安装、启动、建身份、存一步、导出、用导出的 verify.py 检查、卸载后数据还在）。发布新版本：把 `pyproject.toml` 里的 `version` 改成新版本号并提交，再推送同名标签（如 `git tag v0.2.0 && git push origin v0.2.0`），工作流会建一个附带两个安装包和 `SHA256SUMS.txt` 的**草稿** Release，检查无误后在 GitHub 上点发布。在中国大陆下载 GitHub 可能很慢，可以把同样的文件另外放到国内网盘或对象存储，并附上 `SHA256SUMS.txt` 让大家对照。
+GitHub Actions 的 **Package** 工作流在每次推送时自动打两个安装包，并完整试一遍（安装、启动、建身份、存一步、导出、用导出的 verify.py 检查、卸载后数据还在）。发布新版本：把 `pyproject.toml` 里的 `version` 改成新版本号并提交，再推送同名标签（如 `git tag v0.3.0 && git push origin v0.3.0`），工作流会建一个附带两个安装包和 `SHA256SUMS.txt` 的**草稿** Release，检查无误后在 GitHub 上点发布。在中国大陆下载 GitHub 可能很慢，可以把同样的文件另外放到国内网盘或对象存储，并附上 `SHA256SUMS.txt` 让大家对照。
 
 **以后要签名的话需要什么：**
 
@@ -257,5 +257,5 @@ GitHub Actions 的 **Package** 工作流在每次推送时自动打两个安装�
 - **P0 已完成**：只追加的记录、签名、重放；第三方签名时间证明（RFC 3161）；导出证据包、`report.html`（含静态演化图）、`verify.py`、篡改测试；记录表单和演化图。
 - **P1 已完成**：比特币时间锚定（OpenTimestamps）和区块浏览器核对；「只看里程碑」视图；时间线视图；详情侧栏的完整分区（Verified record / Author statement / Later additions / Changes，以及在侧栏里追加关系、里程碑、说明、撤回）；备份与恢复；FSF 样例数据。
 - **第 4 轮（安装包）**：macOS（Apple 芯片）和 Windows 10/11 安装包，菜单栏/通知区域图标，只开一份；Windows 的备份位置建议和全套测试（含浏览器测试）在 GitHub Actions 上跑；日期章增加 DigiCert 作为备用；Settings → Check stamp services 检查各个时间证明服务能不能连上（见 DECISIONS D-043 – D-045）。
-- **第 5 轮（进行中）**：中英文切换——界面、程序自己写的文字和错误提示、导出的报告和 VERIFY.md、菜单栏 / 托盘菜单、Windows 安装程序（见 DECISIONS D-046）；快速记一笔、从本机 git 仓库自动记录提交（D-047）；不用 AI 的「研究经过」（D-048）；盯住文件夹和收件箱（D-049）；可选的本机 AI 重新讲述（D-050）。
+- **第 5 轮（v0.3.0）**：中英文切换——界面、程序自己写的文字和错误提示、导出的报告和 VERIFY.md、菜单栏 / 托盘菜单、Windows 安装程序（见 DECISIONS D-046）；快速记一笔、从本机 git 仓库自动记录提交（D-047）；不用 AI 的「研究经过」（D-048）；盯住文件夹和收件箱（D-049）；可选的本机 AI 重新讲述（D-050）。
 - **需要在联网的 Mac 上完成**：`make freetsa-certs`、`make test-network`（AC-09：真实 FreeTSA 的 `.tsr` 用 `openssl ts -verify` 验证；真实 DigiCert 时间戳；真实 OpenTimestamps 日历和区块浏览器），以及 PRD 第 16 节的 4 项人工检查。

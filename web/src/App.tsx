@@ -65,14 +65,21 @@ export function App() {
 
   // Set when reload() itself picks the project, so that this choice does not load everything again.
   const pickedByReload = useRef(false);
+  // Only the newest load may change the page: an older one that answers late (say, for the practice
+  // project a reset has just replaced) is dropped instead of emptying the map.
+  const loads = useRef(0);
 
   const reload = useCallback(async () => {
+    const load = ++loads.current;
+    const stale = () => load !== loads.current;
     try {
       const s = await api.status();
+      if (stale()) return;
       setDevice(s.device, s.keychain_name);
       setStatus(s);
       if (!s.initialized) return;
       const ps = await api.projects();
+      if (stale()) return;
       setProjects(ps);
       const pid = projectId || ps[0]?.id || "";
       if (pid !== projectId) {
@@ -80,11 +87,15 @@ export function App() {
         setProjectId(pid);
       }
       // The map first; the list's data is asked for after it, so it never holds the map up.
-      setGraph(await api.graph(pid || undefined));
+      const g = await api.graph(pid || undefined);
+      if (stale()) return;
+      setGraph(g);
       setVersion((v) => v + 1);
-      setTimeline(await api.timeline(pid || undefined));
+      const rows = await api.timeline(pid || undefined);
+      if (stale()) return;
+      setTimeline(rows);
     } catch (e) {
-      setNotice({ text: (e as Error).message, kind: "error" });
+      if (!stale()) setNotice({ text: (e as Error).message, kind: "error" });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projectId, space]);
