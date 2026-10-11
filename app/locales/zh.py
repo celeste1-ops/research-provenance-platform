@@ -401,6 +401,8 @@ MESSAGES: dict[str, str] = {
     "this entry is already retracted": "这一步已经撤回了",
     "this installation already has an identity": "这个安装已经有身份了",
     "the keychain already holds a different signing key for this installation": "钥匙保管处里已经有这个安装的另一把签名钥匙",
+    "the system keychain refused access: click Try again at the top of the page and choose Always Allow":
+        "系统钥匙串拒绝了访问：请点页面顶部的「重试」，在弹出的窗口里选「始终允许」",
     "body text is larger than 50 MB": "正文超过 50 MB",
     "commit must be a hexadecimal commit hash": "提交必须是十六进制的提交哈希",
     # a local AI model (D-050)

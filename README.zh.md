@@ -51,7 +51,23 @@
 | macOS 11 或更新，Apple 芯片（M1/M2/M3/M4） | `ResearchHistory-<版本>-macos-arm64.dmg` |
 | Windows 10（1809 或更新）/ Windows 11，64 位 | `ResearchHistory-<版本>-windows-x64-setup.exe` |
 
-安装包在本仓库的 **Releases** 页面（打版本标签时自动生成草稿，发布后别人才能下载），每次推送代码后也会在 **Actions → Package → Artifacts** 里生成一份（要登录 GitHub，保留 90 天）。Intel 芯片的 Mac 暂时没有安装包，可以先用下面「从源代码运行」的方法。
+安装包在本仓库的 **Releases** 页面：在仓库首页右边那一栏的 **Releases** 下面，点最新的版本（标着 **Latest**），或者直接打开 [github.com/celeste1-ops/research-provenance-platform/releases/latest](https://github.com/celeste1-ops/research-provenance-platform/releases/latest)；文件在那一页最下面的 **Assets** 里。每次推送代码后也会在 **Actions → Package → Artifacts** 里生成一份（要登录 GitHub，保留 90 天）。Intel 芯片的 Mac 暂时没有安装包（左上角苹果菜单 → 关于本机，看「芯片」那一行），可以先用下面「从源代码运行」的方法。
+
+**Mac 上一步一步装：**
+
+1. 点 `ResearchHistory-<版本>-macos-arm64.dmg`，浏览器会把它存进「下载」文件夹（点浏览器右上角的下载箭头，或者打开访达 → 下载）。
+2. 双击这个 `.dmg` 文件，会打开一个窗口，里面并排放着 **Research History** 和 **Applications**（应用程序）文件夹。
+3. 把 **Research History** 拖到 **Applications** 上。升级时选「替换」。之后可以关掉窗口，在访达左边栏推出「Research History」，删掉 `.dmg`。
+4. 打开「应用程序」（访达 → 应用程序，或者启动台），双击 **Research History**。第一次打开系统会拦一下，按下一节放行。
+5. 浏览器会打开程序的页面，屏幕右上角的菜单栏里会出现一个蓝色圆形图标。这个浏览器页面**就是**程序本身，没有别的窗口。
+
+**Windows 上一步一步装：**
+
+1. 点 `ResearchHistory-<版本>-windows-x64-setup.exe`，它会存进「下载」文件夹。
+2. 双击它（Windows 拦的话看下一节），然后一路点「下一步 → 安装 → 完成」。
+3. 最后一步默认勾着「运行 Research History」，浏览器会打开程序的页面；以后从开始菜单打开。它的图标在屏幕右下角的通知区域（有时藏在 **^** 里）。
+
+页面右上角的 **中文 / English** 按钮可以把整个程序在中文和英文之间切换。
 
 **用起来：** 双击打开后，程序在后台启动，并自动在浏览器里打开 http://127.0.0.1:8765 （8765 被占用时换下一个端口）。Mac 的菜单栏、Windows 右下角的通知区域里会出现一个蓝色圆形图标：点它可以重新打开页面，或者 **Quit** 退出。关掉浏览器窗口不会退出程序；要再打开页面，点这个图标 → **Open Research History**（Windows 上再双击一次程序也行）。程序不会同时开两份（安装版和 `make run` 也不会同时用同一个数据文件夹）。日志在数据文件夹的 `logs/app.log`。
 
@@ -65,7 +81,7 @@
 
 **macOS 15（Sequoia）及更新：** 右键打开这一招已经没有用了。先双击一次（会提示无法打开，点「完成」），然后打开 **系统设置 → 隐私与安全性**，往下拉到「安全性」，在「已阻止使用 Research History」旁边点 **仍要打开**，在弹出的对话框里再点 **仍要打开**，输入登录密码。
 
-Mac 上第一次存签名钥匙时会问能否使用钥匙串，点 **始终允许**。因为没有签名，**每次升级后**系统还会再问一次，同样点「始终允许」——这是正常的，钥匙还在钥匙串里。
+**装好或升级后，钥匙串会问 1 到 2 次。** 新版本第一次运行时（或者在安装版和 `make run` 之间换着用时），macOS 会问能否让 Research History 使用它存在钥匙串里的东西：先是备份密码，再是签名钥匙。每次都点 **始终允许**，要密码就输入电脑的登录密码。因为程序还没有开发者签名，**每次升级后**都会再问；这是正常的，什么都没丢——钥匙和密码都还在钥匙串里。如果点了 **拒绝**（或者只点了 **允许**），程序就不再追问：页面顶部会显示「钥匙串拒绝了访问」，保存步骤和自动备份先等着，你准备好了在那里点 **重试**。
 
 **Windows：** 双击安装包，如果出现蓝色的「Windows 已保护你的电脑」（SmartScreen），点 **更多信息 → 仍要运行**。用 Edge 下载时如果提示「通常不会下载此文件」，点「…」→ **保留** → **仍然保留**。安装不需要管理员权限，装在 `%LOCALAPPDATA%\Programs\Research History`，开始菜单里会有 Research History（桌面图标可选）。新装的 Windows 11 如果开着**智能应用控制（Smart App Control）**，可能会直接阻止没有签名的程序且没有「仍要运行」按钮；这时只能在 Windows 安全中心里把它关掉（关掉后可能无法再打开），或者等以后有签名的版本。签名钥匙存在 **Windows 凭据管理器**里。
 
@@ -259,5 +275,6 @@ GitHub Actions 的 **Package** 工作流在每次推送时自动打两个安装�
 - **P0 已完成**：只追加的记录、签名、重放；第三方签名时间证明（RFC 3161）；导出证据包、`report.html`（含静态演化图）、`verify.py`、篡改测试；记录表单和演化图。
 - **P1 已完成**：比特币时间锚定（OpenTimestamps）和区块浏览器核对；「只看里程碑」视图；时间线视图；详情侧栏的完整分区（Verified record / Author statement / Later additions / Changes，以及在侧栏里追加关系、里程碑、说明、撤回）；备份与恢复；FSF 样例数据。
 - **第 4 轮（安装包）**：macOS（Apple 芯片）和 Windows 10/11 安装包，菜单栏/通知区域图标，只开一份；Windows 的备份位置建议和全套测试（含浏览器测试）在 GitHub Actions 上跑；日期章增加 DigiCert 作为备用；Settings → Check stamp services 检查各个时间证明服务能不能连上（见 DECISIONS D-043 – D-045）。
+- **v0.3.1**：升级后钥匙串只问一次，不再每隔几秒就弹窗；被拒绝后不会自己重试，等你点「重试」（DECISIONS D-051）。
 - **第 5 轮（v0.3.0）**：中英文切换——界面、程序自己写的文字和错误提示、导出的报告和 VERIFY.md、菜单栏 / 托盘菜单、Windows 安装程序（见 DECISIONS D-046）；快速记一笔、从本机 git 仓库自动记录提交（D-047）；不用 AI 的「研究经过」（D-048）；盯住文件夹和收件箱（D-049）；可选的本机 AI 重新讲述（D-050）。
 - **需要在联网的 Mac 上完成**：`make freetsa-certs`、`make test-network`（AC-09：真实 FreeTSA 的 `.tsr` 用 `openssl ts -verify` 验证；真实 DigiCert 时间戳；真实 OpenTimestamps 日历和区块浏览器），以及 PRD 第 16 节的 4 项人工检查。

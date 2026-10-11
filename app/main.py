@@ -19,6 +19,7 @@ from app.config import Settings
 from app.i18n import set_language, tr_message
 from app.instance import InstanceLock
 from app.services.context import AppContext
+from app.services.keystore import KeychainDenied
 from app.services.spaces import Spaces
 
 log = logging.getLogger("rprov")
@@ -77,6 +78,11 @@ def create_app(ctx: AppContext, *, start_jobs: bool = False) -> FastAPI:
         # Error messages are written in English where they are raised; translated on the way out.
         detail = tr_message(exc.detail) if isinstance(exc.detail, str) else exc.detail
         return JSONResponse({"detail": detail}, status_code=exc.status_code, headers=getattr(exc, "headers", None))
+
+    @app.exception_handler(KeychainDenied)
+    async def keychain_denied(request: Request, exc: KeychainDenied):
+        # Not an internal error: the person said no to the keychain. The page offers Try again.
+        return JSONResponse({"detail": tr_message(str(exc)), "keychain_denied": True}, status_code=403)
 
     @app.exception_handler(Exception)
     async def log_unexpected(request: Request, exc: Exception):

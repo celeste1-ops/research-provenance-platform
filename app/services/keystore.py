@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import logging
 import os
+import threading
 from abc import ABC, abstractmethod
 from pathlib import Path
 
@@ -26,7 +27,22 @@ class KeyStoreError(RuntimeError):
     pass
 
 
+class KeychainDenied(KeyStoreError):
+    """The system keychain refused access: the person clicked Deny, or it is locked."""
+
+
+DENIED = "the system keychain refused access: click Try again at the top of the page and choose Always Allow"
+
+
 class KeyStore(ABC):
+    @property
+    def denied(self) -> bool:
+        """True after the keychain refused access, until the person asks to try again."""
+        return False
+
+    def retry(self) -> None:  # noqa: B027 - nothing to reset where nothing can refuse
+        """The person asks to try the keychain again (it may ask them once more)."""
+
     @abstractmethod
     def load(self, installation: str) -> Ed25519PrivateKey | None: ...
 
@@ -46,6 +62,13 @@ class KeyStore(ABC):
 
 
 class KeyringKeyStore(KeyStore):
+    # One gate for every keychain access of this app (real record and practice alike): once the
+    # keychain refuses, nothing touches it again — so macOS does not ask again and again — until
+    # the person clicks Try again. An app that is not signed by a developer is asked about each
+    # item it did not create itself, after every upgrade, unless the person chose Always Allow.
+    _denied = False
+    _gate = threading.Lock()
+
     def __init__(self) -> None:
         import keyring
         from keyring.backends import fail
@@ -57,26 +80,47 @@ class KeyringKeyStore(KeyStore):
             )
         self._keyring = keyring
 
+    @property
+    def denied(self) -> bool:
+        return KeyringKeyStore._denied
+
+    def retry(self) -> None:
+        with KeyringKeyStore._gate:
+            KeyringKeyStore._denied = False
+
+    def _call(self, fn, *args):
+        from keyring.errors import KeyringLocked
+
+        if KeyringKeyStore._denied:
+            raise KeychainDenied(DENIED)
+        try:
+            return fn(*args)
+        except KeyringLocked as exc:
+            with KeyringKeyStore._gate:
+                KeyringKeyStore._denied = True
+            log.warning("the keychain refused access (%s); not asking again until the person clicks Try again", exc)
+            raise KeychainDenied(DENIED) from None
+
     def load(self, installation: str) -> Ed25519PrivateKey | None:
-        value = self._keyring.get_password(KEYRING_SERVICE, installation)
+        value = self._call(self._keyring.get_password, KEYRING_SERVICE, installation)
         return private_key_from_raw(bytes.fromhex(value)) if value else None
 
     def save(self, installation: str, key: Ed25519PrivateKey) -> None:
-        self._keyring.set_password(KEYRING_SERVICE, installation, private_key_raw(key).hex())
+        self._call(self._keyring.set_password, KEYRING_SERVICE, installation, private_key_raw(key).hex())
 
     def delete(self, installation: str) -> None:
         from keyring.errors import PasswordDeleteError
 
         try:
-            self._keyring.delete_password(KEYRING_SERVICE, installation)
+            self._call(self._keyring.delete_password, KEYRING_SERVICE, installation)
         except PasswordDeleteError:
             pass
 
     def load_secret(self, name: str) -> str | None:
-        return self._keyring.get_password(KEYRING_SECRET_SERVICE, name)
+        return self._call(self._keyring.get_password, KEYRING_SECRET_SERVICE, name)
 
     def save_secret(self, name: str, value: str) -> None:
-        self._keyring.set_password(KEYRING_SECRET_SERVICE, name, value)
+        self._call(self._keyring.set_password, KEYRING_SECRET_SERVICE, name, value)
 
 
 class MemoryKeyStore(KeyStore):

@@ -1,8 +1,12 @@
-## What's in this version (v0.3.0)
+## What's in this version (v0.3.1)
 
-The first public installers of Research History. They contain everything built so far.
+**Fixed in v0.3.1**
+- After an upgrade, the keychain question no longer comes back every few seconds. The app reads the backup password once, and the signing key once, so macOS asks at most twice — click **Always Allow** each time.
+- If you click Deny, the app stops asking: the top of the page says the keychain refused access, saving steps and backups wait, and **Try again** asks once more when you're ready. The page no longer shows an internal error.
 
-**New in this version**
+**Also in this version**, from v0.3.0 (the first public installers):
+
+**New in v0.3.0**
 - **Chinese / English.** One switch changes the whole app: the interface and its messages, the exported report and VERIFY.md, the menu bar / tray menu, and the Windows installer.
 - **Quick note.** A button in the top bar and an item in the tray menu: type a line and it is saved as a note, with its date stamp like any other step.
 - **Record from git.** Pick a repository and branch on your computer, and every new commit becomes a "code" step. Only the local repository is read; nothing is fetched or pushed.
@@ -15,6 +19,14 @@ The first public installers of Research History. They contain everything built s
 - The map, a key-steps-only view, a timeline, and a detail panel that keeps verified records, author statements and later additions apart.
 - Evidence bundles with `report.html` and a single-file `verify.py`, so anyone can check them without installing this app.
 - Automatic encrypted backup with a recovery code, a practice space, and Settings → Check stamp services.
+
+## How to install
+
+**Mac:** click the `.dmg` file below; it goes to your Downloads folder. Double-click it: a window opens with **Research History** and **Applications**. Drag Research History onto Applications (choose Replace when upgrading). Then open Applications and double-click Research History. Your browser opens the app's page, and a blue round icon appears in the menu bar.
+
+**Windows:** click the `.exe` file below; it goes to your Downloads folder. Double-click it and click through the installer (Next → Install → Finish). Your browser opens the app's page; next time, open it from the Start menu.
+
+The **中文 / English** button at the top right of the page switches the app between Chinese and English.
 
 ## Downloads
 
@@ -33,7 +45,7 @@ macOS and Windows warn about apps from unidentified developers. Make sure you do
 
 - **macOS 14 or earlier:** drag Research History into Applications, Control-click it (or right-click) → **Open**, then **Open** again.
 - **macOS 15 or later:** double-click it once and close the warning, then go to **System Settings → Privacy & Security**, scroll to Security and click **Open Anyway** next to Research History; confirm with **Open Anyway** and your password.
-- On a Mac, the first time the app stores its signing key it asks to use the keychain: click **Always Allow**. Because the app is unsigned, it asks again after each upgrade; the key is still there.
+- On a Mac, the first time a new version runs, macOS asks once or twice whether it may use what the app keeps in the keychain (the backup password, the signing key): click **Always Allow** each time and enter your login password. Because the app is unsigned, this comes back after each upgrade; nothing is lost.
 - **Windows:** if "Windows protected your PC" (SmartScreen) appears, click **More info → Run anyway**. On a new Windows 11 with Smart App Control turned on, unsigned apps may be blocked with no way to run them until a signed version is available.
 
 A Chinese guide is in [README.zh.md](https://github.com/celeste1-ops/research-provenance-platform/blob/main/README.zh.md) (中文说明见 README.zh.md).

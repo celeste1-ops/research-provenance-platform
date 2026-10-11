@@ -58,6 +58,8 @@ export class ApiError extends Error {
   }
 }
 
+export const KEYCHAIN_DENIED_EVENT = "rprov-keychain-denied";
+
 async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
   const headers: Record<string, string> = spaceHeaders();
   let payload: BodyInit | undefined;
@@ -74,6 +76,8 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
     try {
       const data = await res.json();
       message = typeof data.detail === "string" ? data.detail : JSON.stringify(data.detail);
+      // The keychain refused access: the page shows its "Try again" banner right away.
+      if (data.keychain_denied) window.dispatchEvent(new Event(KEYCHAIN_DENIED_EVENT));
     } catch {
       /* not JSON */
     }
@@ -144,6 +148,7 @@ export const api = {
     request<ExportPreview>("POST", "/api/export/preview", body),
   backupDownload: (password: string) => downloadRequest("/api/backup", { password }),
   backupStatus: () => request<BackupStatus>("GET", "/api/backup/status"),
+  keychainRetry: () => request<{ keychain_denied: boolean }>("POST", "/api/keychain/retry"),
   backupSuggestions: () => request<BackupSuggestion[]>("GET", "/api/backup/suggestions"),
   backupSettings: (location: string, password: string, create: boolean) =>
     request<BackupStatus>("POST", "/api/backup/settings", { location, password, create }),

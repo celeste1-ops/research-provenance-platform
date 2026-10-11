@@ -650,3 +650,24 @@ verification rules or what leaves the machine for time proofs.
      needed) and it is never put into a bundle; it can be saved as a Markdown draft labelled
      AI inference, without the crossed-out sentences. The address and model chosen are
      remembered in `preferences.json`.
+
+- **D-051 · The keychain is asked once, and a refusal waits for "Try again".** With a new
+  version installed, opening the real record made the keychain question come back without end:
+  the page asks the server for its status every few seconds, and each answer read the backup
+  password from the keychain again. macOS asks about every read by an app that is not signed by a
+  developer of an item it did not create itself (after every upgrade the app counts as new),
+  unless the person chose "Always Allow"; after "Deny" the status even became an internal error.
+  1. *Read once.* The backup password is read the first time it is needed and remembered per
+     keychain entry while the app runs (setting a new one updates it). The status no longer
+     needs the signing key at all: the key fingerprint shown on the recovery sheet comes from
+     the identity's first record. So a new version asks at most twice: the backup password,
+     then the signing key when the first backup or step needs it.
+  2. *A refusal is not retried by itself.* One gate in `KeyringKeyStore`, shared by the real
+     record and practice: after the keychain refuses (`KeyringLocked`), nothing touches the
+     keychain again — so the system does not ask again — until the person clicks **Try again**
+     at the top of the page, which asks for both items right away. Meanwhile the status
+     answers normally with `keychain_denied`; the backup pill says it waits; a backup is
+     skipped without being recorded as a failure; saving a step answers 403 with a message the
+     page shows (not an internal error).
+  3. README and release notes say that a new version asks once or twice and that "Always
+     Allow" is the answer; signing the app (README, "What signing would take") would end it.

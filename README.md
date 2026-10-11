@@ -51,7 +51,23 @@ For people who don't write code: download an installer and double-click. The app
 | macOS 11 or later, Apple silicon (M1/M2/M3/M4) | `ResearchHistory-<version>-macos-arm64.dmg` |
 | Windows 10 (1809 or later) / Windows 11, 64-bit | `ResearchHistory-<version>-windows-x64-setup.exe` |
 
-The installers are on this repository's **Releases** page. Every push also builds a copy under **Actions → Package → Artifacts** (you need to be signed in to GitHub; kept for 90 days). There is no installer for Intel Macs yet; use "Run from source" below.
+The installers are on this repository's **Releases** page: on the repository's front page, look in the right-hand column under **Releases** and click the newest version (marked **Latest**), or go straight to [github.com/celeste1-ops/research-provenance-platform/releases/latest](https://github.com/celeste1-ops/research-provenance-platform/releases/latest); the files are under **Assets** at the bottom of that page. Every push also builds a copy under **Actions → Package → Artifacts** (you need to be signed in to GitHub; kept for 90 days). There is no installer for Intel Macs yet (Apple menu → About This Mac shows the chip); use "Run from source" below.
+
+**On a Mac, step by step:**
+
+1. Click `ResearchHistory-<version>-macos-arm64.dmg`. The browser saves it in your **Downloads** folder (click the download arrow at the top right of the browser, or open Finder → Downloads).
+2. Double-click the `.dmg` file. A window opens with **Research History** and an **Applications** folder side by side.
+3. Drag **Research History** onto **Applications**. When upgrading, choose **Replace**. You can then close the window, eject "Research History" in the Finder sidebar and delete the `.dmg`.
+4. Open **Applications** (Finder → Applications, or Launchpad) and double-click **Research History**. The first time, macOS will warn you: allow it as described in the next section.
+5. Your browser opens the app's page, and a blue round icon appears in the menu bar at the top right. That browser page *is* the app: there is no other window.
+
+**On Windows, step by step:**
+
+1. Click `ResearchHistory-<version>-windows-x64-setup.exe`; it goes to your **Downloads** folder.
+2. Double-click it (if Windows warns you, see the next section), then click through the installer (Next → Install → Finish).
+3. "Launch Research History" is ticked at the end, so your browser opens the app's page; next time, open it from the Start menu. Its icon sits in the notification area at the bottom right (sometimes hidden under the **^**).
+
+The **中文 / English** button at the top right of the page switches the whole app between Chinese and English.
 
 **Using it:** after you open it, the app starts in the background and opens http://127.0.0.1:8765 in your browser (if 8765 is taken, the next free port). A blue round icon appears in the Mac menu bar or the Windows notification area: click it to open the page again, or **Quit**. Closing the browser window does not quit the app; to get the page back, click the icon → **Open Research History** (on Windows, opening the app again works too). The app never runs twice at once (the installed app and `make run` won't share one data folder either). The log is `logs/app.log` in the data folder.
 
@@ -65,7 +81,7 @@ The installers are not signed by Apple or Microsoft yet, so the first time you o
 
 **macOS 15 (Sequoia) or later:** the right-click trick no longer works. Double-click the app once (it says it can't be opened; click Done), then open **System Settings → Privacy & Security**, scroll down to Security, click **Open Anyway** next to "Research History was blocked", click **Open Anyway** again in the dialog and enter your login password.
 
-The first time the app stores its signing key on a Mac it asks to use the keychain: click **Always Allow**. Because the app is unsigned, the system asks again **after every upgrade**; click Always Allow again. That is normal: the key is still in the keychain.
+**The keychain asks once or twice after installing or upgrading.** The first time a new version runs (or after switching between the installed app and `make run`), macOS asks whether Research History may use what it keeps in the keychain: the backup password, then the signing key. Click **Always Allow** each time and enter your login password if asked. Because the app is not signed by a developer yet, this comes back **after every upgrade**; that is normal, and nothing is lost — the key and the password are still in the keychain. If you click **Deny** (or just **Allow**), the app stops asking: the top of the page says "The Keychain refused access", saving steps and automatic backups wait, and you click **Try again** there when you're ready.
 
 **Windows:** if a blue "Windows protected your PC" (SmartScreen) appears when you open the installer, click **More info → Run anyway**. If Edge says the file "isn't commonly downloaded", click "…" → **Keep** → **Keep anyway**. Installing needs no administrator rights; the app goes into `%LOCALAPPDATA%\Programs\Research History` and appears in the Start menu (a desktop icon is optional). On a freshly installed Windows 11 with **Smart App Control** turned on, unsigned apps may be blocked outright with no "Run anyway" button; the only ways round it are turning Smart App Control off in Windows Security (it may not be possible to turn it back on) or waiting for a signed version. The signing key is kept in the **Windows Credential Manager**.
 
@@ -259,5 +275,6 @@ Code layout: `core/provenance_core/` is the only library with trust logic (JCS, 
 - **P0 done**: append-only records, signing, replay; third-party timestamps (RFC 3161); evidence bundle export, `report.html` (with a static evolution map), `verify.py`, tamper tests; the record form and evolution map.
 - **P1 done**: Bitcoin anchors (OpenTimestamps) and block-explorer checks; the key-steps-only view; the timeline view; the full detail panel (Verified record / Author statement / Later additions / Changes, with adding relations, key steps, notes and retractions from the panel); backup and restore; the FSF sample data.
 - **Round 4 (installers)**: macOS (Apple silicon) and Windows 10/11 installers, a menu bar / notification area icon, a single running copy; Windows backup-location suggestions, and the full test suite (browser tests included) on GitHub Actions; DigiCert as a fallback for date stamps; Settings → Check stamp services checks whether each time-proof service can be reached (DECISIONS D-043 – D-045).
+- **v0.3.1**: after an upgrade the keychain is asked once, not every few seconds; a refusal is not retried until you click Try again (DECISIONS D-051).
 - **Round 5 (v0.3.0)**: the Chinese / English switch — the interface, the app's own texts and error messages, exported reports and VERIFY.md, the menu bar / tray menu and the Windows installer (DECISIONS D-046); quick notes and recording commits from a local git repository (D-047); the Story without AI (D-048); watched folders and the inbox (D-049); optional retelling by a local AI model (D-050).
 - **To be done on a Mac with internet**: `make freetsa-certs`, `make test-network` (AC-09: a real FreeTSA `.tsr` verified with `openssl ts -verify`; a real DigiCert timestamp; real OpenTimestamps calendars and block explorers), and the 4 manual checks in section 16 of the PRD.

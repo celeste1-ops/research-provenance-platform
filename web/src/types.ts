@@ -145,7 +145,8 @@ export interface BackupStatus {
   keep: number;
   where?: BackupWhere;
   needs_password?: boolean;
-  state: "off" | "ok" | "same-disk" | "error" | "paused" | "other-copy";
+  state: "off" | "ok" | "same-disk" | "error" | "paused" | "other-copy" | "keychain-denied";
+  keychain_denied?: boolean;
   paused_after_restore?: boolean;
   paused_reason?: "restored" | "copied" | null;
   key_fingerprint?: string | null;
@@ -190,6 +191,7 @@ export interface Status {
   data_dir_warning: string | null;
   device: string;
   keychain_name: string;
+  keychain_denied?: boolean;
 }
 
 export interface Project {
