@@ -1,4 +1,5 @@
 import type {
+  AiResult,
   BackupStatus,
   BackupSuggestion,
   ExportPreview,
@@ -95,6 +96,9 @@ export const api = {
   timeline: (project?: string) =>
     request<TimelineRow[]>("GET", `/api/timeline${project ? `?project=${encodeURIComponent(project)}` : ""}`),
   record: (id: string) => request<RecordDetail>("GET", `/api/records/${id}`),
+  aiSettings: () => request<{ url: string; model: string }>("GET", "/api/ai"),
+  aiModels: (url: string) => request<{ url: string; models: string[] }>("POST", "/api/ai/models", { url }),
+  aiStory: (body: { url: string; model: string; project?: string }) => request<AiResult>("POST", "/api/ai/story", body),
   narrative: (project?: string) =>
     request<Narrative>("GET", `/api/narrative${project ? `?project=${encodeURIComponent(project)}` : ""}`),
   body: async (id: string) => {

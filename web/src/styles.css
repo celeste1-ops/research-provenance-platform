@@ -283,3 +283,13 @@ ul.plain { list-style: none; padding: 0; margin: 0; }
 .inbox-item { border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; margin: 6px 0; }
 .inbox-item .row { margin: 0 0 4px; }
 .inbox-item .row > select { flex: 0 0 auto; min-width: 120px; }
+/* AI inference (D-050): its own colour, never mixed with records or author statements */
+.ai-open { margin-top: 28px; }
+.ai-panel { margin-top: 28px; border: 1px solid #c9b8ef; border-left: 4px solid #7c5cc4; border-radius: 8px; padding: 10px 14px; background: #f8f5ff; }
+.ai-panel h3 { margin-top: 0; color: #4b2f91; }
+.ai-label { font-weight: 600; color: #4b2f91; }
+.ai-text { line-height: 1.7; }
+.ai-text .ai-flagged { text-decoration: line-through; color: #8a909c; }
+.ai-text .ai-why { color: var(--bad, #b42318); font-size: 12px; text-decoration: none; display: inline; }
+.ai-text .ref { font-size: 11px; margin-left: 2px; }
+@media print { .ai-open { display: none; } }

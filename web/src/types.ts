@@ -308,3 +308,20 @@ export type FolderInspect = {
   max_existing: number;
   already: boolean;
 };
+
+// A retelling by a language model on this computer, labelled "AI inference" (DECISIONS D-050).
+export type AiBlock =
+  | { kind: "heading"; text: string }
+  | { kind: "break" }
+  | { kind: "sentence"; text: string; status: "ok" | "no_source" | "unknown_source" | "claim";
+      refs: { seq: number; id: string | null }[] };
+export type AiResult = {
+  label: string;
+  model: string;
+  url: string;
+  created: string;
+  title: string;
+  facts: number;
+  blocks: AiBlock[];
+  counts: { ok: number; flagged: number };
+};

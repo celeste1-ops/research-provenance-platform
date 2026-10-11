@@ -70,7 +70,8 @@ def test_timeline_view(demo_page):
     page.get_by_test_id("tab-timeline").click()
     table = page.get_by_test_id("timeline")
     table.wait_for()
-    assert table.locator("tbody tr").count() == srv.ctx.ledger.record_count()
+    # The list's data is asked for after the map's, so its rows can arrive just after the click.
+    expect(table.locator("tbody tr")).to_have_count(srv.ctx.ledger.record_count())
     headers = table.locator("thead").inner_text()
     assert "Date stamp" in headers and "Public stamp" in headers and "unverified" in headers
     row = table.get_by_test_id(f"row-{ids['link1']}")

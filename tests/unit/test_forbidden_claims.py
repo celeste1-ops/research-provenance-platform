@@ -5,31 +5,13 @@ signed by the same key."""
 
 from __future__ import annotations
 
-import re
 from pathlib import Path
 
 import pytest
 
-ROOT = Path(__file__).resolve().parent.parent.parent
+from app.services.claims import FORBIDDEN, forbidden_claims  # noqa: F401  (one list for the app and the tests)
 
-FORBIDDEN = [
-    r"原创证明",
-    r"认证",
-    r"确权",
-    r"保护你的想法",
-    r"保护您的想法",
-    r"proof of originality",
-    r"originality proof",
-    r"(?<!not )(?<!n't )proves? (?:the )?originality",
-    r"proof of authorship",
-    r"(?<!not )(?<!n't )proves? (?:the )?authorship",
-    r"\bcertif(?:y|ied|ies|ication)\b",
-    r"protects? your ideas?",
-    r"proof of ownership",
-    r"establish(?:es)? ownership",
-    r"\bownership\b",
-    r"\bauthenticated\b",
-]
+ROOT = Path(__file__).resolve().parent.parent.parent
 
 
 def _scanned_files() -> list[Path]:
@@ -42,7 +24,7 @@ def _scanned_files() -> list[Path]:
 
 
 def _hits(text: str) -> list[str]:
-    return [m.group(0) for pat in FORBIDDEN for m in re.finditer(pat, text, flags=re.IGNORECASE)]
+    return forbidden_claims(text)
 
 
 def test_no_forbidden_claims_in_sources():

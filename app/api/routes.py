@@ -406,9 +406,12 @@ def get_timeline(request: Request, project: str | None = None):
 @router.get("/narrative")
 def get_narrative(request: Request, project: str | None = None):
     """The research told in sentences from fixed templates, each linked to its records (D-048)."""
+    return _narrative(ctx(request), project)
+
+
+def _narrative(c: AppContext, project: str | None) -> dict:
     from app.services.narrative import build_narrative
 
-    c = ctx(request)
     snap = Snapshot.load(c.ledger, c.anchors)
     title = next((p.title for p in c.ledger.projects() if p.id == project), None) if project else None
     records = [(r.id, r.seq, r.kind, snap.payloads[r.id]) for r in snap.rows]
@@ -533,6 +536,55 @@ def git_remove(source_id: str, request: Request):
     except LedgerError as exc:
         raise HTTPException(404, str(exc)) from None
     return c.git.status()
+
+
+# ---------------------------------------------------------------- retelling with a local AI (D-050)
+
+
+class AiIn(BaseModel):
+    url: str = ""
+    model: str = ""
+    project: str | None = None
+
+
+@router.get("/ai")
+def ai_settings(request: Request):
+    from app import preferences
+    from provenance_core.providers.local_ai import DEFAULT_URL
+
+    prefs = preferences.load(real(request).settings.data_dir)
+    return {"url": prefs.get("ai_url") or DEFAULT_URL, "model": prefs.get("ai_model") or ""}
+
+
+@router.post("/ai/models")
+def ai_models(body: AiIn, request: Request):
+    """The models the local server offers (asked only when the author clicks)."""
+    from app.services import ai_story
+    from provenance_core.providers.local_ai import LocalAIError
+
+    try:
+        model = ai_story.model_factory(body.url)
+        return {"url": model.base, "models": model.models()}
+    except LocalAIError as exc:
+        raise HTTPException(400, str(exc)) from None
+
+
+@router.post("/ai/story")
+def ai_retell(body: AiIn, request: Request):
+    """Retell the story with the chosen local model; nothing is sent anywhere but this computer."""
+    from app import preferences
+    from app.i18n import current
+    from app.services import ai_story
+    from provenance_core.providers.local_ai import LocalAIError
+
+    c = ctx(request)
+    try:
+        model = ai_story.model_factory(body.url, body.model)
+        result = ai_story.retell(_narrative(c, body.project), model, current())
+    except LocalAIError as exc:
+        raise HTTPException(400, str(exc)) from None
+    preferences.save(real(request).settings.data_dir, ai_url=model.base, ai_model=body.model)
+    return result
 
 
 # ---------------------------------------------------------------- watched folders and the inbox (D-049)

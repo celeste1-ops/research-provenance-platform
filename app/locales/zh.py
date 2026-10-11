@@ -251,6 +251,7 @@ TEXTS: dict[str, str] = {
     "a step": "一步",
     "My research": "我的研究",
     "The research, step by step": "研究经过",
+    "AI inference": "AI 推断",
     "The file {file} already existed by {time}, when it arrived in the inbox (date stamp).":
         "文件 {file} 在 {time} 进入收件箱时就已经存在（日期章）。",
     "Date stamp of {file}": "{file} 的日期章",
@@ -402,6 +403,14 @@ MESSAGES: dict[str, str] = {
     "the keychain already holds a different signing key for this installation": "钥匙保管处里已经有这个安装的另一把签名钥匙",
     "body text is larger than 50 MB": "正文超过 50 MB",
     "commit must be a hexadecimal commit hash": "提交必须是十六进制的提交哈希",
+    # a local AI model (D-050)
+    "only a model on this computer can be used (an address like http://127.0.0.1:11434)":
+        "只能用这台电脑上的模型（地址类似 http://127.0.0.1:11434）",
+    "the local model answered HTTP {value}": "本机模型回答了 HTTP {value}",
+    "choose a model first": "请先选择一个模型",
+    "the local model took too long to answer": "本机模型太久没有回答",
+    "no local model answered at this address (is it running?)": "这个地址上没有本机模型回答（它在运行吗？）",
+    "the local model's answer was not readable": "读不懂本机模型的回答",
     # watched folders (D-049)
     "choose a folder that does not contain the app's data folder": "请选一个不包含程序数据文件夹的文件夹",
     "this folder has too many files; choose the folder of one piece of work": "这个文件夹里文件太多；请选某一项工作的文件夹",
