@@ -94,6 +94,8 @@ def test_p0_flow_in_the_browser(tmp_path, browser):
         page.get_by_test_id("submit-record").click()
         page.get_by_test_id("section-author").get_by_text("the experiment failed").wait_for()
 
+        page.get_by_test_id("section-verified").locator(".proof-line").nth(1).wait_for()
+        page.get_by_test_id("section-author").locator("li[data-field=milestone]").wait_for()
         s = _sections(page)
         assert "the experiment failed" in s["author"] and "the experiment failed" not in s["verified"]
         assert "2025-11" in s["author"] and "2025-11" not in s["verified"]
@@ -119,6 +121,8 @@ def test_p0_flow_in_the_browser(tmp_path, browser):
 
         # Graph: two nodes, one milestone, both proof icons on each node.
         graph = page.get_by_test_id("graph")
+        graph.locator(".record-node").nth(1).wait_for()
+        graph.locator(".record-node [data-proof=tsa][data-state=confirmed]").nth(1).wait_for()
         assert graph.locator(".record-node").count() == 2
         assert graph.locator(".record-node.milestone").count() == 1
         assert graph.locator(".record-node [data-proof=tsa][data-state=confirmed]").count() == 2

@@ -19,14 +19,15 @@ export function Detail({ id, version, onClose, onSelect }: Props) {
 
   useEffect(() => {
     let live = true;
-    setDetail(null);
-    setBody(null);
+    // Clear only when switching records; a refresh of the same record keeps it on screen.
+    setDetail((d) => (d && d.id === id ? d : null));
     api
       .record(id)
       .then((d) => {
         if (!live) return;
         setDetail(d);
         if (d.verified.has_body) api.body(id).then((t) => live && setBody(t));
+        else setBody(null);
       })
       .catch((e) => live && setError((e as Error).message));
     return () => {
