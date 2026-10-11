@@ -9,6 +9,8 @@ import { Graph } from "./components/Graph";
 import { Help } from "./components/Help";
 import { Legend, TechnicalDetails, WhereIsMyData } from "./components/InfoPanels";
 import { KeyBackupDialog } from "./components/KeyBackupDialog";
+import { GitDialog } from "./components/GitDialog";
+import { QuickNote } from "./components/QuickNote";
 import { RecordForm } from "./components/RecordForm";
 import { ServiceCheckDialog } from "./components/ServiceCheck";
 import { Setup } from "./components/Setup";
@@ -18,7 +20,9 @@ import { dev, setDevice } from "./device";
 import { chosenHere, lang, setLang, t, tn, tx, type Lang } from "./i18n";
 import { LangSwitch } from "./components/LangSwitch";
 
-type Dialog = null | "form" | "export" | "backup" | "key" | "where" | "tech" | "services" | "practice-reset";
+type Dialog = null | "form" | "export" | "backup" | "key" | "where" | "tech" | "services" | "practice-reset" | "git"
+  | "quick";
+const QUICK_NOTE_HASH = "#quick-note"; // the menu bar / tray icon opens the page with it (D-047)
 const SPACE_KEY = "rprov-space";
 
 // Remembered per browser so a reload stays in the same space (a convenience only).
@@ -173,6 +177,18 @@ export function App() {
     </div>
   );
 
+  // "Quick note…" in the menu bar / tray menu opens the page at #quick-note.
+  useEffect(() => {
+    const open = () => {
+      if (window.location.hash !== QUICK_NOTE_HASH) return;
+      window.history.replaceState(null, "", window.location.pathname + window.location.search);
+      setDialog("quick");
+    };
+    open();
+    window.addEventListener("hashchange", open);
+    return () => window.removeEventListener("hashchange", open);
+  }, []);
+
   if (!status) return <div className="loading">{t("Loading…")}</div>;
   if (!status.initialized)
     return <Setup key={uiLang} onDone={reload} onPractice={() => switchSpace("practice")} onLang={changeLang} />;
@@ -205,6 +221,28 @@ export function App() {
   function openForm(type?: string) {
     setFormType(type);
     setDialog("form");
+  }
+
+  async function afterSaved(id: string) {
+    setDialog(null);
+    setSelected(id);
+    await reload();
+    const b = (await api.status()).backup;
+    if (practice) {
+      setNotice({ text: t("Saved in practice. It is not part of your real record.") });
+    } else if (b?.state === "paused") {
+      setNotice({
+        text: t("Saved. Automatic backup is paused since the restore — confirm the folder to resume it."),
+        action: { label: t("Review backup"), onClick: () => setDialog("backup") },
+      });
+    } else if (b?.state === "ok") {
+      setNotice({ text: t("Saved. It gets its date stamp in a few seconds and goes into the next automatic backup.") });
+    } else {
+      setNotice({
+        text: t("Saved. Automatic backup is not set up yet — if this {device} is lost, this step would be lost too.", { device: dev() }),
+        action: { label: t("Set up backup"), onClick: () => setDialog("backup") },
+      });
+    }
   }
 
   function openMenuItem(d: Dialog) {
@@ -244,6 +282,10 @@ export function App() {
           </button>
           <Help id="share" label={t("Share")} align="right">{help("share")}</Help>
         </span>
+        <button className="secondary" onClick={() => setDialog("quick")} disabled={!projectId}
+          data-testid="quick-note-open">
+          {t("Quick note")}
+        </button>
         <span className="with-help">
           <button className="primary" onClick={() => openForm()} disabled={!projectId} data-testid="new-record">
             {t("+ Add a step")}
@@ -258,6 +300,9 @@ export function App() {
           {menuOpen && (
             <div className="menu" role="menu">
               <button role="menuitem" onClick={checkProofs}>{t("Check stamps now")}</button>
+              <button role="menuitem" onClick={() => openMenuItem("git")} data-testid="menu-git">
+                {t("Record from git…")}
+              </button>
               <button role="menuitem" onClick={() => openMenuItem("services")}>{t("Check stamp services…")}</button>
               {!practice && <button role="menuitem" onClick={() => openMenuItem("backup")}>{t("Backup…")}</button>}
               <button role="menuitem" onClick={() => openMenuItem("where")}>{t("Where is my data?")}</button>
@@ -394,27 +439,7 @@ export function App() {
               initialType={formType}
               space={space}
               onCancel={() => setDialog(null)}
-              onCreated={async (id) => {
-                setDialog(null);
-                setSelected(id);
-                await reload();
-                const b = (await api.status()).backup;
-                if (practice) {
-                  setNotice({ text: t("Saved in practice. It is not part of your real record.") });
-                } else if (b?.state === "paused") {
-                  setNotice({
-                    text: t("Saved. Automatic backup is paused since the restore — confirm the folder to resume it."),
-                    action: { label: t("Review backup"), onClick: () => setDialog("backup") },
-                  });
-                } else if (b?.state === "ok") {
-                  setNotice({ text: t("Saved. It gets its date stamp in a few seconds and goes into the next automatic backup.") });
-                } else {
-                  setNotice({
-                    text: t("Saved. Automatic backup is not set up yet — if this {device} is lost, this step would be lost too.", { device: dev() }),
-                    action: { label: t("Set up backup"), onClick: () => setDialog("backup") },
-                  });
-                }
-              }}
+              onCreated={afterSaved}
             />
           </div>
         </div>
@@ -447,6 +472,12 @@ export function App() {
         <TechnicalDetails status={status} onClose={() => setDialog(null)} onKeyBackup={() => setDialog("key")} />
       )}
       {dialog === "services" && <ServiceCheckDialog onClose={() => setDialog(null)} />}
+      {dialog === "git" && (
+        <GitDialog projects={projects} projectId={projectId} onClose={() => setDialog(null)} onChanged={reload} />
+      )}
+      {dialog === "quick" && projectId && (
+        <QuickNote projects={projects} projectId={projectId} onClose={() => setDialog(null)} onSaved={afterSaved} />
+      )}
       {dialog === "export" && (
         <ExportDialog rows={timeline} defaultTitle={project?.title ?? t("evidence")} onClose={() => setDialog(null)}
           practice={practice} />

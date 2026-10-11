@@ -133,6 +133,16 @@ class Spaces:
                 out.append(self._practice.anchors)
             return out
 
+    def record_git(self) -> int:
+        """Every minute: new commits of the repositories each existing space records (D-047)."""
+        with self._lock:
+            contexts = [self.real]
+            if self._practice is None and self.practice_dir.exists():
+                self._practice = self._open_practice()
+            if self._practice is not None:
+                contexts.append(self._practice)
+        return sum(c.git.check()["recorded"] for c in contexts if c.git.has_sources())
+
     def refresh(self, force: bool = False) -> dict[str, int]:
         """Hourly job: check stamps in both spaces."""
         total: dict[str, int] = {}

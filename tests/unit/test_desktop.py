@@ -96,7 +96,7 @@ def test_menu_follows_the_language_chosen_in_the_app(tmp_path, monkeypatch):
 
     monkeypatch.setattr(desktop, "system_language", lambda: "en")
     assert desktop.menu_language(tmp_path) == "en"
-    assert desktop.MENU["en"] == {"open": "Open Research History", "quit": "Quit"}
+    assert desktop.MENU["en"] == {"open": "Open Research History", "note": "Quick note…", "quit": "Quit"}
     seen = []
     preferences.on_change(seen.append)
     try:
@@ -105,7 +105,7 @@ def test_menu_follows_the_language_chosen_in_the_app(tmp_path, monkeypatch):
         preferences._listeners.remove(seen.append)
     assert seen == [{"language": "zh"}]
     assert desktop.menu_language(tmp_path) == "zh"
-    assert desktop.MENU["zh"] == {"open": "打开 Research History", "quit": "退出"}
+    assert desktop.MENU["zh"] == {"open": "打开 Research History", "note": "快速记一笔…", "quit": "退出"}
 
 
 def test_system_language_is_read_from_the_environment(monkeypatch):
