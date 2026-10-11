@@ -84,10 +84,10 @@ each section.
   and then creates the key pair and the genesis record (`POST /api/identity`). Renaming a
   project uses `POST /api/projects/{id}/rename`; projects are local display data, not
   records.
-- **D-014 · Bitcoin anchor is off until OpenTimestamps lands (P1).** Following PRD §17,
-  `RPROV_BTC` defaults to `off` while P0 is built; the UI then shows
-  "Bitcoin anchor: not enabled". When it is switched on, missing anchors are backfilled for
-  old records; their Bitcoin time is later than the record time, which is expected.
+- **D-014 · Bitcoin anchor was off until OpenTimestamps landed (P1).** Following PRD §17,
+  `RPROV_BTC` defaulted to `off` while P0 was built; the UI then showed
+  "Bitcoin anchor: not enabled". It now defaults to `ots`. Missing anchors are backfilled
+  for older records; their Bitcoin time is later than the record time, which is expected.
 - **D-015 · Retry policy for time proofs.** Failed submissions are retried with exponential
   backoff (1 min doubling to a 6 h cap); after 30 attempts the row is marked `failed` but the
   manual refresh still retries it. Pending Bitcoin anchors are re-checked hourly.
@@ -132,3 +132,16 @@ each section.
 - **D-024 · The session token is injected by the backend.** The built `index.html` keeps a
   `__RPROV_SESSION_TOKEN__` placeholder that the local server replaces per launch; the Vite
   plugin that fills it during `make dev` only runs on the dev server.
+- **D-025 · How Bitcoin anchors are checked.** The app and `verify.py` check a Bitcoin
+  attestation against the block header from a local node (`RPROV_BITCOIN_RPC` /
+  `--bitcoin-node`) or, by default, from two public block explorers (blockstream.info,
+  mempool.space) that must agree; results say "checked via block explorers". Only block
+  heights are sent. `verify.py --offline` makes no requests and reports the attestation as
+  "not checked" (neither verified time nor failure). The app shows "Bitcoin anchor:
+  confirmed" only after that header check succeeds; until then the anchor stays pending.
+- **D-026 · OpenTimestamps details.** As the official client does, a 16-byte random nonce
+  is appended to the record ID and hashed before submission, so calendars only see
+  SHA-256(record ID ‖ nonce). The proof is submitted to the four default calendars and
+  needs at least two answers. Upgrades only contact calendars on the official whitelist.
+  Proofs are built with the official `opentimestamps` library (an install extra); the
+  verifier reads them with its own standard-library reader.

@@ -17,6 +17,7 @@ from cryptography import x509
 from .bundle import BundleError, load_bundle
 from .certs import FREETSA_ROOT_SHA256, builtin_tsa_roots
 from .proofs import BTC_LABEL, TSA_LABEL
+from .providers.explorers import ExplorerHeaderLookup, NodeHeaderLookup
 from .verify import STATUS_LABELS, LogReport, verify_log
 
 _PROOF_WORDS = {
@@ -115,6 +116,16 @@ def main(argv: list[str] | None = None) -> int:
         help="also trust this TSA root certificate (only after checking its fingerprint yourself)",
     )
     parser.add_argument("--allow-mock", action="store_true", help="accept mock Bitcoin anchors (testing only)")
+    parser.add_argument(
+        "--bitcoin-node",
+        metavar="URL",
+        help="check Bitcoin anchors against your own node's JSON-RPC, e.g. http://user:pass@127.0.0.1:8332",
+    )
+    parser.add_argument(
+        "--offline",
+        action="store_true",
+        help="make no network requests; Bitcoin attestations are then reported as not checked",
+    )
     args = parser.parse_args(argv)
 
     roots = list(builtin_tsa_roots())
@@ -130,12 +141,20 @@ def main(argv: list[str] | None = None) -> int:
     except BundleError as exc:
         print(f"cannot read bundle: {exc}", file=sys.stderr)
         return 2
+    # Bitcoin block headers: a local node if given, otherwise at least two agreeing public
+    # block explorers (only block heights are sent). Nothing is fetched with --offline.
+    header_lookup = None
+    if args.bitcoin_node:
+        header_lookup = NodeHeaderLookup(args.bitcoin_node)
+    elif not args.offline:
+        header_lookup = ExplorerHeaderLookup()
     report = verify_log(
         bundle.chain_ids,
         bundle.materials,
         tsa_roots=roots,
         allow_mock=args.allow_mock,
         identity_pem=bundle.identity_pem,
+        btc_header_lookup=header_lookup,
     )
     if args.json:
         print(json.dumps(report_to_dict(report), indent=2, ensure_ascii=False))

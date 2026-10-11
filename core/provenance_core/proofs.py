@@ -320,11 +320,12 @@ def verify_btc_proof(
             code="BTC_INVALID",
             detail=f"commitment does not match the merkle root of block {att.height}",
         )
+    method = getattr(header_lookup, "method", "")
     return ProofCheck(
         BTC_KIND,
         "verified",
         time=format_utc(datetime.fromtimestamp(block_time, UTC)),
-        detail=f"commitment matches the merkle root of Bitcoin block {att.height}",
+        detail=f"commitment matches the merkle root of Bitcoin block {att.height}" + (f"; {method}" if method else ""),
         source=f"Bitcoin block {att.height}",
     )
 

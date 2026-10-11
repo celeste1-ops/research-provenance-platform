@@ -34,9 +34,11 @@ def make_providers(settings: Settings) -> dict[str, TimestampProvider | None]:
         raise ValueError(f"unknown RPROV_TSA={settings.tsa!r}")
     btc: TimestampProvider | None
     if settings.btc == "ots":
+        from provenance_core.providers.explorers import ExplorerHeaderLookup, NodeHeaderLookup
         from provenance_core.providers.ots import OtsProvider
 
-        btc = OtsProvider(timeout=settings.network_timeout)
+        lookup = NodeHeaderLookup(settings.bitcoin_rpc) if settings.bitcoin_rpc else ExplorerHeaderLookup()
+        btc = OtsProvider(timeout=settings.network_timeout, header_lookup=lookup)
     elif settings.btc == "mock":
         from provenance_core.providers.mock import MockProvider
 

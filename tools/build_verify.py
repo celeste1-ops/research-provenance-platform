@@ -20,11 +20,13 @@ ROOT = Path(__file__).resolve().parent.parent
 CORE = ROOT / "core" / "provenance_core"
 
 # Dependency order matters: each module may only use names defined above it.
-MODULES = ["der", "jcs", "ots", "proofs", "records", "signing", "chain", "verify", "bundle", "verify_cli"]
+MODULES = ["der", "jcs", "ots", "proofs", "records", "signing", "chain", "verify", "bundle",
+           "providers/explorers", "verify_cli"]
 
 ALLOWED_IMPORTS = {
     "__future__", "argparse", "collections", "dataclasses", "datetime", "hashlib", "json", "posixpath",
-    "re", "secrets", "sys", "typing", "unicodedata", "uuid", "zipfile", "pathlib", "abc",
+    "re", "secrets", "sys", "typing", "unicodedata", "uuid", "zipfile", "pathlib", "abc", "base64",
+    "urllib",  # only providers/explorers.py: public Bitcoin block headers, skipped with --offline
     "cryptography", "rfc3161_client",
 }
 
@@ -42,6 +44,10 @@ form (V2), Ed25519 signature (V3), third-party RFC 3161 timestamp against the
 built-in FreeTSA root (V4), Bitcoin anchor (V5, OpenTimestamps), log chain (V6),
 references (V7). The two kinds of time are always reported separately.
 Exit code: 0 = nothing failed, 1 = at least one failure, 2 = unreadable bundle.
+
+Network: only to check Bitcoin anchors, verify.py asks two public block explorers for
+block headers (it sends block heights, nothing from the bundle). Use --bitcoin-node to
+ask your own node instead, or --offline to make no requests at all.
 """
 '''
 

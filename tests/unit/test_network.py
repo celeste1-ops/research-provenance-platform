@@ -1,4 +1,5 @@
-"""AC-09 (network): a real FreeTSA .tsr verifies with the openssl command from PRD §10.
+"""Network tests (run on the Mac): AC-09 — a real FreeTSA .tsr verifies with the openssl
+command from PRD §10 — plus real OpenTimestamps calendars and block explorers.
 
 Skipped unless RPROV_NETWORK_TESTS=1 (`make test-network` on the Mac).
 """
@@ -40,3 +41,30 @@ def test_real_freetsa_token_verifies_with_openssl(tmp_path):
         cwd=tmp_path, capture_output=True, text=True,
     )
     assert out.returncode == 0 and "Verification: OK" in out.stdout, out.stdout + out.stderr
+
+
+def test_real_opentimestamps_submission_is_pending():
+    from provenance_core.ots import parse_ots
+    from provenance_core.providers.ots import OtsProvider
+
+    manifest_bytes, _, rid = _manifest()
+    res = OtsProvider().submit(rid, manifest_bytes)
+    assert res.status == "pending"
+    proof = parse_ots(res.proof)
+    assert proof.file_digest.hex() == rid and len(proof.pending) >= 2
+
+
+def test_real_block_explorers_confirm_the_official_example():
+    """hello-world.txt.ots (block 358391) checked against two public block explorers."""
+    import hashlib
+    from pathlib import Path
+
+    from provenance_core.proofs import verify_btc_proof
+    from provenance_core.providers.explorers import ExplorerHeaderLookup
+
+    fix = Path(__file__).resolve().parent.parent / "fixtures" / "ots"
+    digest = hashlib.sha256((fix / "hello-world.txt").read_bytes()).hexdigest()
+    check = verify_btc_proof(digest, (fix / "hello-world.txt.ots").read_bytes(), header_lookup=ExplorerHeaderLookup())
+    assert check.verified, check
+    assert check.time.startswith("2015-05-28")
+    assert "block explorers" in check.detail

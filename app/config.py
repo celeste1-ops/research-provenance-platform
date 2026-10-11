@@ -17,8 +17,10 @@ class Settings:
     # Third-party timestamp provider: freetsa | mock | off
     tsa: str = os.environ.get("RPROV_TSA", "freetsa")
     tsa_url: str = os.environ.get("RPROV_TSA_URL", "https://freetsa.org/tsr")
-    # Bitcoin anchor provider: ots | mock | off  (P1 — off until OpenTimestamps is enabled)
-    btc: str = os.environ.get("RPROV_BTC", "off")
+    # Bitcoin anchor provider: ots | mock | off
+    btc: str = os.environ.get("RPROV_BTC", "ots")
+    # Optional local Bitcoin node for checking block headers (else: two public block explorers)
+    bitcoin_rpc: str | None = os.environ.get("RPROV_BITCOIN_RPC") or None
     # Signing-key storage: keyring (macOS Keychain) | memory (tests) | dev-insecure-file
     keystore: str = os.environ.get("RPROV_KEYSTORE", "keyring")
     dev: bool = os.environ.get("RPROV_DEV", "") == "1"

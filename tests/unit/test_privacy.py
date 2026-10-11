@@ -59,17 +59,24 @@ def test_only_providers_import_network_libraries():
     assert offenders == []
 
 
-def test_generated_verify_py_has_no_network_imports():
+def test_generated_verify_py_network_use_is_limited_to_block_headers():
+    """verify.py may fetch public Bitcoin block headers (block heights only, never
+    bundle content), and only through the explorers code; --offline disables it."""
     from app.services.export import verify_py_source
 
-    tree = ast.parse(verify_py_source())
+    src = verify_py_source()
+    tree = ast.parse(src)
     mods = set()
     for node in ast.walk(tree):
         if isinstance(node, ast.Import):
             mods.update(a.name for a in node.names)
         elif isinstance(node, ast.ImportFrom) and node.module:
             mods.add(node.module)
-    assert not {m for m in mods if m.split(".")[0] in {"httpx", "requests", "urllib3", "socket", "aiohttp"}}
+    network = {m for m in mods if m.split(".")[0] in {"httpx", "requests", "urllib3", "socket", "aiohttp", "urllib"}}
+    assert network == {"urllib.request"}
+    users = [n.name for n in ast.walk(tree) if isinstance(n, ast.FunctionDef) and "urlopen" in ast.unparse(n)]
+    assert users == ["_urllib_fetch"]
+    assert "--offline" in src
 
 
 SECRETS = {
