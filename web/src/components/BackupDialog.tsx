@@ -2,10 +2,14 @@ import { useEffect, useState } from "react";
 import { api, download } from "../api";
 import type { BackupStatus, BackupSuggestion, LocationCheck } from "../types";
 import { timeAgo } from "../util";
+import { dev, keychainName } from "../device";
 
 // Choose a folder + password once; from then on every change is backed up automatically,
 // fully encrypted. Used in first-run onboarding and in the Backup dialog. The first time,
 // a printable recovery code is shown (D-039).
+// How long the backup form waits for the list of suggested folders before showing without it.
+const SUGGESTIONS_WAIT_MS = 5000;
+
 export function BackupSetup({
   current,
   onDone,
@@ -17,7 +21,9 @@ export function BackupSetup({
   onSkip?: () => void;
   submitLabel?: string;
 }) {
-  const [suggestions, setSuggestions] = useState<BackupSuggestion[]>([]);
+  // null while still looking: the form is shown once the list is known, so nothing moves under
+  // the pointer (on Windows the list can take a few seconds and used to push the button down).
+  const [suggestions, setSuggestions] = useState<BackupSuggestion[] | null>(null);
   const [location, setLocation] = useState(current?.location ?? "");
   const [check, setCheck] = useState<LocationCheck | null>(null);
   const [password, setPassword] = useState("");
@@ -27,14 +33,19 @@ export function BackupSetup({
   const [created, setCreated] = useState<BackupStatus | null>(null);
 
   useEffect(() => {
-    api
-      .backupSuggestions()
-      .then((s) => {
-        setSuggestions(s);
-        if (!location && s.length > 0) setLocation(s[0].path);
-      })
-      .catch(() => setSuggestions([]));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    let settled = false;
+    const settle = (s: BackupSuggestion[]) => {
+      if (settled) return; // a list that arrives after giving up is ignored
+      settled = true;
+      setSuggestions(s);
+      if (s.length > 0) setLocation((typed) => typed || s[0].path);
+    };
+    const giveUp = window.setTimeout(() => settle([]), SUGGESTIONS_WAIT_MS);
+    api.backupSuggestions().then(settle).catch(() => settle([]));
+    return () => {
+      settled = true;
+      window.clearTimeout(giveUp);
+    };
   }, []);
 
   // Say where the chosen folder really is while the author types or picks one.
@@ -82,6 +93,14 @@ export function BackupSetup({
     );
   }
 
+  if (suggestions === null) {
+    return (
+      <p className="muted" data-testid="backup-looking">
+        Looking for good places for backups on this {dev()}…
+      </p>
+    );
+  }
+
   return (
     <form onSubmit={submit} className="backup-setup" data-testid="backup-setup">
       <div className="field">
@@ -92,7 +111,7 @@ export function BackupSetup({
               <label key={s.path} className={`choice ${location === s.path ? "selected" : ""}`}>
                 <input type="radio" name="loc" checked={location === s.path} onChange={() => setLocation(s.path)} />
                 <b>{s.label}</b>
-                <span className="muted small">{s.kind === "synced" ? "kept in sync off this Mac" : "external drive"}</span>
+                <span className="muted small">{s.kind === "synced" ? `kept in sync off this ${dev()}` : "external drive"}</span>
               </label>
             ))}
           </div>
@@ -103,18 +122,21 @@ export function BackupSetup({
           onChange={(e) => setLocation(e.target.value)}
           placeholder="/Volumes/MyDrive/Research Provenance Backups"
         />
-        {check && (
-          <p className={`small location-check ${check.safe ? "ok" : "warn"}`} data-testid="location-check">
-            {check.safe ? "✓ " : "⚠ "}
-            <b>{check.label}</b>
-            {check.creates && " — the folder will be created"}
-            {check.warning && <span className="block">{check.warning}</span>}
-          </p>
-        )}
+        {/* Space is kept for this line, so the button below does not move when it appears. */}
+        <div className="location-check-slot">
+          {check && (
+            <p className={`small location-check ${check.safe ? "ok" : "warn"}`} data-testid="location-check">
+              {check.safe ? "✓ " : "⚠ "}
+              <b>{check.label}</b>
+              {check.creates && " — the folder will be created"}
+              {check.warning && <span className="block">{check.warning}</span>}
+            </p>
+          )}
+        </div>
         <p className="note">
-          Pick a place that is <b>not only on this Mac</b>: an external drive, or a folder kept in sync by a service
+          Pick a place that is <b>not only on this {dev()}</b>: an external drive, or a folder kept in sync by a service
           you already use (iCloud Drive, Dropbox…). Only the encrypted backup files go there — the app's working data
-          stays in its own folder on this Mac.
+          stays in its own folder on this {dev()}.
         </p>
       </div>
       <label>
@@ -128,7 +150,7 @@ export function BackupSetup({
       <p className="warning small" data-testid="password-warning">
         <b>If you forget this password, your backups can't be opened</b> — nobody can open them, including us. Write it
         down somewhere safe. {current?.recovery?.configured ? "Your printed recovery code also opens them." : "Next you get a recovery code to print: it opens your backups if the password is lost."}{" "}
-        This Mac remembers the password (in the Keychain) so backups run by themselves.
+        This {dev()} remembers the password (in the {keychainName()}) so backups run by themselves.
       </p>
       {error && <p className="error">{error}</p>}
       <button className="primary" disabled={busy || !location.trim() || password.length < 8 || check?.ok === false}>
@@ -163,7 +185,7 @@ export function RecoveryCodeSheet({ code, fingerprint, onDone }: {
         </p>
         <p className="small">
           Research history · made {made}. If the backup password is ever lost, this code opens your backups instead:
-          install the app on a Mac, choose <b>Restore from a backup</b>, pick the newest <span className="mono">.rprovbackup</span>{" "}
+          install the app on a {dev()}, choose <b>Restore from a backup</b>, pick the newest <span className="mono">.rprovbackup</span>{" "}
           file and click <b>Use the recovery code instead</b>.
         </p>
         {fingerprint && (
@@ -175,7 +197,7 @@ export function RecoveryCodeSheet({ code, fingerprint, onDone }: {
       </div>
       <p className="warning small">
         This is the only time the code is shown — the app does not keep it. Print it or write it down, and keep it
-        somewhere safe away from this Mac (not in the same folder as the backups).
+        somewhere safe away from this {dev()} (not in the same folder as the backups).
       </p>
       <div className="row">
         <button type="button" className="secondary" onClick={() => window.print()}>
@@ -203,9 +225,9 @@ export function BackupPill({ status, onClick }: { status: BackupStatus | null; o
       : st === "paused"
         ? "Backup paused — confirm to resume"
         : st === "other-copy"
-        ? "Another Mac is backing up here too"
+        ? `Another ${dev()} is backing up here too`
         : st === "same-disk"
-        ? "Backup is on this Mac only"
+        ? `Backup is on this ${dev()} only`
         : st === "error"
           ? "Backup failed"
           : status?.needs_password
@@ -314,8 +336,8 @@ export function BackupDialog({
         ) : (
           <>
             <p className="small">
-              A backup holds everything — your steps, files, stamps and signing key — fully encrypted. If this Mac is
-              lost or breaks, install the app on a new Mac and choose <b>Restore from a backup</b>.
+              A backup holds everything — your steps, files, stamps and signing key — fully encrypted. If this {dev()} is
+              lost or breaks, install the app on a new {dev()} and choose <b>Restore from a backup</b>.
             </p>
             {status?.data_dir_warning && <p className="error small">{status.data_dir_warning}</p>}
             {status?.state === "paused" && !editing && (
@@ -325,7 +347,9 @@ export function BackupDialog({
                   {status.paused_reason === "restored"
                     ? " because this copy was restored from a backup."
                     : status.paused_reason === "copied"
-                      ? " because this data folder was copied from somewhere else (for example by Migration Assistant or Time Machine)."
+                      ? ` because this data folder was copied from somewhere else (for example ${
+                          dev() === "Mac" ? "by Migration Assistant or Time Machine" : "from another computer or by a backup tool"
+                        }).`
                       : "."}
                 </div>
                 <div className="small">
@@ -334,19 +358,19 @@ export function BackupDialog({
                 {status.other_copy && (
                   <p className="error small">
                     Another copy of this research wrote a backup into this folder at {status.other_copy.last_backup},
-                    after the backup you restored from. Is the old Mac still running? Quit the app there first, or
+                    after the backup you restored from. Is the old {dev()} still running? Quit the app there first, or
                     choose a different folder.
                   </p>
                 )}
                 <p className="warning small">
-                  Resume only on the Mac you will keep using. If another Mac — or the copy you restored from — still
+                  Resume only on the {dev()} you will keep using. If another {dev()} — or the copy you restored from — still
                   backs up into this folder, choose a different folder instead. If this was only a test of your backup,
                   don't resume: close this copy and delete its folder.
                 </p>
                 {status.needs_password ? (
                   <>
                     <p className="small">
-                      To resume, set a backup password for this Mac (it can be the same as before). Your printed
+                      To resume, set a backup password for this {dev()} (it can be the same as before). Your printed
                       recovery code stays valid.
                     </p>
                     <BackupSetup
@@ -374,9 +398,9 @@ export function BackupDialog({
                   {status.other_copy.last_backup}.
                 </div>
                 <p className="small">
-                  That usually means a second Mac (for example the old one, after you restored onto a new one) still
-                  runs the app. Use <b>only one Mac</b> to add steps: if both keep adding steps, the two histories split,
-                  and a restore can bring back only one of them. Quit the app on the Mac you no longer use. Your own
+                  That usually means a second {dev()} (for example the old one, after you restored onto a new one) still
+                  runs the app. Use <b>only one {dev()}</b> to add steps: if both keep adding steps, the two histories split,
+                  and a restore can bring back only one of them. Quit the app on the {dev()} you no longer use. Your own
                   backups are not affected — each copy keeps its own files.
                 </p>
                 <div className="row">

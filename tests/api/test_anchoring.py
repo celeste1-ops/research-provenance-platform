@@ -1,6 +1,7 @@
 """AC-10 (offline, then manual refresh) and the RFC 3161 provider without network."""
 
 import hashlib
+import time
 from datetime import UTC, datetime
 
 import httpx
@@ -59,7 +60,7 @@ def test_rfc3161_provider_rejects_bad_replies(tamper):
 def test_rfc3161_provider_untrusted_root_rejected():
     manifest = b"{}"
     rid = hashlib.sha256(manifest).hexdigest()
-    p = Rfc3161Provider("https://tsa.test/tsr", transport=_mock_tsa_transport([]))  # built-in FreeTSA root only
+    p = Rfc3161Provider("https://tsa.test/tsr", transport=_mock_tsa_transport([]))  # built-in roots only
     with pytest.raises(ProviderRejected, match="TSA_CHAIN_UNTRUSTED"):
         p.submit(rid, manifest)
 
@@ -152,4 +153,41 @@ def test_enabling_a_provider_later_backfills_rows(tmp_path):
     assert set(next(iter(ctx.anchors.rows_by_record().values()))) == {"tsa"}
     ctx.anchors.providers["btc"] = MockProvider("btc")
     assert ctx.anchors.ensure_rows() == 1
+    ctx.close()
+
+
+def test_saving_does_not_wait_again_for_a_service_that_just_failed(tmp_path):
+    """D-045: where a stamp service is blocked, only the first save waits for its time limit."""
+    from app.services import anchors as A
+    from app.services.ledger import EntryInput
+
+    class Counting(MockProvider):
+        calls = 0
+
+        def submit(self, record_id, manifest_bytes):
+            self.calls += 1
+            return super().submit(record_id, manifest_bytes)
+
+    tsa, btc = Counting("tsa", offline=True), Counting("btc")
+    ctx = make_ctx(tmp_path, tsa=tsa, btc=btc)
+    ctx.ledger.init_identity("A")  # first save: the date stamp service is tried and fails
+    assert tsa.calls == 1 and ctx.anchors.recently_unreachable("tsa")
+    pid = ctx.ledger.create_project("P").id
+    ctx.ledger.create_entry(EntryInput(pid, "idea", "quick save"))
+    assert tsa.calls == 1, "the second save must not wait for the unreachable service again"
+    assert btc.calls == 2  # the working service is still asked on every save
+    # The retry job still tries it; once it answers, saving asks it again.
+    tsa.offline = False
+    assert ctx.anchors.refresh(force=True)["submitted"] == 2
+    assert not ctx.anchors.recently_unreachable("tsa")
+    assert all(r["tsa"].status == "confirmed" for r in ctx.anchors.rows_by_record().values())
+    ctx.ledger.create_entry(EntryInput(pid, "idea", "online again"))
+    assert tsa.calls == 4
+    # After the waiting period, a save tries a still-blocked service again.
+    tsa.offline = True
+    ctx.ledger.create_entry(EntryInput(pid, "idea", "blocked again"))
+    assert tsa.calls == 5
+    ctx.anchors._unreachable_at["tsa"] = time.monotonic() - A.SKIP_AFTER_UNREACHABLE_SECONDS - 1
+    ctx.ledger.create_entry(EntryInput(pid, "idea", "ten minutes later"))
+    assert tsa.calls == 6
     ctx.close()

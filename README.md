@@ -34,32 +34,69 @@
 
 | | **Date stamp**（日期章；报告里叫 Third-party timestamp，第三方签名时间证明） | **Public stamp**（公开章；报告里叫 Bitcoin anchor，比特币时间锚定） |
 | --- | --- | --- |
-| 协议 | RFC 3161，默认 [FreeTSA](https://freetsa.org/) | [OpenTimestamps](https://opentimestamps.org/) |
+| 协议 | RFC 3161，默认 [FreeTSA](https://freetsa.org/)，连不上时用 [DigiCert](https://www.digicert.com/) | [OpenTimestamps](https://opentimestamps.org/) |
 | 多久拿到 | 几秒，显示「Date stamp ✓」 | 先「Public stamp: waiting」，通常几小时后「Public stamp: done」 |
 | 要相信谁 | 相信这家机构的私钥和时钟；它的签名任何人都能检查 | 不用相信任何机构，只依赖公开的比特币区块链 |
 
 **只追加，不修改。** 已经留下证明的记录，任何人都不能改，包括你自己。后来补一个关系、标一个里程碑、补一句说明、更正、撤回，都是新加的一条记录，有自己的签名和时间证明，界面上会显示「这是某天补加的」。
 
-## 安装（Mac）
+## 下载安装（不用装开发工具）
+
+给不写代码的人：下载一个安装包，双击就能用。程序叫 **Research History**，自带 Python 和界面，不需要再装别的。
+
+| 系统 | 安装包 |
+| --- | --- |
+| macOS 11 或更新，Apple 芯片（M1/M2/M3/M4） | `ResearchHistory-<版本>-macos-arm64.dmg` |
+| Windows 10（1809 或更新）/ Windows 11，64 位 | `ResearchHistory-<版本>-windows-x64-setup.exe` |
+
+安装包在本仓库的 **Releases** 页面（打版本标签时自动生成草稿，发布后别人才能下载），每次推送代码后也会在 **Actions → Package → Artifacts** 里生成一份（要登录 GitHub，保留 90 天）。Intel 芯片的 Mac 暂时没有安装包，可以先用下面「从源代码运行」的方法。
+
+**用起来：** 双击打开后，程序在后台启动，并自动在浏览器里打开 http://127.0.0.1:8765 （8765 被占用时换下一个端口）。Mac 的菜单栏、Windows 右下角的通知区域里会出现一个蓝色圆形图标：点它可以重新打开页面，或者 **Quit** 退出。关掉浏览器窗口不会退出程序；要再打开页面，点这个图标 → **Open Research History**（Windows 上再双击一次程序也行）。程序不会同时开两份（安装版和 `make run` 也不会同时用同一个数据文件夹）。日志在数据文件夹的 `logs/app.log`。
+
+**数据放在哪里：** Mac 是 `~/.rprov`，Windows 是 `%USERPROFILE%\.rprov`（和从源代码运行时是同一个位置，两种方式可以互换）。**升级**就是用新版本安装包再装一次；**卸载**（Mac：把程序拖进废纸篓；Windows：设置 → 应用 → Research History → 卸载）都不会删除数据。
+
+### 第一次打开：系统会拦一下（安装包还没有签名）
+
+这两个安装包暂时没有经过苹果和微软的签名，所以第一次打开时系统会提示「无法验证开发者」。确认安装包是从本仓库下载的，再按下面放行，以后就不会再问。
+
+**macOS 14 及更早：** 把 Research History 拖进「应用程序」文件夹，在访达里**按住 Control 点它（或右键）→ 打开**，在弹出的对话框里再点 **打开**。
+
+**macOS 15（Sequoia）及更新：** 右键打开这一招已经没有用了。先双击一次（会提示无法打开，点「完成」），然后打开 **系统设置 → 隐私与安全性**，往下拉到「安全性」，在「已阻止使用 Research History」旁边点 **仍要打开**，在弹出的对话框里再点 **仍要打开**，输入登录密码。
+
+Mac 上第一次存签名钥匙时会问能否使用钥匙串，点 **始终允许**。因为没有签名，**每次升级后**系统还会再问一次，同样点「始终允许」——这是正常的，钥匙还在钥匙串里。
+
+**Windows：** 双击安装包，如果出现蓝色的「Windows 已保护你的电脑」（SmartScreen），点 **更多信息 → 仍要运行**。用 Edge 下载时如果提示「通常不会下载此文件」，点「…」→ **保留** → **仍然保留**。安装不需要管理员权限，装在 `%LOCALAPPDATA%\Programs\Research History`，开始菜单里会有 Research History（桌面图标可选）。新装的 Windows 11 如果开着**智能应用控制（Smart App Control）**，可能会直接阻止没有签名的程序且没有「仍要运行」按钮；这时只能在 Windows 安全中心里把它关掉（关掉后可能无法再打开），或者等以后有签名的版本。签名钥匙存在 **Windows 凭据管理器**里。
+
+### 在中国大陆等地方使用
+
+两种时间证明都要连到国外的公开服务：日期章用 FreeTSA（连不上时自动改用 DigiCert），公开章用 4 个 OpenTimestamps 服务器，核对比特币区块用 blockstream.info 和 mempool.space。有些地方其中一部分可能被拦或者很慢。
+
+- **Settings → Check stamp services…** 点 **Check now**，会逐个试一遍这些服务，并用一句话告诉你：日期章能不能拿到（由哪家给的）、公开章能不能开始、比特币区块能不能核对。试的时候只发送一个随机的测试值，不发送你的任何内容。
+- **连不上也不会丢东西。** 步骤照样马上存在你的电脑上，缺的时间证明以后自动补上（每小时重试一次，也可以点 **Settings → Check stamps now**）。某个服务刚连不上时，接下来 10 分钟里保存不会再等它，所以不会每存一步都卡十几秒。
+- 换一个网络（比如手机热点）再点一次 Check now，可以看出是不是当前网络的问题。
+
+## 从源代码运行（开发者，Mac）
 
 需要：[uv](https://docs.astral.sh/uv/)（自动准备 Python 3.12 或 3.13）、Node.js 22 或更新、`make`、OpenSSL 3（手工验证签名用，`brew install openssl@3`；若系统里还有更新版本的 openssl，请让 3 版排在前面）。
+
+Windows 上也可以从源代码运行（没有 `make` 时直接用 `uv sync --extra ots --extra desktop`、`cd web; npm ci; npm run build`、`uv run python -m app.desktop`），数据在 `%USERPROFILE%\.rprov`。
 
 ```bash
 git clone <本仓库地址> research-provenance-platform
 cd research-provenance-platform
 make install          # Python 依赖（uv.lock）和界面依赖（package-lock.json）
-make freetsa-certs    # 第一次：从 freetsa.org 核对并更新内置的 FreeTSA 证书（见 DECISIONS D-004）
+make freetsa-certs    # 第一次：从 freetsa.org 核对并更新内置的 FreeTSA 证书，并核对内置的 DigiCert 根证书（见 DECISIONS D-004、D-045）
 make run              # 打开 http://127.0.0.1:8765
 ```
 
 第一次打开分两步：
 
-1. 填你的名字或笔名（报告里标为「自我声明」）和研究项目名，点 **Start**。程序生成签名钥匙并存进 macOS 钥匙串，不以明文文件存放。
+1. 填你的名字或笔名（报告里标为「自我声明」）和研究项目名，点 **Start**。程序生成签名钥匙并存进系统的钥匙保管处（macOS 钥匙串；Windows 凭据管理器），不以明文文件存放。
 2. **打开自动备份**：选一个备份文件夹，设一个备份密码。之后每加一步、每拿到一个时间证明，程序都会自己往那里写一份新的备份（保留最近 10 份），不用再管。
 
 ![第一次打开：自动备份](docs/screenshots/first-run-backup.png)
 
-**备份放哪儿？** 放一个「不只在这台 Mac 上」的地方：外接硬盘，或者你本来就在用的同步文件夹（iCloud Drive、Dropbox、Google Drive、OneDrive）。程序会把找到的这类位置列出来让你选；如果你选的文件夹和数据在同一块硬盘上，顶栏会提醒「Backup is on this Mac only」——这样的备份在电脑丢了或坏了时帮不上忙。备份用的是你自己的存储，本工具不收费，也不经手。
+**备份放哪儿？** 放一个「不只在这台电脑上」的地方：外接硬盘，或者你本来就在用的同步文件夹（Mac：iCloud Drive、Dropbox、Google Drive、OneDrive；Windows：OneDrive、iCloud for Windows 的 iCloud Drive、Dropbox、Google Drive 的「我的云端硬盘」、另一块硬盘或 U 盘）。程序会把找到的这类位置列出来让你选；如果你选的文件夹和数据在同一块硬盘上，顶栏会提醒「Backup is on this Mac only」——这样的备份在电脑丢了或坏了时帮不上忙。备份用的是你自己的存储，本工具不收费，也不经手。
 
 **备份是全加密的**（`.rprovbackup` 文件：数据库、全部附件和签名钥匙一起用 AES-256-GCM 加密，打开它要备份密码或恢复码）：放在 iCloud 或 Dropbox 里，对方也看不到任何标题或内容。**请把备份密码记在安全的地方**——密码和恢复码都没有了，谁都打不开备份，包括我们。这台 Mac 把密码存在钥匙串里，所以备份能自动进行；只有恢复时才需要你再输入。
 
@@ -136,7 +173,7 @@ python3 verify.py provenance-FSF-2026-10-12.zip      # 也可以对解压后的�
 
 检查比特币时间锚定时，`verify.py` 会向两个公开区块浏览器（blockstream.info、mempool.space）查询区块头，只发送区块高度；有自己的比特币节点可以用 `--bitcoin-node http://user:pass@127.0.0.1:8332`，完全不联网用 `--offline`（这时比特币锚定显示为「未核对」，不算失败也不给时间）。
 
-它逐条检查：内容的哈希（V1）、清单和载荷（V2）、签名（V3）、第三方签名时间证明（V4，对照内置的 FreeTSA 根证书）、比特币时间锚定（V5）、日志链（V6）、引用（V7）。每条记录的结果是 *Pass*、*Pass (Bitcoin anchor pending)*、*Warning* 或 *Fail*（附失败代码）。退出码 0 表示没有任何记录失败。
+它逐条检查：内容的哈希（V1）、清单和载荷（V2）、签名（V3）、第三方签名时间证明（V4，对照内置的 FreeTSA 和 DigiCert 两个根证书，最后会打印两者的指纹）、比特币时间锚定（V5）、日志链（V6）、引用（V7）。每条记录的结果是 *Pass*、*Pass (Bitcoin anchor pending)*、*Warning* 或 *Fail*（附失败代码）。退出码 0 表示没有任何记录失败。
 
 不想运行程序的人，可以照 `VERIFY.md` 用 `sha256sum`、`openssl` 和 `ots` 命令手工检查同样的内容。
 
@@ -145,11 +182,28 @@ python3 verify.py provenance-FSF-2026-10-12.zip      # 也可以对解压后的�
 ```bash
 make dev              # 后端（自动重载）+ Vite 开发服务器 http://127.0.0.1:5173
 make test             # ruff + 全部测试（单元、接口、篡改、端到端）；联网测试跳过
-make test-network     # 需要真实 FreeTSA / OpenTimestamps / 区块浏览器的测试（含 AC-09），在联网的 Mac 上跑
+make test-network     # 需要真实 FreeTSA / DigiCert / OpenTimestamps / 区块浏览器的测试（含 AC-09），在联网的 Mac 上跑
 make verify-py        # 从核心库重新生成 dist/verify.py
+make tsa-fixture      # 把真实的 FreeTSA / DigiCert 回应存成离线测试用的样本（在联网的 Mac 上跑，存进 tests/fixtures/tsa/ 后提交）
 ```
 
 不联网开发时可以用模拟时间证明：`RPROV_TSA=mock RPROV_BTC=mock make run`（模拟机构签的证明，`verify.py` 默认不信任；只在测试时加 `--tsa-root certs/mock-tsa-root.pem`）。没有钥匙串的 Linux 开发环境另需 `RPROV_KEYSTORE=dev-insecure-file`（明文钥匙文件，只用于开发）。
+
+**打安装包**（DECISIONS D-044）：
+
+```bash
+bash packaging/build_macos.sh          # 在 Mac 上：dist/Research History.app 和 .dmg，并自动做一遍冒烟测试
+# Windows（需要 Inno Setup 6）：
+#   ./packaging/build_windows.ps1; ./packaging/smoke_windows.ps1
+```
+
+GitHub Actions 的 **Package** 工作流在每次推送时自动打两个安装包，并完整试一遍（安装、启动、建身份、存一步、导出、用导出的 verify.py 检查、卸载后数据还在）。发布新版本：把 `pyproject.toml` 里的 `version` 改成新版本号并提交，再推送同名标签（如 `git tag v0.2.0 && git push origin v0.2.0`），工作流会建一个附带两个安装包和 `SHA256SUMS.txt` 的**草稿** Release，检查无误后在 GitHub 上点发布。在中国大陆下载 GitHub 可能很慢，可以把同样的文件另外放到国内网盘或对象存储，并附上 `SHA256SUMS.txt` 让大家对照。
+
+**以后要签名的话需要什么：**
+
+- **macOS**：加入 Apple Developer Program（每年 99 美元），申请「Developer ID Application」证书；打包时用它签名（开启 hardened runtime），再用 `xcrun notarytool submit --wait` 提交苹果公证、`xcrun stapler staple` 把结果钉进 .dmg。之后用户双击就能打开，升级后钥匙串也不会再问。证书和 App Store Connect API 密钥可以存成 GitHub Secrets，让 Package 工作流自动签名和公证。
+- **Windows**：需要代码签名证书。可选：微软的云签名服务（Azure Trusted Signing，现名 Artifact Signing，约每月 10 美元，目前只对部分国家和地区的机构与个人开放，以微软官网为准），或者向证书机构购买 OV 代码签名证书（每年约 200–500 美元，私钥必须放在硬件令牌或云端 HSM 里）。用 `signtool` 签安装包和程序，并加时间戳（如 `http://timestamp.digicert.com`）。签名后「仍要运行」的提示会随着下载量逐渐消失（SmartScreen 信誉要积累，EV 证书现在也不能立刻免除提示），智能应用控制也会放行。
+- **Intel Mac**：在 Intel 的 macOS 运行器上再打一份（`macos-13`），或者用 universal2 的 Python 和依赖打一个同时支持两种芯片的包；代码本身不用改。
 
 代码结构：`core/provenance_core/` 是唯一包含信任逻辑的核心库（JCS、哈希、签名、日志链、重放、验证、时间证明接口），`app/` 是本地服务（FastAPI + SQLite），`web/` 是界面（React + TypeScript），`tools/build_verify.py` 从核心库生成单文件 `verify.py`。
 
@@ -157,4 +211,5 @@ make verify-py        # 从核心库重新生成 dist/verify.py
 
 - **P0 已完成**：只追加的记录、签名、重放；第三方签名时间证明（RFC 3161）；导出证据包、`report.html`（含静态演化图）、`verify.py`、篡改测试；记录表单和演化图。
 - **P1 已完成**：比特币时间锚定（OpenTimestamps）和区块浏览器核对；「只看里程碑」视图；时间线视图；详情侧栏的完整分区（Verified record / Author statement / Later additions / Changes，以及在侧栏里追加关系、里程碑、说明、撤回）；备份与恢复；FSF 样例数据。
-- **需要在联网的 Mac 上完成**：`make freetsa-certs`、`make test-network`（AC-09：真实 FreeTSA 的 `.tsr` 用 `openssl ts -verify` 验证；真实 OpenTimestamps 日历和区块浏览器），以及 PRD 第 16 节的 4 项人工检查。
+- **第 4 轮（安装包）**：macOS（Apple 芯片）和 Windows 10/11 安装包，菜单栏/通知区域图标，只开一份；Windows 的备份位置建议和全套测试（含浏览器测试）在 GitHub Actions 上跑；日期章增加 DigiCert 作为备用；Settings → Check stamp services 检查各个时间证明服务能不能连上（见 DECISIONS D-043 – D-045）。
+- **需要在联网的 Mac 上完成**：`make freetsa-certs`、`make test-network`（AC-09：真实 FreeTSA 的 `.tsr` 用 `openssl ts -verify` 验证；真实 DigiCert 时间戳；真实 OpenTimestamps 日历和区块浏览器），以及 PRD 第 16 节的 4 项人工检查。

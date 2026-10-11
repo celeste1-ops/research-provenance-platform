@@ -1,0 +1,10 @@
+# Keep LF line endings on every platform (Windows checkouts included): record hashes,
+# fixtures and snapshots compare exact bytes.
+* text=auto eol=lf
+*.png binary
+*.ico binary
+*.icns binary
+*.ots binary
+*.tsr binary
+*.der binary
+*.sqlite3 binary

@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { api } from "../api";
-import { HOME_NOTE } from "../labels";
+import { homeNote } from "../labels";
 import { BackupSetup, RestoreForm } from "./BackupDialog";
+import { dev, keychainName } from "../device";
 
 // First run: (1) your name + first project, (2) automatic backup. Or restore instead.
 export function Setup({ onDone, onPractice }: { onDone: () => void; onPractice: () => void }) {
@@ -45,7 +46,7 @@ export function Setup({ onDone, onPractice }: { onDone: () => void; onPractice: 
                 <b>Every step gets a date stamp automatically</b>, so you can later show it existed by that date and
                 hasn't been changed since.
               </li>
-              <li data-testid="home-note-setup">{HOME_NOTE}</li>
+              <li data-testid="home-note-setup">{homeNote()}</li>
             </ul>
             <form onSubmit={start}>
               <label>
@@ -62,7 +63,7 @@ export function Setup({ onDone, onPractice }: { onDone: () => void; onPractice: 
                 {busy ? "Setting up…" : "Start"}
               </button>
               <p className="note">
-                This also creates a signing key kept in this Mac's Keychain. It shows that all steps came from the same
+                This also creates a signing key kept in this {dev()}'s {keychainName()}. It shows that all steps came from the same
                 key — not who you are.
               </p>
             </form>
@@ -74,7 +75,7 @@ export function Setup({ onDone, onPractice }: { onDone: () => void; onPractice: 
               <span className="muted">— nothing there goes into your real record.</span>
             </p>
             <p className="small center">
-              Already used this app on another Mac?{" "}
+              Already used this app on another {dev()}?{" "}
               <button type="button" className="link" onClick={() => setStep("restore")}>
                 Restore from a backup
               </button>
@@ -86,7 +87,7 @@ export function Setup({ onDone, onPractice }: { onDone: () => void; onPractice: 
           <>
             <h1>Turn on automatic backup</h1>
             <p>
-              Your research lives on this Mac. If the Mac is lost or breaks, a backup is what brings it back — the
+              Your research lives on this {dev()}. If the {dev()} is lost or breaks, a backup is what brings it back — the
               stamps alone can't. Choose a folder once; after that every new step is backed up automatically.
             </p>
             <BackupSetup onDone={onDone} onSkip={onDone} />

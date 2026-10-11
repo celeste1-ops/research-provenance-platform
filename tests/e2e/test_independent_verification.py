@@ -6,6 +6,7 @@ import hashlib
 import json
 import shutil
 import subprocess
+import sys
 
 import pytest
 
@@ -18,9 +19,9 @@ def test_verify_py_in_fresh_venv(tmp_path, uv_bin):
     s = make_sample(tmp_path)
     venv = tmp_path / "fresh-venv"
     subprocess.run([uv_bin, "venv", "--quiet", "--python", "3.12", str(venv)], check=True)
-    py = venv / "bin" / "python"
+    py = venv / "Scripts" / "python.exe" if sys.platform == "win32" else venv / "bin" / "python"
     # Exactly the dependencies verify.py declares in its header.
-    header = (s.bundle_dir / "verify.py").read_text().split('"""')[1]
+    header = (s.bundle_dir / "verify.py").read_text(encoding="utf-8").split('"""')[1]
     assert 'pip install "cryptography>=44" "rfc3161-client>=1.0.6"' in header
     subprocess.run([uv_bin, "pip", "install", "--quiet", "--python", str(py),
                     "cryptography>=44", "rfc3161-client>=1.0.6"], check=True)
@@ -34,14 +35,14 @@ def test_verify_py_in_fresh_venv(tmp_path, uv_bin):
         out = subprocess.run(
             [str(py), "-I", str(s.bundle_dir / "verify.py"), str(target),
              "--tsa-root", str(s.bundle_dir / "certs" / "mock-tsa-root.pem")],
-            cwd=work, capture_output=True, text=True,
+            cwd=work, capture_output=True, text=True, encoding="utf-8",
         )
         assert out.returncode == 0, out.stdout + out.stderr
         assert "Result: OK" in out.stdout
     out = subprocess.run(
         [str(py), "-I", str(s.bundle_dir / "verify.py"), str(s.bundle_dir), "--json",
          "--tsa-root", str(s.bundle_dir / "certs" / "mock-tsa-root.pem")],
-        cwd=work, capture_output=True, text=True,
+        cwd=work, capture_output=True, text=True, encoding="utf-8",
     )
     data = json.loads(out.stdout)
     assert data["ok"] is True
@@ -55,12 +56,12 @@ def test_manual_verify_md_commands(tmp_path):
         pytest.skip("needs openssl and sha256sum")
     s = make_sample(tmp_path)
     d = s.bundle_dir
-    verify_md = (d / "VERIFY.md").read_text()
+    verify_md = (d / "VERIFY.md").read_text(encoding="utf-8")
     assert "openssl ts -verify -data manifests/<id>.json -in proofs/<id>.tsr" in verify_md
     rid = s.ids["exp"]
 
     def sha(rel: str) -> str:
-        out = subprocess.run(["sha256sum", rel], cwd=d, capture_output=True, text=True, check=True)
+        out = subprocess.run(["sha256sum", rel], cwd=d, capture_output=True, text=True, encoding="utf-8", check=True)
         return out.stdout.split()[0]
 
     payload = json.loads((d / f"payloads/{rid}.json").read_bytes())
@@ -77,24 +78,24 @@ def test_manual_verify_md_commands(tmp_path):
         (d / "id.bin").write_bytes(bytes.fromhex(rid))
     assert (d / "id.bin").read_bytes() == bytes.fromhex(rid)
     out = subprocess.run([openssl, "pkeyutl", "-verify", "-pubin", "-inkey", "identity/public_key.pem", "-rawin",
-                          "-in", "id.bin", "-sigfile", f"signatures/{rid}.sig"], cwd=d, capture_output=True, text=True)
+                          "-in", "id.bin", "-sigfile", f"signatures/{rid}.sig"], cwd=d, capture_output=True, text=True, encoding="utf-8")
     assert out.returncode == 0 and "Signature Verified Successfully" in out.stdout, out.stdout + out.stderr
 
     # 3. third-party timestamp — this bundle is from the mock TSA, so use its root (VERIFY.md says so)
     assert "Test bundle" in verify_md
     out = subprocess.run([openssl, "ts", "-verify", "-data", f"manifests/{rid}.json", "-in", f"proofs/{rid}.tsr",
                           "-CAfile", "certs/mock-tsa-root.pem", "-untrusted", "certs/mock-tsa.pem"],
-                         cwd=d, capture_output=True, text=True)
+                         cwd=d, capture_output=True, text=True, encoding="utf-8")
     assert out.returncode == 0 and "Verification: OK" in out.stdout, out.stdout + out.stderr
     # ...and the FreeTSA root rightly refuses a mock token.
     out = subprocess.run([openssl, "ts", "-verify", "-data", f"manifests/{rid}.json", "-in", f"proofs/{rid}.tsr",
                           "-CAfile", "certs/freetsa-cacert.pem", "-untrusted", "certs/freetsa-tsa.crt"],
-                         cwd=d, capture_output=True, text=True)
+                         cwd=d, capture_output=True, text=True, encoding="utf-8")
     assert out.returncode != 0
     # A tampered manifest fails the manual timestamp check too.
     (d / "tampered.json").write_bytes((d / f"manifests/{rid}.json").read_bytes() + b" ")
     out = subprocess.run([openssl, "ts", "-verify", "-data", "tampered.json", "-in", f"proofs/{rid}.tsr",
                           "-CAfile", "certs/mock-tsa-root.pem", "-untrusted", "certs/mock-tsa.pem"],
-                         cwd=d, capture_output=True, text=True)
+                         cwd=d, capture_output=True, text=True, encoding="utf-8")
     assert out.returncode != 0
     assert hashlib.sha256((d / f"manifests/{rid}.json").read_bytes()).hexdigest() == rid

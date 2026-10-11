@@ -184,6 +184,8 @@ export interface Status {
   space: "real" | "practice";
   practice_dir: string;
   data_dir_warning: string | null;
+  device: string;
+  keychain_name: string;
 }
 
 export interface Project {
@@ -197,4 +199,19 @@ export interface ExportPreview {
   records: { id: string; seq: number; kind: string; disclosure: string; visible: string[] }[];
   warnings: string[];
   counts: Record<string, number>;
+}
+
+// “Check stamp services” (DECISIONS D-045)
+export interface ServiceCheck {
+  group: "tsa" | "calendar" | "explorer";
+  name: string;
+  url: string;
+  ok: boolean;
+  ms: number | null;
+  detail: string;
+}
+
+export interface ServiceCheckResult {
+  checks: ServiceCheck[];
+  in_use: { tsa: string[]; btc: boolean; explorers: boolean };
 }

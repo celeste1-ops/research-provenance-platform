@@ -1,21 +1,23 @@
 # Research provenance tool — one-command entry points (PRD §13).
 UV      ?= uv
-PY      := $(UV) run --extra ots python
+PY      := $(UV) run --extra ots --extra desktop python
 PORT    ?= 8765
 
-.PHONY: help install dev run test test-network lint fmt web demo verify-py freetsa-certs clean
+.PHONY: help install dev run test test-network lint fmt web demo verify-py freetsa-certs tsa-fixture clean
 
 help:
 	@echo "make install      install Python (uv), web (npm) and test-browser dependencies"
 	@echo "make dev          backend with reload on 127.0.0.1:$(PORT) + Vite dev server on 127.0.0.1:5173"
 	@echo "make run          build the UI and serve everything on 127.0.0.1:$(PORT)"
 	@echo "make test         ruff + full pytest suite (network tests skipped)"
-	@echo "make test-network run the tests that need real FreeTSA / OpenTimestamps"
+	@echo "make test-network run the tests that need real FreeTSA / DigiCert / OpenTimestamps"
 	@echo "make demo         load the FSF sample data into the data directory"
 	@echo "make verify-py    regenerate dist/verify.py from the core library"
+	@echo "make freetsa-certs refresh the FreeTSA certificates and check the DigiCert root"
+	@echo "make tsa-fixture  save real FreeTSA / DigiCert responses as offline test fixtures"
 
 install:
-	$(UV) sync --extra ots
+	$(UV) sync --extra ots --extra desktop
 	cd web && npm ci
 	$(UV) run playwright install chromium   # browser for the end-to-end tests in `make test`
 
@@ -39,10 +41,10 @@ fmt:
 	$(UV) run ruff format .
 
 test: lint
-	$(UV) run --extra ots pytest
+	$(UV) run --extra ots --extra desktop pytest
 
 test-network:
-	RPROV_NETWORK_TESTS=1 $(UV) run --extra ots pytest -m network
+	RPROV_NETWORK_TESTS=1 $(UV) run --extra ots --extra desktop pytest -m network
 
 demo:
 	$(PY) -m app.demo
@@ -52,6 +54,9 @@ verify-py:
 
 freetsa-certs:
 	$(PY) tools/update_freetsa_certs.py
+
+tsa-fixture:
+	$(PY) tools/capture_tsa_fixture.py
 
 clean:
 	rm -rf dist web/dist .pytest_cache

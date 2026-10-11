@@ -40,6 +40,7 @@ from app.services.backup import (
     stamp_to_iso,
     write_backup_file,
 )
+from app.services.locations import SUGGESTED_FOLDER_NAME, suggestions, synced_service  # noqa: F401
 from provenance_core.signing import public_key_hex
 
 log = logging.getLogger("rprov.backup")
@@ -48,35 +49,12 @@ KEEP_BACKUPS = 10
 DEBOUNCE_SECONDS = 20.0
 MIN_PASSWORD = 8
 
-ICLOUD_DRIVE = Path("~/Library/Mobile Documents/com~apple~CloudDocs").expanduser()
-CLOUD_STORAGE = Path("~/Library/CloudStorage").expanduser()
-LEGACY_SYNC_FOLDERS = (("Dropbox", Path("~/Dropbox").expanduser()),)
-SUGGESTED_FOLDER_NAME = "Research Provenance Backups"
-
-
 def _now() -> datetime:
     return datetime.now(UTC).replace(microsecond=0)
 
 
 def _iso(dt: datetime) -> str:
     return dt.strftime("%Y-%m-%dT%H:%M:%SZ")
-
-
-def synced_service(path: Path) -> str | None:
-    """Name of the sync service whose folder contains ``path`` (iCloud Drive, Dropbox, …), if any."""
-    try:
-        resolved = path.expanduser().resolve()
-    except OSError:
-        return None
-    roots = [("iCloud Drive", ICLOUD_DRIVE), *LEGACY_SYNC_FOLDERS]
-    for label, root in roots:
-        if root.exists() and (resolved == root.resolve() or root.resolve() in resolved.parents):
-            return label
-    if CLOUD_STORAGE.exists():
-        base = CLOUD_STORAGE.resolve()
-        if base in resolved.parents:
-            return resolved.relative_to(base).parts[0].split("-")[0]
-    return None
 
 
 def data_dir_warning(data_dir: Path) -> str | None:
@@ -99,23 +77,23 @@ def inside(folder: Path, data_dir: Path) -> bool:
     return f == d or d in f.parents
 
 
-def check_location(location: str, data_dir: Path) -> dict:
+def check_location(location: str, data_dir: Path, device: str = "computer") -> dict:
     """What the backup dialog shows while the author types or picks a folder."""
     folder = Path(location).expanduser()
     if not location.strip() or not folder.is_absolute():
         return {"ok": False, "kind": "invalid", "label": "Choose a full folder path", "safe": False}
     if inside(folder, data_dir):
         return {"ok": False, "kind": "inside-data", "label": "Inside the app's own data folder", "safe": False,
-                "warning": "Choose a folder outside the app's data folder — and ideally not on this Mac at all."}
+                "warning": f"Choose a folder outside the app's data folder — and ideally not on this {device} at all."}
     if folder.is_dir():
-        return {"ok": True, **classify_location(folder, data_dir)}
+        return {"ok": True, **classify_location(folder, data_dir, device)}
     if folder.parent.is_dir():
-        where = classify_location(folder.parent, data_dir)
+        where = classify_location(folder.parent, data_dir, device)
         return {"ok": True, **where, "creates": True}
-    return {"ok": False, **classify_location(folder, data_dir)}
+    return {"ok": False, **classify_location(folder, data_dir, device)}
 
 
-def classify_location(folder: Path, data_dir: Path) -> dict:
+def classify_location(folder: Path, data_dir: Path, device: str = "computer") -> dict:
     """Where would a backup in ``folder`` survive? Returns kind + plain-language label.
 
     kind: synced (a cloud-sync folder) | external (another disk) | same-disk | missing
@@ -135,36 +113,12 @@ def classify_location(folder: Path, data_dir: Path) -> dict:
         return {"kind": "external", "label": "Another disk", "safe": True}
     return {
         "kind": "same-disk",
-        "label": "This Mac's own disk",
+        "label": f"This {device}'s own disk",
         "safe": False,
-        "warning": "This folder is on this Mac's own disk: if this Mac is lost or breaks, this backup is lost "
-        "with it. Choose an external drive or a synced folder such as iCloud Drive.",
+        "warning": f"This folder is on this {device}'s own disk: if this {device} is lost or breaks, this backup "
+        "is lost with it. Choose an external drive or a folder your sync service (iCloud Drive, OneDrive, "
+        "Dropbox…) copies elsewhere.",
     }
-
-
-def suggestions(data_dir: Path) -> list[dict]:
-    """Folders worth offering: iCloud Drive, other cloud-sync folders, external drives."""
-    out = []
-    if ICLOUD_DRIVE.is_dir():
-        out.append({"path": str(ICLOUD_DRIVE / SUGGESTED_FOLDER_NAME), "label": "iCloud Drive", "kind": "synced"})
-    if CLOUD_STORAGE.is_dir():
-        for entry in sorted(CLOUD_STORAGE.iterdir()):
-            if entry.is_dir() and not entry.name.startswith("."):
-                provider = entry.name.split("-")[0]
-                out.append({"path": str(entry / SUGGESTED_FOLDER_NAME), "label": provider, "kind": "synced"})
-    for label, root in LEGACY_SYNC_FOLDERS:
-        if root.is_dir():
-            out.append({"path": str(root / SUGGESTED_FOLDER_NAME), "label": label, "kind": "synced"})
-    volumes = Path("/Volumes")
-    if volumes.is_dir():
-        for vol in sorted(volumes.iterdir()):
-            try:
-                if vol.is_dir() and not vol.is_symlink() and os.stat(vol).st_dev != os.stat(data_dir).st_dev:
-                    out.append({"path": str(vol / SUGGESTED_FOLDER_NAME), "label": f"Drive “{vol.name}”",
-                                "kind": "external"})
-            except OSError:
-                continue
-    return out
 
 
 class AutoBackup:
@@ -348,7 +302,7 @@ class AutoBackup:
             "keep": KEEP_BACKUPS,
         }
         if location:
-            st["where"] = classify_location(Path(location), self.ctx.settings.data_dir)
+            st["where"] = classify_location(Path(location), self.ctx.settings.data_dir, self.ctx.settings.device)
         if location and not configured:
             st["needs_password"] = True
         paused = ledger.meta("backup_paused") or ""

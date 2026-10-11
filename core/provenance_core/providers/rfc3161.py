@@ -16,7 +16,7 @@ from cryptography import x509
 from rfc3161_client import HashAlgorithm, TimestampRequestBuilder, decode_timestamp_response
 
 from ..certs import builtin_tsa_roots, freetsa_bundle_files
-from ..proofs import ProofCheck, verify_tsa_proof
+from ..proofs import ProofCheck, canonical_tsr, verify_tsa_proof
 from .base import AnchorResult, ProviderRejected, ProviderUnavailable, TimestampProvider
 
 FREETSA_URL = "https://freetsa.org/tsr"
@@ -71,7 +71,7 @@ class Rfc3161Provider(TimestampProvider):
             raise ProviderUnavailable(f"{self.name}: HTTP {response.status_code}")
         if response.status_code != 200:
             raise ProviderRejected(f"{self.name}: HTTP {response.status_code}")
-        tsr = response.content
+        tsr = canonical_tsr(response.content)  # certificates in DER order (D-045), as stored and exported
         try:
             parsed = decode_timestamp_response(tsr)
             nonce = parsed.tst_info.nonce

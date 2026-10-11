@@ -41,7 +41,7 @@ def test_foreign_origin_rejected(client):
 def test_token_is_in_the_page_not_the_url(ctx, tmp_path):
     dist = tmp_path / "dist"
     dist.mkdir()
-    (dist / "index.html").write_text('<meta name="rprov-session-token" content="__RPROV_SESSION_TOKEN__">')
+    (dist / "index.html").write_text('<meta name="rprov-session-token" content="__RPROV_SESSION_TOKEN__">', encoding="utf-8")
     ctx.settings.web_dist = dist
     app = create_app(ctx)
     with TestClient(app, base_url="http://127.0.0.1:8765") as cl:

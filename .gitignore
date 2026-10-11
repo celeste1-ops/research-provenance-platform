@@ -9,3 +9,4 @@ web/dist/
 *.egg-info/
 .DS_Store
 *.tsbuildinfo
+build/

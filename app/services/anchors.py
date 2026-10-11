@@ -9,19 +9,24 @@ from __future__ import annotations
 
 import logging
 import threading
+import time
 from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import select
 from sqlalchemy.orm import sessionmaker
 
 from app.db.models import WRITE_LOCK, AnchorRow, RecordRow
-from provenance_core.providers.base import TimestampProvider
+from provenance_core.providers.base import ProviderUnavailable, TimestampProvider
 
 log = logging.getLogger("rprov.anchors")
 
 BACKOFF_BASE = timedelta(minutes=1)
 BACKOFF_MAX = timedelta(hours=6)
 MAX_ATTEMPTS_BEFORE_FAILED = 30
+# Saving waits for the stamps. A service that could not be reached a moment ago (blocked,
+# offline) is not waited for again on the next saves for this long; the retry job and
+# "Check stamps now" still try it (D-045).
+SKIP_AFTER_UNREACHABLE_SECONDS = 600.0
 
 
 def _now() -> datetime:
@@ -42,6 +47,11 @@ class AnchorService:
         self.sessions = sessions
         self.providers = providers  # {"tsa": provider|None, "btc": provider|None}
         self._lock = threading.Lock()
+        self._unreachable_at: dict[str, float] = {}  # kind -> time.monotonic() of the last failure
+
+    def recently_unreachable(self, kind: str) -> bool:
+        at = self._unreachable_at.get(kind)
+        return at is not None and time.monotonic() - at < SKIP_AFTER_UNREACHABLE_SECONDS
 
     def enabled(self) -> dict[str, TimestampProvider]:
         return {k: p for k, p in self.providers.items() if p is not None}
@@ -68,6 +78,9 @@ class AnchorService:
                         )
                         s.add(row)
             for kind in self.enabled():
+                if self.recently_unreachable(kind):
+                    log.info("%s service unreachable a moment ago: not waiting for it; it is retried later", kind)
+                    continue  # the row stays pending and due, so the next refresh picks it up
                 self._attempt(record_id, kind, manifest)
 
     def _attempt(self, record_id: str, kind: str, manifest: bytes) -> None:
@@ -84,12 +97,16 @@ class AnchorService:
         except Exception as exc:  # noqa: BLE001 - every failure goes to the retry queue
             error = f"{type(exc).__name__}: {exc}"
             log.info("%s proof for %s not obtained: %s", kind, record_id[:12], error)
+            if isinstance(exc, ProviderUnavailable):
+                self._unreachable_at[kind] = time.monotonic()
+        else:
+            self._unreachable_at.pop(kind, None)
         with WRITE_LOCK, self.sessions.begin() as s:
             row = s.scalar(select(AnchorRow).where(AnchorRow.record_id == record_id, AnchorRow.provider == kind))
             now = _now()
             row.attempts += 1
             row.updated_local = _iso(now)
-            row.provider_name = provider.name
+            row.provider_name = (result.provider if result is not None and result.provider else provider.name)
             if result is not None and error is None:
                 row.status = result.status
                 row.proof_bytes = result.proof

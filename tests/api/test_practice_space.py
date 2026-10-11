@@ -108,3 +108,14 @@ def test_stamp_checks_cover_both_spaces(api, client, ctx, force):
     assert len(spaces.anchor_services()) == 2
     stats = spaces.refresh(force=force)
     assert set(stats) >= {"submitted", "upgraded", "still_pending"}
+
+
+def test_start_over_reports_a_folder_it_cannot_delete(api, client, ctx, monkeypatch):
+    """Windows keeps files in use undeletable for a moment; never silently keep old practice data."""
+    import app.services.spaces as spaces_mod
+
+    _practice_entry(client)
+    monkeypatch.setattr(spaces_mod.shutil, "rmtree", lambda *a, **k: None)  # nothing gets deleted
+    monkeypatch.setattr(spaces_mod.time, "sleep", lambda s: None)
+    r = client.post("/api/practice/reset", json={})
+    assert r.status_code == 409 and "still in use" in r.text

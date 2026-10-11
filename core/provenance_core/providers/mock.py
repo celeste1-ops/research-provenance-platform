@@ -57,14 +57,19 @@ def _alg(oid: str) -> bytes:
 
 
 def build_mock_tsr(
-    digest: bytes, gen_time: datetime, nonce: int | None = None, *, cert: x509.Certificate | None = None, key=None
+    digest: bytes, gen_time: datetime, nonce: int | None = None, *, cert: x509.Certificate | None = None, key=None,
+    chain: tuple[x509.Certificate, ...] | list[x509.Certificate] = (), chain_order: bool = False,
 ) -> bytes:
     """A complete, verifiable RFC 3161 TimeStampResp from the mock TSA (or from the
-    given certificate and RSA key, e.g. an "attacker" TSA in tamper tests)."""
+    given certificate and RSA key, e.g. an "attacker" TSA in tamper tests).
+
+    ``chain`` adds more certificates to the token; ``chain_order`` lists them signer first
+    instead of in DER order, as DigiCert does (D-045)."""
     if cert is None or key is None:
         cert = x509.load_pem_x509_certificate((MOCK_TSA_DIR / "mock-tsa.pem").read_bytes())
         key = serialization.load_pem_private_key((MOCK_TSA_DIR / "mock-tsa-key.pem").read_bytes(), None)
     cert_der = cert.public_bytes(serialization.Encoding.DER)
+    certs = [cert_der] + [c.public_bytes(serialization.Encoding.DER) for c in chain]
     serial = int.from_bytes(digest[:8], "big") >> 1 or 1
     fields = [
         der_int(1),
@@ -99,7 +104,7 @@ def build_mock_tsr(
         der_int(3),
         der_set(_alg(_SHA256)),
         der_seq(der_oid(_TST_INFO), der_explicit(0, der_octets(tst_info))),
-        der_tlv(0xA0, cert_der),
+        der_tlv(0xA0, b"".join(certs if chain_order else sorted(certs))),
         der_set(signer_info),
     )
     token = der_seq(der_oid(_SIGNED_DATA), der_explicit(0, signed_data))

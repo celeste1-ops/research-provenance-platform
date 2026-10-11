@@ -10,11 +10,13 @@ import { Help } from "./components/Help";
 import { Legend, TechnicalDetails, WhereIsMyData } from "./components/InfoPanels";
 import { KeyBackupDialog } from "./components/KeyBackupDialog";
 import { RecordForm } from "./components/RecordForm";
+import { ServiceCheckDialog } from "./components/ServiceCheck";
 import { Setup } from "./components/Setup";
 import { Timeline } from "./components/Timeline";
-import { HELP, HOME_NOTE } from "./labels";
+import { HELP, homeNote } from "./labels";
+import { dev, setDevice } from "./device";
 
-type Dialog = null | "form" | "export" | "backup" | "key" | "where" | "tech" | "practice-reset";
+type Dialog = null | "form" | "export" | "backup" | "key" | "where" | "tech" | "services" | "practice-reset";
 const SPACE_KEY = "rprov-space";
 
 // Remembered per browser so a reload stays in the same space (a convenience only).
@@ -55,6 +57,7 @@ export function App() {
   const reload = useCallback(async () => {
     try {
       const s = await api.status();
+      setDevice(s.device, s.keychain_name);
       setStatus(s);
       if (!s.initialized) return;
       const ps = await api.projects();
@@ -227,6 +230,7 @@ export function App() {
           {menuOpen && (
             <div className="menu" role="menu">
               <button role="menuitem" onClick={checkProofs}>Check stamps now</button>
+              <button role="menuitem" onClick={() => openMenuItem("services")}>Check stamp services…</button>
               {!practice && <button role="menuitem" onClick={() => openMenuItem("backup")}>Backup…</button>}
               <button role="menuitem" onClick={() => openMenuItem("where")}>Where is my data?</button>
               <hr />
@@ -255,7 +259,7 @@ export function App() {
       {!practice && status.backup?.other_copy && status.backup.state !== "paused" && (
         <div className="banner error small" data-testid="other-copy-banner">
           <span>
-            Another copy of this research (another Mac?) is also backing up into your backup folder. Use only one Mac to
+            Another copy of this research (another {dev()}?) is also backing up into your backup folder. Use only one {dev()} to
             add steps.
           </span>
           <button className="secondary small" onClick={() => setDialog("backup")}>
@@ -346,7 +350,7 @@ export function App() {
         )}
       </main>
       <footer className="footbar small" data-testid="home-note">
-        <span>{HOME_NOTE}</span>
+        <span>{homeNote()}</span>
         <button className="link small" onClick={() => setDialog("where")}>
           Where is my data?
         </button>
@@ -378,7 +382,7 @@ export function App() {
                   setNotice({ text: "Saved. It gets its date stamp in a few seconds and goes into the next automatic backup." });
                 } else {
                   setNotice({
-                    text: "Saved. Automatic backup is not set up yet — if this Mac is lost, this step would be lost too.",
+                    text: `Saved. Automatic backup is not set up yet — if this ${dev()} is lost, this step would be lost too.`,
                     action: { label: "Set up backup", onClick: () => setDialog("backup") },
                   });
                 }
@@ -414,6 +418,7 @@ export function App() {
       {dialog === "tech" && (
         <TechnicalDetails status={status} onClose={() => setDialog(null)} onKeyBackup={() => setDialog("key")} />
       )}
+      {dialog === "services" && <ServiceCheckDialog onClose={() => setDialog(null)} />}
       {dialog === "export" && (
         <ExportDialog rows={timeline} defaultTitle={project?.title ?? "evidence"} onClose={() => setDialog(null)}
           practice={practice} />

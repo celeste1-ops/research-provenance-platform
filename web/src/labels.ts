@@ -1,3 +1,4 @@
+import { dev } from "./device";
 import type { ProofStatus } from "./types";
 
 // Plain words used everywhere in the app (DECISIONS D-034, D-037). Reports and verify.py
@@ -40,12 +41,11 @@ export const HELP = {
   share:
     "Make a package anyone can check: a report plus a small checking program. You choose how much of each step it shows.",
   dateStamp:
-    "An independent timestamp service (FreeTSA) signs a fingerprint of the step within seconds. It shows the step existed at that time and has not changed since. Reports call it “Third-party timestamp”.",
+    "An independent timestamp service (FreeTSA, or DigiCert when FreeTSA can't be reached) signs a fingerprint of the step within seconds. It shows the step existed at that time and has not changed since. Reports call it “Third-party timestamp”.",
   publicStamp:
     "The same fingerprint is also written into the public Bitcoin blockchain, which anyone can check without trusting any company. It takes a few hours. Reports call it “Bitcoin anchor”.",
-  backup:
-    "A fully encrypted copy of everything, written automatically to a folder you choose. If this Mac is lost, it brings your research back.",
 } as const;
 
-export const HOME_NOTE =
-  "Your notes stay on this Mac. Only a fingerprint is sent out to get a date stamp. Backups let you get everything back if this Mac is lost.";
+export function homeNote(): string {
+  return `Your notes stay on this ${dev()}. Only a fingerprint is sent out to get a date stamp. Backups let you get everything back if this ${dev()} is lost.`;
+}

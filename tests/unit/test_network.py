@@ -1,5 +1,6 @@
 """Network tests (run on the Mac): AC-09 — a real FreeTSA .tsr verifies with the openssl
-command from PRD §10 — plus real OpenTimestamps calendars and block explorers.
+command from PRD §10 — the DigiCert fallback authority (D-045), real OpenTimestamps
+calendars and block explorers, and the "check stamp services" diagnostics.
 
 Skipped unless RPROV_NETWORK_TESTS=1 (`make test-network` on the Mac).
 """
@@ -38,7 +39,40 @@ def test_real_freetsa_token_verifies_with_openssl(tmp_path):
     out = subprocess.run(
         [openssl, "ts", "-verify", "-data", f"manifests/{rid}.json", "-in", f"proofs/{rid}.tsr",
          "-CAfile", str(FREETSA_ROOT_FILE), "-untrusted", str(FREETSA_TSA_FILE)],
-        cwd=tmp_path, capture_output=True, text=True,
+        cwd=tmp_path, capture_output=True, text=True, encoding="utf-8",
+    )
+    assert out.returncode == 0 and "Verification: OK" in out.stdout, out.stdout + out.stderr
+
+
+def test_real_digicert_token_verifies_with_builtin_root_and_openssl(tmp_path):
+    from cryptography.hazmat.primitives import serialization
+    from rfc3161_client import decode_timestamp_response
+
+    from app.config import Settings
+    from app.services.context import public_tsa
+    from app.services.export import signer_chain_file
+    from provenance_core.certs import DIGICERT_ROOT_FILE
+    from provenance_core.proofs import tsa_embedded_certificates
+
+    manifest_bytes, _, rid = _manifest()
+    result = public_tsa(Settings(), "digicert").submit(rid, manifest_bytes)
+    assert result.status == "confirmed"
+    # DigiCert lists its certificates in chain order; what is stored must be readable as is.
+    assert len(decode_timestamp_response(result.proof).signed_data.certificates) >= 2
+    check = verify_tsa_proof(rid, result.proof, builtin_tsa_roots())
+    assert check.verified and "DigiCert" in (check.source or ""), check
+    embedded = tsa_embedded_certificates(result.proof)
+    assert signer_chain_file(embedded) == "digicert-tsa-chain.pem"
+    openssl = shutil.which("openssl")
+    if openssl is None:
+        pytest.skip("openssl not installed")
+    (tmp_path / "chain.pem").write_bytes(b"".join(c.public_bytes(serialization.Encoding.PEM) for c in embedded))
+    (tmp_path / "m.json").write_bytes(manifest_bytes)
+    (tmp_path / "t.tsr").write_bytes(result.proof)
+    out = subprocess.run(
+        [openssl, "ts", "-verify", "-data", "m.json", "-in", "t.tsr",
+         "-CAfile", str(DIGICERT_ROOT_FILE), "-untrusted", "chain.pem"],
+        cwd=tmp_path, capture_output=True, text=True, encoding="utf-8",
     )
     assert out.returncode == 0 and "Verification: OK" in out.stdout, out.stdout + out.stderr
 

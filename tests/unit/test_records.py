@@ -1,6 +1,8 @@
 """AC-01 (vectors), AC-02, AC-03, AC-04 and record schema rules."""
 
+import hashlib
 import json
+import shutil
 import subprocess
 import uuid
 from pathlib import Path
@@ -63,8 +65,14 @@ def test_crlf_and_lf_give_same_body_hash(tmp_path):  # AC-04
     assert lf == crlf == cr
     exported = tmp_path / "body.md"
     exported.write_bytes(crlf)
-    out = subprocess.run(["sha256sum", str(exported)], capture_output=True, text=True, check=True)
-    assert out.stdout.split()[0] == R.sha256_hex(lf)
+    if shutil.which("sha256sum"):  # an independent tool where there is one (not on stock Windows)
+        # Relative name: GNU sha256sum escapes backslashes in Windows paths (and marks the line with "\").
+        out = subprocess.run(["sha256sum", exported.name], cwd=tmp_path, capture_output=True, text=True,
+                             encoding="utf-8", check=True)
+        digest = out.stdout.split()[0]
+    else:
+        digest = hashlib.sha256(exported.read_bytes()).hexdigest()
+    assert digest == R.sha256_hex(lf)
 
 
 def test_schema_rejects_bad_payloads():

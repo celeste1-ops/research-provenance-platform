@@ -184,7 +184,7 @@ def test_bundle_with_confirmed_bitcoin_anchor_verifies(tmp_path):
     assert report.ok
     assert all(r.btc.verified and r.tsa.verified for r in report.records)
     out = subprocess.run([sys.executable, "-I", str(bundle / "verify.py"), str(bundle), "--offline",
-                          "--tsa-root", str(bundle / "certs/mock-tsa-root.pem")], capture_output=True, text=True)
+                          "--tsa-root", str(bundle / "certs/mock-tsa-root.pem")], capture_output=True, text=True, encoding="utf-8")
     assert out.returncode == 0, out.stdout + out.stderr
     assert "Bitcoin anchor: attested, block header not checked" in out.stdout
     # A forged .ots (commitment changed) fails even offline, because the start digest no longer matches.
@@ -194,5 +194,5 @@ def test_bundle_with_confirmed_bitcoin_anchor_verifies(tmp_path):
     data[60] ^= 0xFF
     ots.write_bytes(bytes(data))
     out = subprocess.run([sys.executable, "-I", str(bundle / "verify.py"), str(bundle), "--offline",
-                          "--tsa-root", str(bundle / "certs/mock-tsa-root.pem")], capture_output=True, text=True)
+                          "--tsa-root", str(bundle / "certs/mock-tsa-root.pem")], capture_output=True, text=True, encoding="utf-8")
     assert out.returncode == 1 and "BTC_INVALID" in out.stdout

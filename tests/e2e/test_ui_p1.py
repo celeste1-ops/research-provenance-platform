@@ -45,6 +45,26 @@ def test_milestones_only_view(demo_page):  # AC-13
     assert graph.locator(".record-node").count() == 14
 
 
+def test_redrawing_the_map_never_hides_steps_again(demo_page):
+    """The map is fetched again after start-up, a restore and every save, mostly unchanged. Steps
+    handed to React Flow as new objects were hidden and measured again each time, and a redraw at
+    the wrong moment left one hidden for good (seen on CI after a restore). Unchanged steps now
+    stay the same objects; changed ones keep their size."""
+    page, ids, _srv = demo_page
+    page.wait_for_timeout(500)
+    page.evaluate("""() => { window.__hidden = 0;
+        new MutationObserver(ms => { for (const m of ms) if (m.target.classList?.contains('react-flow__node')
+            && m.target.style.visibility === 'hidden') window.__hidden++; })
+          .observe(document.querySelector('.react-flow'), {subtree: true, attributes: true, attributeFilter: ['style']}); }""")
+    page.get_by_test_id("settings-menu").click()
+    page.get_by_role("menuitem", name="Check stamps now").click()  # the same data again
+    page.get_by_test_id(f"node-{ids['exp1']}").click()  # a redraw where two steps change
+    page.get_by_test_id("detail").wait_for()
+    page.get_by_test_id(f"node-{ids['exp2']}").click()
+    page.wait_for_timeout(1000)
+    assert page.evaluate("window.__hidden") == 0
+
+
 def test_timeline_view(demo_page):
     page, ids, srv = demo_page
     page.get_by_test_id("tab-timeline").click()
@@ -275,8 +295,8 @@ def test_empty_state_and_help_panels(tmp_path, browser):
         # Technical actions live in the More menu.
         page.get_by_test_id("settings-menu").click()
         items = [i.inner_text() for i in page.get_by_role("menuitem").all()]
-        assert items == ["Check stamps now", "Backup…", "Where is my data?", "Technical details",
-                         "Back up signing key only…"]
+        assert items == ["Check stamps now", "Check stamp services…", "Backup…", "Where is my data?",
+                         "Technical details", "Back up signing key only…"]
         page.get_by_role("menuitem", name="Where is my data?").click()
         where = page.get_by_test_id("where-is-my-data")
         text = where.inner_text()
@@ -289,6 +309,100 @@ def test_empty_state_and_help_panels(tmp_path, browser):
         tech = page.get_by_test_id("technical-details")
         assert srv.ctx.ledger.installation in tech.inner_text()
         assert "2 — 1 research step, plus" in tech.inner_text()
+        page.close()
+
+
+def test_backup_form_does_not_move_under_the_pointer(tmp_path, browser, monkeypatch):
+    """On Windows the suggested folders arrive a few seconds late (every drive is looked at) and the
+    folder check a moment after typing. Both used to push the "Turn on" button down, so a click
+    could land on a suggestion instead (seen on windows-latest: the recovery sheet never came), and
+    a late list replaced a typed folder. Now the form waits for the list, and the check has room."""
+    import time
+
+    from app.services import autobackup
+
+    folder = tmp_path / "typed"
+    folder.mkdir()
+    other = tmp_path / "suggested"
+    real_check = autobackup.check_location
+
+    def slow_suggestions(data_dir):
+        time.sleep(1.5)
+        return [{"path": str(other), "label": "Drive D:", "kind": "external"}]
+
+    def slow_check(*args, **kwargs):
+        time.sleep(1.0)
+        return real_check(*args, **kwargs)
+
+    monkeypatch.setattr(autobackup, "suggestions", slow_suggestions)
+    monkeypatch.setattr(autobackup, "check_location", slow_check)
+    with LiveServer(tmp_path / "a") as srv:
+        srv.ctx.ledger.init_identity("Typist")
+        page = browser.new_page(viewport={"width": 1400, "height": 900})
+        page.goto(srv.url)
+        page.get_by_test_id("backup-pill").click()
+        expect(page.get_by_test_id("backup-looking")).to_be_visible()  # no form to click yet
+        assert page.get_by_test_id("backup-setup").count() == 0
+        dlg = page.get_by_test_id("backup-setup")
+        expect(dlg.get_by_text("Drive D:")).to_be_visible()  # the form comes with the list
+        field = dlg.get_by_label("Backup folder")
+        expect(field).to_have_value(str(other))  # an empty field takes the first suggestion
+        button = dlg.get_by_role("button", name="Turn on automatic backup")
+        field.fill(str(folder))
+        y = button.bounding_box()["y"]
+        expect(dlg.get_by_test_id("location-check")).to_contain_text("This Mac's own disk")
+        assert button.bounding_box()["y"] == y  # the check appeared without moving the button
+        expect(field).to_have_value(str(folder))
+        page.close()
+
+
+def _check(group, name, ok, detail, ms=420):
+    return {"group": group, "name": name, "url": f"https://{name}", "ok": ok, "ms": ms if ok else None,
+            "detail": detail}
+
+
+def test_check_stamp_services(tmp_path, browser):
+    """D-045: FreeTSA blocked, DigiCert working, one calendar blocked: the summary says what still works."""
+    with LiveServer(tmp_path) as srv:
+        srv.ctx.ledger.init_identity("Checker")
+        calls = []
+
+        def fake_check():
+            calls.append(1)
+            return {
+                "checks": [
+                    _check("tsa", "FreeTSA", False, "not reachable (ConnectTimeout)"),
+                    _check("tsa", "DigiCert", True, "stamp received and checked"),
+                    _check("calendar", "a.pool.opentimestamps.org", True, "answered"),
+                    _check("calendar", "b.pool.opentimestamps.org", True, "answered"),
+                    _check("calendar", "a.pool.eternitywall.com", False, "not reachable (ConnectError)"),
+                    _check("calendar", "ots.btc.catallaxy.com", True, "answered"),
+                    _check("explorer", "blockstream.info", True, "current block 917,123"),
+                    _check("explorer", "mempool.space", False, "not reachable (ConnectTimeout)"),
+                ],
+                "in_use": {"tsa": ["freetsa", "digicert"], "btc": True, "explorers": True},
+            }
+
+        srv.ctx.service_check = fake_check
+        page = browser.new_page(viewport={"width": 1400, "height": 900})
+        page.goto(srv.url)
+        page.get_by_test_id("empty-state").wait_for()
+        page.get_by_test_id("settings-menu").click()
+        page.get_by_role("menuitem", name="Check stamp services…").click()
+        dialog = page.get_by_test_id("service-check")
+        expect(dialog).to_contain_text("nothing from your notes")
+        assert calls == []  # nothing is contacted until the author asks
+        dialog.get_by_test_id("service-check-run").click()
+        summary = dialog.get_by_test_id("service-check-summary")
+        expect(summary).to_contain_text("Date stamps work (DigiCert answered).")
+        expect(summary).to_contain_text("Public stamps can start (3 of 4 services answered).")
+        expect(summary).to_contain_text("Finished public stamps can't be checked from here right now")
+        expect(dialog.get_by_test_id("service-FreeTSA")).to_contain_text("not reachable")
+        expect(dialog.get_by_test_id("service-DigiCert")).to_contain_text("0.4 s")
+        expect(dialog.get_by_test_id("service-check-run")).to_have_text("Check again")
+        assert calls == [1]
+        dialog.get_by_role("button", name="Close").click()
+        expect(page.get_by_test_id("service-check")).to_have_count(0)
         page.close()
 
 

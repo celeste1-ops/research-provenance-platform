@@ -111,14 +111,14 @@ class DevInsecureFileKeyStore(KeyStore):
     def load(self, installation: str) -> Ed25519PrivateKey | None:
         if not self.path.exists():
             return None
-        stored_inst, raw = self.path.read_text().split(":", 1)
+        stored_inst, raw = self.path.read_text(encoding="utf-8").split(":", 1)
         if stored_inst != installation:
             return None
         return private_key_from_raw(bytes.fromhex(raw.strip()))
 
     def save(self, installation: str, key: Ed25519PrivateKey) -> None:
         fd = os.open(self.path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
-        with os.fdopen(fd, "w") as fh:
+        with os.fdopen(fd, "w", encoding="utf-8") as fh:
             fh.write(f"{installation}:{private_key_raw(key).hex()}\n")
 
     def delete(self, installation: str) -> None:
@@ -131,11 +131,11 @@ class DevInsecureFileKeyStore(KeyStore):
 
     def load_secret(self, name: str) -> str | None:
         p = self._secret_path(name)
-        return p.read_text() if p.exists() else None
+        return p.read_text(encoding="utf-8") if p.exists() else None
 
     def save_secret(self, name: str, value: str) -> None:
         fd = os.open(self._secret_path(name), os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
-        with os.fdopen(fd, "w") as fh:
+        with os.fdopen(fd, "w", encoding="utf-8") as fh:
             fh.write(value)
 
 

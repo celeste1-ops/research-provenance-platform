@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { dev } from "../device";
 
 export interface SummaryItem {
   label: string;
@@ -41,7 +42,7 @@ export function ConfirmReal({
           ))}
         </dl>
       )}
-      <p className="note">Only a fingerprint of it is sent out for the date stamp; the content stays on this Mac.</p>
+      <p className="note">Only a fingerprint of it is sent out for the date stamp; the content stays on this {dev()}.</p>
       {error && <p className="error">{error}</p>}
       <div className="actions">
         <button type="button" className="secondary" onClick={onCancel} disabled={busy}>

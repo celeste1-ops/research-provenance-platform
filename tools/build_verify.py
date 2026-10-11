@@ -82,22 +82,35 @@ def _top_level_names(source: str) -> set[str]:
 
 
 def _certs_block() -> str:
-    root_pem = (CORE / "certs" / "freetsa-cacert.pem").read_text().strip()
-    from provenance_core.certs import FREETSA_ROOT_SHA256
+    from provenance_core.certs import BUILTIN_TSA_ROOTS, FREETSA_ROOT_SHA256
 
+    entries = []
+    for name, label, sha in BUILTIN_TSA_ROOTS:
+        pem = (CORE / "certs" / name).read_text(encoding="ascii").strip()
+        entries.append(f'    ({label!r}, "{sha}", b"""{pem}\n"""),')
+    listing = "\n".join(f"#   {label}: SHA-256 {sha}" for _n, label, sha in BUILTIN_TSA_ROOTS)
     return f'''
-# ---------------------------------------------------------------- built-in trust anchor
-# FreeTSA Root CA (SHA-256 fingerprint {FREETSA_ROOT_SHA256}).
+# ---------------------------------------------------------------- built-in trust anchors
+# Time-stamping authorities this checker trusts (DECISIONS D-004, D-045):
+{listing}
 # Embedded here so the trust decision does not depend on files inside the bundle.
 FREETSA_ROOT_SHA256 = "{FREETSA_ROOT_SHA256}"
-_FREETSA_ROOT_PEM = b"""{root_pem}
-"""
+BUILTIN_TSA_ROOT_LIST = [
+{chr(10).join(entries)}
+]
 
 
 def builtin_tsa_roots():
-    cert = x509.load_pem_x509_certificate(_FREETSA_ROOT_PEM)
-    assert cert.fingerprint(hashes.SHA256()).hex() == FREETSA_ROOT_SHA256
-    return [cert]
+    roots = []
+    for _label, sha, pem in BUILTIN_TSA_ROOT_LIST:
+        cert = x509.load_pem_x509_certificate(pem)
+        assert cert.fingerprint(hashes.SHA256()).hex() == sha
+        roots.append(cert)
+    return roots
+
+
+def builtin_tsa_root_labels():
+    return [(label, sha) for label, sha, _pem in BUILTIN_TSA_ROOT_LIST]
 '''
 
 

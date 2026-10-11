@@ -19,6 +19,8 @@ dependencies = [
 
 [project.optional-dependencies]
 ots = ["opentimestamps>=0.4.5,<0.5"]
+# The double-click desktop app: menu-bar / system-tray icon (D-044).
+desktop = ["pystray>=0.19", "pillow>=10"]
 
 [dependency-groups]
 dev = [
@@ -26,6 +28,10 @@ dev = [
     "ruff>=0.6",
     "rfc8785>=0.1.4",
     "playwright>=1.47",
+]
+# Building the installers (macOS .dmg, Windows setup .exe).
+package = [
+    "pyinstaller>=6.10",
 ]
 
 [build-system]

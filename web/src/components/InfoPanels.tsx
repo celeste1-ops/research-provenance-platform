@@ -1,5 +1,6 @@
 import type { Status } from "../types";
 import { timeAgo } from "../util";
+import { dev } from "../device";
 
 // How to read the map: lines, star and the two stamp icons. Shown behind the "?" next to Map.
 export function Legend() {
@@ -32,7 +33,7 @@ export function WhereIsMyData({ status, onClose, onBackup }: { status: Status; o
           <h2>Where is my data?</h2>
           <button className="link" onClick={onClose} aria-label="Close">✕</button>
         </div>
-        <h3>Your research stays on this Mac</h3>
+        <h3>Your research stays on this {dev()}</h3>
         {status.space === "practice" ? (
           <p className="small">
             You are in the <b>practice space</b>. It is kept apart from your real record, in{" "}
@@ -42,7 +43,7 @@ export function WhereIsMyData({ status, onClose, onBackup }: { status: Status; o
         ) : (
           <p className="small">
             Everything you add — text, files, links between steps — is stored here:{" "}
-            <span className="mono">{status.data_dir}</span>. The page you are looking at is served by this Mac to
+            <span className="mono">{status.data_dir}</span>. The page you are looking at is served by this {dev()} to
             itself; nobody else can open it. Practice steps are kept apart, in{" "}
             <span className="mono">{status.practice_dir}</span>.
           </p>
@@ -55,19 +56,19 @@ export function WhereIsMyData({ status, onClose, onBackup }: { status: Status; o
           </p>
         ) : (
           <p className="small">
-            <b>Not set up yet.</b> Without a backup, a lost or broken Mac means lost research.{" "}
+            <b>Not set up yet.</b> Without a backup, a lost or broken {dev()} means lost research.{" "}
             <button className="link" onClick={onBackup}>Set up backup</button>
           </p>
         )}
         <h3>Stamps prove time — they don't store anything</h3>
         <p className="small">
-          The date stamp service (FreeTSA) and the Bitcoin network only receive a fingerprint (hash) of each step. From a
+          The date stamp services (FreeTSA, or DigiCert when FreeTSA can't be reached) and the Bitcoin network only receive a fingerprint (hash) of each step. From a
           fingerprint nobody can read or rebuild your content — so they can't give it back either, not even through
           Bitcoin. Only a backup can bring your files back.
         </p>
-        <h3>If this Mac is lost</h3>
+        <h3>If this {dev()} is lost</h3>
         <p className="small">
-          Install the app on the new Mac and choose <b>Restore from a backup</b> on the first screen. You need the backup
+          Install the app on the new {dev()} and choose <b>Restore from a backup</b> on the first screen. You need the backup
           file and its password. Your steps, files, stamps and signing key come back as they were.
         </p>
       </div>
