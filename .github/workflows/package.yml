@@ -93,12 +93,16 @@ jobs:
           # A release that already exists keeps its files, so they always match its SHA256SUMS.txt:
           # running this again only brings a draft's notes up to date with RELEASE_NOTES.md, and
           # publishing a draft (which creates its tag and so runs this workflow again) changes nothing.
-          release=$(gh api "repos/$GITHUB_REPOSITORY/releases" --paginate \
-            --jq ".[] | select(.tag_name == \"$TAG\") | \"\(.id) \(.draft)\"" | head -n 1)
+          # A draft's tag_name only reads back as the tag before an edit (the API clears it unless the
+          # edit sends it again), so drafts are matched by title too.
+          release=$(gh api "repos/$GITHUB_REPOSITORY/releases" --paginate --jq ".[] | select(.tag_name == \"$TAG\"
+              or (.draft and .name == \"Research History $TAG\")) | \"\(.id) \(.draft) \(.target_commitish)\"" | head -n 1)
           if [ -n "$release" ]; then
-            read -r id draft <<< "$release"
+            read -r id draft target <<< "$release"
             if [ "$draft" = "true" ]; then
-              gh api -X PATCH "repos/$GITHUB_REPOSITORY/releases/$id" -F body=@packaging/RELEASE_NOTES.md > /dev/null
+              keep=(-f tag_name="$TAG")
+              [ -n "$target" ] && keep+=(-f target_commitish="$target")
+              gh api -X PATCH "repos/$GITHUB_REPOSITORY/releases/$id" -F body=@packaging/RELEASE_NOTES.md "${keep[@]}" > /dev/null
               echo "draft $TAG: notes updated from packaging/RELEASE_NOTES.md, files left as they are"
             else
               echo "release $TAG is already published; nothing to do"
