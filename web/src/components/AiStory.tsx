@@ -73,12 +73,13 @@ export function AiStory({ projectId, onSelect }: { projectId: string; onSelect: 
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!open || url) return;
+    if (!open) return;
     api.aiSettings().then((s) => {
-      setUrl(s.url);
-      setModel(s.model);
+      // A late answer never replaces what the author has typed in the meantime.
+      setUrl((typed) => typed || s.url);
+      setModel((chosen) => chosen || s.model);
     }).catch(() => undefined);
-  }, [open, url]);
+  }, [open]);
 
   async function findModels() {
     setBusy("models");

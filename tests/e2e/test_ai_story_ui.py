@@ -53,9 +53,13 @@ def test_retell_with_a_local_model(tmp_path, browser):
             page = browser.new_page(viewport={"width": 1400, "height": 900})
             page.goto(srv.url)
             page.get_by_test_id("tab-story").click()
+            # The saved address arrives late (a slow machine): what the author typed must stay.
+            page.route("**/api/ai", lambda route: (page.wait_for_timeout(600), route.continue_()))
             page.get_by_test_id("ai-open").click()
             panel = page.get_by_test_id("ai-panel")
             panel.get_by_test_id("ai-url").fill(f"http://127.0.0.1:{model_server.server_port}")
+            page.wait_for_timeout(900)
+            expect(panel.get_by_test_id("ai-url")).to_have_value(f"http://127.0.0.1:{model_server.server_port}")
             panel.get_by_test_id("ai-find").click()
             expect(panel.get_by_test_id("ai-model")).to_have_value("qwen2.5:7b")
             panel.get_by_test_id("ai-write").click()
