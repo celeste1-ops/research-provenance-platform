@@ -11,6 +11,7 @@ from fastapi.responses import Response
 from pydantic import BaseModel, Field
 
 from app.config import MAX_UPLOAD_BYTES
+from app.i18n import tr
 from app.services.context import AppContext
 from app.services.ledger import EntryInput, LedgerError, NotInitialized, UploadedFile
 from app.services.spaces import PRACTICE, REAL, SPACE_HEADER
@@ -396,6 +397,18 @@ def get_graph(request: Request, project: str | None = None, milestones_only: boo
 def get_timeline(request: Request, project: str | None = None):
     c = ctx(request)
     return timeline_view(Snapshot.load(c.ledger, c.anchors), project)
+
+
+@router.get("/narrative")
+def get_narrative(request: Request, project: str | None = None):
+    """The research told in sentences from fixed templates, each linked to its records (D-048)."""
+    from app.services.narrative import build_narrative
+
+    c = ctx(request)
+    snap = Snapshot.load(c.ledger, c.anchors)
+    title = next((p.title for p in c.ledger.projects() if p.id == project), None) if project else None
+    records = [(r.id, r.seq, r.kind, snap.payloads[r.id]) for r in snap.rows]
+    return build_narrative(records, snap.when, title=title or tr("My research"), project_id=project)
 
 
 # ---------------------------------------------------------------- time proofs & verification

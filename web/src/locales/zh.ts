@@ -474,4 +474,10 @@ export const ZH: Record<string, string> = {
   "This branch of this repository is already being recorded.": "这个仓库的这个分支已经在记录了。",
   "Every commit recorded becomes a permanent step in My research — it can't be changed or deleted.": "每一次被记下的提交都会成为“我的研究”里永久的一步——不能修改或删除。",
   "Start recording": "开始记录",
+  // Story (D-048)
+  "Story": "研究经过",
+  "the story": "研究经过",
+  "Your research told in sentences, written from the steps with fixed wording — no AI. Each paragraph names the step it comes from; your own reasons and notes are highlighted. It also goes into the report you share.": "用句子讲出你的研究经过：按固定句式从步骤中写出来——不用 AI。每一段都标出来自哪一步；你自己写的原因和说明会标出颜色。分享的报告里也会有这一部分。",
+  "Save as Markdown": "存成 Markdown",
+  "Print or save as PDF": "打印或存成 PDF",
 };

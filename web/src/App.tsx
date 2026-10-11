@@ -14,6 +14,7 @@ import { QuickNote } from "./components/QuickNote";
 import { RecordForm } from "./components/RecordForm";
 import { ServiceCheckDialog } from "./components/ServiceCheck";
 import { Setup } from "./components/Setup";
+import { Story } from "./components/Story";
 import { Timeline } from "./components/Timeline";
 import { help, homeNote } from "./labels";
 import { dev, setDevice } from "./device";
@@ -54,7 +55,7 @@ export function App() {
   const [dialog, setDialog] = useState<Dialog>(null);
   const [formType, setFormType] = useState<string | undefined>(undefined);
   const [version, setVersion] = useState(0);
-  const [view, setView] = useState<"graph" | "timeline">("graph");
+  const [view, setView] = useState<"graph" | "timeline" | "story">("graph");
   const [milestonesOnly, setMilestonesOnly] = useState(false);
   const [notice, setNotice] = useState<Notice | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -376,6 +377,11 @@ export function App() {
               {t("List")}
             </button>
             <Help id="list" label={t("the list")}>{help("list")}</Help>
+            <button role="tab" aria-selected={view === "story"} className={view === "story" ? "tab active" : "tab"}
+              onClick={() => setView("story")} data-testid="tab-story">
+              {t("Story")}
+            </button>
+            <Help id="story" label={t("the story")}>{help("story")}</Help>
           </div>
           {view === "graph" && (
             <span className="with-help">
@@ -402,6 +408,8 @@ export function App() {
             />
           ) : view === "timeline" ? (
             <Timeline rows={timeline} onSelect={setSelected} />
+          ) : view === "story" ? (
+            <Story projectId={projectId} version={version} onSelect={setSelected} />
           ) : graph ? (
             <Graph data={graph} selected={selected} onSelect={setSelected} milestonesOnly={milestonesOnly} />
           ) : (

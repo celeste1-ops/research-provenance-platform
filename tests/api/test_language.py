@@ -92,3 +92,16 @@ def test_both_verify_guides_give_the_same_commands():
 
     assert commands("VERIFY.md.j2") == commands("VERIFY.zh.md.j2")
     assert len(commands("VERIFY.md.j2")) > 10
+
+
+def test_the_story_over_the_api_and_in_the_report(api, client):
+    api.init()
+    a = api.entry("Idea", "idea", body="hello", author_statement="because")["id"]
+    zh = client.get(f"/api/narrative?project={api.project_id}", headers={"X-RPROV-Lang": "zh"}).json()
+    para = zh["chapters"][0]["paragraphs"][0]
+    assert para[0]["text"].endswith("作者记下了一个想法：“Idea”。") and para[0]["refs"][0]["id"] == a
+    assert para[1] == {**para[1], "source": "author", "text": "作者当时写的原因：“because”"}
+    html, _md = _report(client.post("/api/export", json={"title": "t", "records": {a: "full"},
+                                                         "language": "en"}).content)
+    assert 'id="narrative"' in html and "The research, step by step" in html
+    assert f'href="#r-{a}"' in html

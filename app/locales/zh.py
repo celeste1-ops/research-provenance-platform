@@ -236,8 +236,64 @@ TEXTS: dict[str, str] = {
         "“只公开结构”会公开正文和附件的 SHA-256 哈希值。别人已经有、或者容易猜到的内容（短句、已发表的段落、别人手里也有的文件），可以通过比较哈希值被确认出来。",
     "chain.json shows that this installation has {total} record(s) up to the highest record in the bundle (seq {max_seq}), including the ones you do not disclose.":
         "chain.json 会显示：到这个证据包里最后一条记录（第 {max_seq} 条）为止，这个安装共有 {total} 条记录，包括你没有公开的。",
+    # ---------------------------------------------------------------- the research told in sentences (D-048)
+    "“{text}”": "“{text}”",
+    "{a} and {b}": "{a}和{b}",
+    ", ": "、",
+    "an idea": "一个想法",
+    "a note": "一条笔记",
+    "a hypothesis or claim": "一个假设或论断",
+    "a document": "一份文档",
+    "data": "一份数据",
+    "an experiment": "一个实验",
+    "a figure": "一张图",
+    "a paper": "一篇论文",
+    "a step": "一步",
+    "My research": "我的研究",
+    "The research, step by step": "研究经过",
+    "On {date} the author recorded {kind}: {title}.": "{date}，作者记下了{kind}：{title}。",
+    "It is older material added that day; the author dates it to {claimed} — the author's statement, not a verified date.":
+        "这是当天补记的旧材料；作者说它来自 {claimed}——这是作者陈述，不是已验证的日期。",
+    "The author marked it as a new version of {targets}.": "作者把它标为{targets}的新版本。",
+    "The author noted that it grew out of {targets}.": "作者注明它是从{targets}发展出来的。",
+    "The author noted that it builds on {targets}.": "作者注明它用到了{targets}。",
+    "The author linked it to {targets}.": "作者把它和{targets}连了起来。",
+    "The author's reason at the time: {text}": "作者当时写的原因：{text}",
+    "It refers to commit {commit} of {repo}.": "它对应 {repo} 的提交 {commit}。",
+    "The code itself is kept with it.": "代码本身也一起保存了。",
+    "The code itself is not kept in the record, only the reference.": "记录里没有保存代码本身，只有引用。",
+    "It refers to {ref}.": "它引用了 {ref}。",
+    "{n} more files": "另外 {n} 个文件",
+    "It holds {files}.": "附有{files}。",
+    "The author marked it as a key step.": "作者把它标为关键一步。",
+    "On {date} the author withdrew the link between {a} and {b}.": "{date}，作者撤销了{a}和{b}之间的关系。",
+    "On {date} the author added that {a} is a new version of {b}.": "{date}，作者补充说明{a}是{b}的新版本。",
+    "On {date} the author added that {a} grew out of {b}.": "{date}，作者补充说明{a}是从{b}发展出来的。",
+    "On {date} the author added that {a} builds on {b}.": "{date}，作者补充说明{a}用到了{b}。",
+    "On {date} the author added a link from {a} to {b}.": "{date}，作者补加了从{a}到{b}的关系。",
+    "Reason given: {text}": "给出的原因：{text}",
+    "On {date} the author marked {title} as a key step.": "{date}，作者把{title}标为关键一步。",
+    "On {date} the author removed the key-step mark from {title}.": "{date}，作者取消了{title}的关键一步标记。",
+    "On {date} the author added a note about {title}: {text}": "{date}，作者为{title}补充了说明：{text}",
+    "On {date} the author added a correction about {title}: {text}": "{date}，作者为{title}补充了更正：{text}",
+    "On {date} {title} was retracted.": "{date}，{title}被撤回。",
+    "Record #{seq} is not disclosed here; only that it existed by {date} is shown.":
+        "第 {seq} 条记录在这里没有公开，只显示它在 {date} 已经存在。",
+    "Records #{first} to #{last} are not disclosed here; only that they existed is shown.":
+        "第 {first} 到第 {last} 条记录在这里没有公开，只显示它们已经存在。",
+    "Record #{seq} is not disclosed here.": "第 {seq} 条记录在这里没有公开。",
+    "record #{seq}": "第 {seq} 条记录",
+    "Up to {title}": "到{title}为止",
+    "After {title}": "{title}之后",
+    "This account of {title} was put together from the records with fixed sentences — no AI, and nothing that is not in the records.":
+        "这份关于{title}的研究经过，是按固定句式从记录中整理出来的——没有用 AI，也没有记录以外的内容。",
+    "It covers one step, recorded on {first}.": "共 1 步，记于 {first}。",
+    "It covers {n} steps, all recorded on {first}.": "共 {n} 步，都记于 {first}。",
+    "It covers {n} steps recorded from {first} to {last}.": "共 {n} 步，从 {first} 记到 {last}。",
+    "{n} of them are marked as key steps; each part ends with one.": "其中 {n} 步标为关键一步；每一部分都在一个关键步结束。",
+    "A ✓ marks a date from a date stamp; other dates are the computer's own clock. Highlighted sentences are the author's statements: reasons, notes, claimed dates and the links between steps.":
+        "带 ✓ 的日期来自日期章，其他日期是电脑自己的时钟。标出颜色的句子是作者陈述：原因、说明、声称的日期，以及步骤之间的关系。",
 }
-
 # Messages written in English where they arise (errors, stamp service checks) and translated where
 # they leave the server (``tr_message``); only these are matched as patterns.
 MESSAGES: dict[str, str] = {

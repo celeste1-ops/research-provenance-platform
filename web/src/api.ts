@@ -4,6 +4,7 @@ import type {
   ExportPreview,
   GitInspect,
   GitStatus,
+  Narrative,
   LocationCheck,
   Graph,
   Project,
@@ -92,6 +93,8 @@ export const api = {
   timeline: (project?: string) =>
     request<TimelineRow[]>("GET", `/api/timeline${project ? `?project=${encodeURIComponent(project)}` : ""}`),
   record: (id: string) => request<RecordDetail>("GET", `/api/records/${id}`),
+  narrative: (project?: string) =>
+    request<Narrative>("GET", `/api/narrative${project ? `?project=${encodeURIComponent(project)}` : ""}`),
   body: async (id: string) => {
     const res = await fetch(`/api/records/${id}/content`, { headers: spaceHeaders() });
     if (!res.ok) throw new ApiError(res.status, "no content");
