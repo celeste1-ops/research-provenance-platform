@@ -274,3 +274,23 @@ verification rules or what leaves the machine for time proofs.
   "Go back"). Switching from practice to the real record shows that reminder once. This
   adds no accounts and changes nothing about records, signatures, stamps, verification or
   the evidence bundle.
+- **D-039 · Printable recovery code (backup format 2) and backup-location checks.** A
+  forgotten backup password used to mean unreadable backups. When automatic backup is
+  turned on, the app now also shows a **recovery code** once (24 characters, 120 random
+  bits, Crockford base32 in four groups) with a Print button, and asks the author to tick
+  that they kept it. The code is never stored: the app keeps only the public half of an
+  X25519 key derived from it (scrypt, N = 2^14, since the code itself is random). Backup
+  format 2 (`RPROV-BACKUP-ENC/2`) encrypts the inner zip with a random backup key and
+  stores that key twice in the authenticated header: wrapped with the password-derived
+  key (scrypt, as in D-031) and wrapped to the recovery public key (ephemeral X25519 +
+  HKDF-SHA256 + AES-GCM). Either one opens the backup. The signing key inside the zip is
+  encrypted with a key derived from the backup key, so a recovery-code restore brings it
+  back too. After such a restore the old password is unknown, so automatic backup asks
+  for a new one; the same recovery code keeps working. A new code can be made at any time
+  (older backups keep opening with the old one). Format 1 and the original unencrypted
+  zips still restore. Location checks: while the author picks a folder the dialog says
+  where it really is ("This Mac's own disk — if this Mac is lost or breaks, this backup
+  is lost with it", a synced service, or another disk); a folder inside the app's data
+  folder is refused; and if the live data folder itself sits inside iCloud Drive, Dropbox
+  or another synced folder the app warns on every page, because syncing can damage a
+  database in use — only the encrypted backup files belong in such a folder.

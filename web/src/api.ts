@@ -2,6 +2,7 @@ import type {
   BackupStatus,
   BackupSuggestion,
   ExportPreview,
+  LocationCheck,
   Graph,
   Project,
   RecordDetail,
@@ -113,11 +114,22 @@ export const api = {
   backupSettings: (location: string, password: string, create: boolean) =>
     request<BackupStatus>("POST", "/api/backup/settings", { location, password, create }),
   backupRun: () => request<{ ran: boolean; path: string; status: BackupStatus }>("POST", "/api/backup/run"),
-  restore: (file: File, password: string) => {
+  backupCheck: (location: string) =>
+    request<LocationCheck>("GET", `/api/backup/check?location=${encodeURIComponent(location)}`),
+  backupNewRecoveryCode: () =>
+    request<{ recovery_code: string; status: BackupStatus }>("POST", "/api/backup/recovery-code"),
+  restore: (file: File, secret: { password?: string; recoveryCode?: string }) => {
     const form = new FormData();
     form.set("file", file, file.name);
-    form.set("password", password);
-    return request<{ installation: string; records: number; verification: { ok: boolean }; backup: BackupStatus }>(
+    if (secret.password) form.set("password", secret.password);
+    if (secret.recoveryCode) form.set("recovery_code", secret.recoveryCode);
+    return request<{
+      installation: string;
+      records: number;
+      opened_with: string;
+      verification: { ok: boolean };
+      backup: BackupStatus;
+    }>(
       "POST",
       "/api/restore",
       form,

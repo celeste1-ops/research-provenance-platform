@@ -224,3 +224,15 @@ ul.files { list-style: none; padding: 0; margin: 6px 0; }
 .summary dt { color: var(--muted); font-size: 13px; }
 .summary dd { margin: 0; white-space: pre-wrap; word-break: break-word; }
 ul.plain { list-style: none; padding: 0; margin: 0; }
+
+/* Backup location check and recovery code (D-039) */
+.location-check { margin: 6px 0 0; padding: 6px 10px; border-radius: 6px; }
+.location-check.ok { background: #eaf6ef; color: #14532d; }
+.location-check.warn { background: #fff4df; color: var(--warn); }
+.recovery-code { font-size: 26px; letter-spacing: 2px; text-align: center; padding: 14px; margin: 10px 0; border: 2px dashed var(--line); border-radius: 10px; background: #fafbfc; user-select: all; }
+.recovery .row { align-items: center; gap: 16px; }
+@media print {
+  body * { visibility: hidden !important; }
+  .print-sheet, .print-sheet * { visibility: visible !important; }
+  .print-sheet { position: absolute; left: 0; top: 0; width: 100%; padding: 24px; }
+}

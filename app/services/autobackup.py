@@ -12,6 +12,7 @@ Mac only if the chosen folder is synced by the author's own service.
 
 from __future__ import annotations
 
+import json
 import logging
 import os
 import threading
@@ -21,7 +22,15 @@ from pathlib import Path
 from sqlalchemy import func, select
 
 from app.db.models import AnchorRow, RecordRow
-from app.services.backup import BACKUP_SUFFIX, BackupError, create_backup, write_backup_to
+from app.services.backup import (
+    BACKUP_SUFFIX,
+    RECOVERY_META,
+    BackupError,
+    create_backup,
+    make_recovery,
+    new_recovery_code,
+    write_backup_to,
+)
 
 log = logging.getLogger("rprov.backup")
 
@@ -31,6 +40,7 @@ MIN_PASSWORD = 8
 
 ICLOUD_DRIVE = Path("~/Library/Mobile Documents/com~apple~CloudDocs").expanduser()
 CLOUD_STORAGE = Path("~/Library/CloudStorage").expanduser()
+LEGACY_SYNC_FOLDERS = (("Dropbox", Path("~/Dropbox").expanduser()),)
 SUGGESTED_FOLDER_NAME = "Research Provenance Backups"
 
 
@@ -42,6 +52,59 @@ def _iso(dt: datetime) -> str:
     return dt.strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
+def synced_service(path: Path) -> str | None:
+    """Name of the sync service whose folder contains ``path`` (iCloud Drive, Dropbox, …), if any."""
+    try:
+        resolved = path.expanduser().resolve()
+    except OSError:
+        return None
+    roots = [("iCloud Drive", ICLOUD_DRIVE), *LEGACY_SYNC_FOLDERS]
+    for label, root in roots:
+        if root.exists() and (resolved == root.resolve() or root.resolve() in resolved.parents):
+            return label
+    if CLOUD_STORAGE.exists():
+        base = CLOUD_STORAGE.resolve()
+        if base in resolved.parents:
+            return resolved.relative_to(base).parts[0].split("-")[0]
+    return None
+
+
+def data_dir_warning(data_dir: Path) -> str | None:
+    """The live database must not sit in a synced folder: sync can corrupt a database in use."""
+    service = synced_service(data_dir)
+    if service is None:
+        return None
+    return (
+        f"Your working data folder ({data_dir}) is inside {service}. Syncing can damage a database that is "
+        "in use. Move it out (set RPROV_HOME to a normal folder) and let only the encrypted backups go into "
+        f"{service}."
+    )
+
+
+def inside(folder: Path, data_dir: Path) -> bool:
+    try:
+        f, d = folder.expanduser().resolve(), data_dir.resolve()
+    except OSError:
+        return False
+    return f == d or d in f.parents
+
+
+def check_location(location: str, data_dir: Path) -> dict:
+    """What the backup dialog shows while the author types or picks a folder."""
+    folder = Path(location).expanduser()
+    if not location.strip() or not folder.is_absolute():
+        return {"ok": False, "kind": "invalid", "label": "Choose a full folder path", "safe": False}
+    if inside(folder, data_dir):
+        return {"ok": False, "kind": "inside-data", "label": "Inside the app's own data folder", "safe": False,
+                "warning": "Choose a folder outside the app's data folder — and ideally not on this Mac at all."}
+    if folder.is_dir():
+        return {"ok": True, **classify_location(folder, data_dir)}
+    if folder.parent.is_dir():
+        where = classify_location(folder.parent, data_dir)
+        return {"ok": True, **where, "creates": True}
+    return {"ok": False, **classify_location(folder, data_dir)}
+
+
 def classify_location(folder: Path, data_dir: Path) -> dict:
     """Where would a backup in ``folder`` survive? Returns kind + plain-language label.
 
@@ -51,14 +114,9 @@ def classify_location(folder: Path, data_dir: Path) -> dict:
     if not folder.is_dir():
         return {"kind": "missing", "label": "Folder not found (is the drive connected?)", "safe": False}
     resolved = folder.resolve()
-    for root, label in ((ICLOUD_DRIVE, "iCloud Drive"),):
-        if root.exists() and (resolved == root.resolve() or root.resolve() in resolved.parents):
-            return {"kind": "synced", "label": label, "safe": True}
-    if CLOUD_STORAGE.exists():
-        base = CLOUD_STORAGE.resolve()
-        if base in resolved.parents:
-            provider = resolved.relative_to(base).parts[0].split("-")[0]
-            return {"kind": "synced", "label": provider, "safe": True}
+    service = synced_service(resolved)
+    if service is not None:
+        return {"kind": "synced", "label": service, "safe": True}
     try:
         same = os.stat(resolved).st_dev == os.stat(data_dir).st_dev
     except OSError:
@@ -69,8 +127,8 @@ def classify_location(folder: Path, data_dir: Path) -> dict:
         "kind": "same-disk",
         "label": "This Mac's own disk",
         "safe": False,
-        "warning": "This folder is on the same disk as your records. It does not help if this Mac is lost "
-        "or breaks — choose an external drive or a synced folder such as iCloud Drive.",
+        "warning": "This folder is on this Mac's own disk: if this Mac is lost or breaks, this backup is lost "
+        "with it. Choose an external drive or a synced folder such as iCloud Drive.",
     }
 
 
@@ -84,6 +142,9 @@ def suggestions(data_dir: Path) -> list[dict]:
             if entry.is_dir() and not entry.name.startswith("."):
                 provider = entry.name.split("-")[0]
                 out.append({"path": str(entry / SUGGESTED_FOLDER_NAME), "label": provider, "kind": "synced"})
+    for label, root in LEGACY_SYNC_FOLDERS:
+        if root.is_dir():
+            out.append({"path": str(root / SUGGESTED_FOLDER_NAME), "label": label, "kind": "synced"})
     volumes = Path("/Volumes")
     if volumes.is_dir():
         for vol in sorted(volumes.iterdir()):
@@ -122,6 +183,8 @@ class AutoBackup:
         folder = Path(location).expanduser()
         if not folder.is_absolute():
             raise BackupError("choose a full folder path")
+        if inside(folder, self.ctx.settings.data_dir):
+            raise BackupError("choose a folder outside the app's data folder")
         if create and not folder.exists():
             if not folder.parent.is_dir():
                 raise BackupError("the folder's parent does not exist")
@@ -133,12 +196,31 @@ class AutoBackup:
         self.ctx.keystore.save_secret(self._secret_name(), password)
         ledger.set_meta("backup_location", str(folder))
         ledger.set_meta("backup_auto", "1")
+        code = None if ledger.meta(RECOVERY_META) else self._store_recovery()
         self.run("set up")
-        return self.status()
+        out = self.status()
+        if code:
+            out["recovery_code"] = code  # shown once, never stored
+        return out
 
-    def adopt_restored_password(self, password: str) -> None:
-        """After a restore the same password keeps automatic backups going."""
-        self.ctx.keystore.save_secret(self._secret_name(), password)
+    def _store_recovery(self) -> str:
+        code = new_recovery_code()
+        self.ctx.ledger.set_meta(RECOVERY_META, json.dumps(make_recovery(code), sort_keys=True))
+        return code
+
+    def new_recovery_code(self) -> str:
+        """Replace the recovery code: new backups open with the new one (older ones with the old one)."""
+        if not self.status()["configured"]:
+            raise BackupError("turn on automatic backup first")
+        code = self._store_recovery()
+        self.run("new recovery code")
+        return code
+
+    def adopt_restored_password(self, password: str | None) -> None:
+        """After a restore the same password keeps automatic backups going. After a restore with
+        the recovery code the password is unknown: the app asks for a new one."""
+        if password:
+            self.ctx.keystore.save_secret(self._secret_name(), password)
 
     # ------------------------------------------------------------------ state
 
@@ -167,6 +249,13 @@ class AutoBackup:
             st["where"] = classify_location(Path(location), self.ctx.settings.data_dir)
         if location and not configured:
             st["needs_password"] = True
+        recovery = ledger.meta(RECOVERY_META)
+        st["recovery"] = (
+            {"configured": True, **{k: v for k, v in json.loads(recovery).items() if k in ("id", "created_local")}}
+            if recovery
+            else {"configured": False}
+        )
+        st["data_dir_warning"] = data_dir_warning(self.ctx.settings.data_dir)
         if not configured:
             st["state"] = "off"
         elif st["last_error"]:

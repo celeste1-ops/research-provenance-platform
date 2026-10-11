@@ -252,6 +252,11 @@ export function App() {
           </button>
         </div>
       )}
+      {status.data_dir_warning && (
+        <div className="banner error small" data-testid="data-dir-warning">
+          {status.data_dir_warning}
+        </div>
+      )}
       {btcOff && (
         <div className="banner muted small">Public stamp (Bitcoin): off. Date stamps are on.</div>
       )}

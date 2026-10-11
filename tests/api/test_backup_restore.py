@@ -216,7 +216,8 @@ def test_encryption_format_and_tamper_detection():
         enc = backup_mod.encrypt_backup(plain, PASSWORD)
     finally:
         backup_mod.SCRYPT_N = monkey_n
-    header = json.loads(enc[len(backup_mod.ENCRYPTED_MAGIC):].split(b"\n", 1)[0])
+    assert enc.startswith(backup_mod.ENCRYPTED_MAGIC_V1)  # format 1 stays readable
+    header = json.loads(enc[len(backup_mod.ENCRYPTED_MAGIC_V1):].split(b"\n", 1)[0])
     assert header["kdf"] == "scrypt" and header["n"] == 2**17 and header["cipher"] == "AES-256-GCM"
     assert backup_mod.decrypt_backup(enc, PASSWORD) == plain
     with pytest.raises(BackupError, match="wrong backup password"):
@@ -303,3 +304,155 @@ def test_location_classification(tmp_path, monkeypatch):
     shm = "/dev/shm"
     if os.path.isdir(shm) and os.stat(shm).st_dev != os.stat(data).st_dev:
         assert autobackup.classify_location(type(tmp_path)(shm), data)["kind"] == "external"
+
+
+# ---------------------------------------------------------------- recovery code (D-039)
+
+
+def _configured(tmp_path, name="a"):
+    ctx = make_ctx(tmp_path / name)
+    build_log(ctx)
+    folder = tmp_path / f"{name}-backups"
+    st = ctx.autobackup.configure(str(folder), PASSWORD, create=True)
+    return ctx, folder, st
+
+
+def test_recovery_code_opens_the_backup_when_the_password_is_forgotten(tmp_path):
+    a, folder, st = _configured(tmp_path)
+    code = st["recovery_code"]
+    assert len(code) == 27 and code.count("-") == 3
+    assert st["recovery"]["configured"] and "recovery_code" not in a.autobackup.status()
+    stored = a.ledger.meta(backup_mod.RECOVERY_META)
+    assert code.replace("-", "") not in stored and "public_key" in stored  # only the public half is kept
+    before = _snapshot(a)
+    (backup_file,) = folder.iterdir()
+    data = backup_file.read_bytes()
+    a.close()
+
+    b = make_ctx(tmp_path / "b", keystore=MemoryKeyStore())
+    with pytest.raises(BackupError, match="wrong recovery code"):
+        restore_backup(b, data, recovery_code="0" * 24)
+    with pytest.raises(BackupError, match="24 letters"):
+        restore_backup(b, data, recovery_code="too short")
+    # Typed in lower case, without dashes, with an O for a zero: still accepted.
+    sloppy = code.replace("-", " ").lower().replace("0", "o")
+    summary = restore_backup(b, data, recovery_code=sloppy)
+    assert summary["opened_with"] == "recovery code"
+    assert _snapshot(b) == before
+    assert report_json(verify_database(b.ledger, b.anchors))["ok"]
+    # The password is unknown after this: automatic backup asks for a new one; the code stays valid.
+    st = b.autobackup.status()
+    assert st["needs_password"] and not st["configured"] and st["recovery"]["configured"]
+    b.close()
+
+
+def test_password_still_opens_and_a_new_code_replaces_the_old_one(tmp_path):
+    a, folder, st = _configured(tmp_path)
+    old_code = st["recovery_code"]
+    (old_file,) = folder.iterdir()
+    new_code = a.autobackup.new_recovery_code()
+    assert new_code != old_code
+    new_file = max(folder.iterdir())
+    assert new_file != old_file
+    _, _, opened = backup_mod.open_backup(new_file.read_bytes(), recovery_code=new_code)
+    assert opened == "recovery code"
+    with pytest.raises(BackupError, match="wrong recovery code"):
+        backup_mod.open_backup(new_file.read_bytes(), recovery_code=old_code)
+    backup_mod.open_backup(old_file.read_bytes(), recovery_code=old_code)  # older backups keep the old code
+    assert backup_mod.open_backup(new_file.read_bytes(), password=PASSWORD)[2] == "password"
+    a.close()
+
+
+def test_format_2_header_and_tampering(tmp_path):
+    a, folder, st = _configured(tmp_path)
+    data = next(folder.iterdir()).read_bytes()
+    assert data.startswith(backup_mod.ENCRYPTED_MAGIC)
+    header_line = data[len(backup_mod.ENCRYPTED_MAGIC):].split(b"\n", 1)[0]
+    header = json.loads(header_line)
+    assert header["format"] == "rprov.backup-enc/2" and header["cipher"] == "AES-256-GCM"
+    assert [slot["kind"] for slot in header["slots"]] == ["password", "recovery"]
+    for plaintext in (b"Numerical experiment", b"SQLite format 3", b"PRIVATE KEY"):
+        assert plaintext not in data
+    # Changing anything in the header breaks it (it is authenticated with the contents).
+    forged = data.replace(b'"inner": "rprov.backup/1"', b'"inner": "rprov.backup/9"', 1)
+    with pytest.raises(BackupError, match="damaged"):
+        backup_mod.open_backup(forged, password=PASSWORD)
+    # Swapping in another backup's wrapped key does not open it either.
+    a.autobackup.run("again")
+    other = max(folder.iterdir()).read_bytes()
+    other_header = json.loads(other[len(backup_mod.ENCRYPTED_MAGIC):].split(b"\n", 1)[0])
+    header["slots"][0] = other_header["slots"][0]
+    swapped = backup_mod.ENCRYPTED_MAGIC + json.dumps(header, sort_keys=True).encode() + data[
+        len(backup_mod.ENCRYPTED_MAGIC) + len(header_line):]
+    with pytest.raises(BackupError, match="damaged"):
+        backup_mod.open_backup(swapped, password=PASSWORD)
+    a.close()
+
+
+def test_format_1_backups_still_restore(tmp_path):
+    a = make_ctx(tmp_path / "a")
+    build_log(a)
+    _, plain = create_plain_backup(a, PASSWORD)
+    old = backup_mod.encrypt_backup(plain, PASSWORD)
+    a.close()
+    b = make_ctx(tmp_path / "b", keystore=MemoryKeyStore())
+    with pytest.raises(BackupError, match="older backup"):
+        restore_backup(b, old, recovery_code="0" * 24)
+    assert restore_backup(b, old, PASSWORD)["opened_with"] == "password"
+    b.close()
+
+
+def test_location_checks(tmp_path, monkeypatch):
+    from app.services import autobackup
+
+    ctx = make_ctx(tmp_path / "a")
+    ctx.ledger.init_identity("L")
+    data_dir = ctx.settings.data_dir
+    assert autobackup.check_location(str(data_dir / "bk"), data_dir)["kind"] == "inside-data"
+    with pytest.raises(BackupError, match="outside the app's data folder"):
+        ctx.autobackup.configure(str(data_dir / "bk"), PASSWORD, create=True)
+    new = autobackup.check_location(str(tmp_path / "new-folder"), data_dir)
+    assert new["ok"] and new["creates"] and new["kind"] == "same-disk"
+    assert "lost with it" in new["warning"]
+    assert not autobackup.check_location("relative/path", data_dir)["ok"]
+
+    icloud = tmp_path / "Mobile Documents" / "com~apple~CloudDocs"
+    icloud.mkdir(parents=True)
+    monkeypatch.setattr(autobackup, "ICLOUD_DRIVE", icloud)
+    synced = autobackup.check_location(str(icloud / "Research Provenance Backups"), data_dir)
+    assert synced["ok"] and synced["kind"] == "synced" and synced["label"] == "iCloud Drive" and synced["safe"]
+    # The live database must not live in a synced folder; backups may.
+    assert autobackup.data_dir_warning(data_dir) is None
+    warning = autobackup.data_dir_warning(icloud / "rprov")
+    assert "iCloud Drive" in warning and "database" in warning
+    ctx.close()
+
+
+def test_recovery_code_over_http(tmp_path):
+    a = make_ctx(tmp_path / "a")
+    folder = tmp_path / "bk"
+    with TestClient(create_app(a), base_url="http://127.0.0.1:8765") as cl:
+        cl.headers["X-RPROV-Token"] = a.session_token
+        cl.post("/api/identity", json={"author_label": "HTTP"})
+        check = cl.get("/api/backup/check", params={"location": str(folder)}).json()
+        assert check["creates"] and check["kind"] == "same-disk"
+        r = cl.post("/api/backup/settings", json={"location": str(folder), "password": PASSWORD, "create": True})
+        code = r.json()["recovery_code"]
+        r = cl.post("/api/backup/settings", json={"location": str(folder), "password": "another password"})
+        assert "recovery_code" not in r.json()  # changing the password keeps the same code
+        r = cl.post("/api/backup/recovery-code")
+        assert r.status_code == 200 and r.json()["recovery_code"] != code
+        code = r.json()["recovery_code"]
+        assert cl.get("/api/status").json()["data_dir_warning"] is None
+        latest = max(folder.iterdir()).read_bytes()
+    a.close()
+    b = make_ctx(tmp_path / "b", keystore=MemoryKeyStore())
+    with TestClient(create_app(b), base_url="http://127.0.0.1:8765") as cl:
+        cl.headers["X-RPROV-Token"] = b.session_token
+        r = cl.post("/api/restore", files={"file": ("x.rprovbackup", latest, "application/octet-stream")})
+        assert r.status_code == 400 and "password or the recovery code" in r.text
+        r = cl.post("/api/restore", data={"recovery_code": code},
+                    files={"file": ("x.rprovbackup", latest, "application/octet-stream")})
+        assert r.status_code == 200, r.text
+        assert r.json()["opened_with"] == "recovery code" and r.json()["backup"]["needs_password"]
+    b.close()

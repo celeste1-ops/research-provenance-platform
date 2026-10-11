@@ -85,8 +85,15 @@ def status(request: Request):
         "data_dir": str(c.settings.data_dir),
         "public_key": genesis["public_key"] if genesis else None,
         "space": space_name(request),
+        "data_dir_warning": _data_dir_warning(real(request)),
         "practice_dir": str(request.app.state.spaces.practice_dir),
     }
+
+
+def _data_dir_warning(c: AppContext) -> str | None:
+    from app.services.autobackup import data_dir_warning
+
+    return data_dir_warning(c.settings.data_dir)
 
 
 class PracticeResetIn(BaseModel):
@@ -485,6 +492,27 @@ def backup_suggestions(request: Request):
     return suggestions(real(request).settings.data_dir)
 
 
+@router.get("/backup/check")
+def backup_check(location: str, request: Request):
+    """Where would a backup in this folder survive? Shown while the author picks a folder."""
+    from app.services.autobackup import check_location
+
+    return check_location(location, real(request).settings.data_dir)
+
+
+@router.post("/backup/recovery-code")
+def backup_new_recovery_code(request: Request):
+    """Make a new printable recovery code (shown once; the app keeps only its public half)."""
+    from app.services.backup import BackupError
+
+    c = real(request)
+    try:
+        code = c.autobackup.new_recovery_code()
+    except BackupError as exc:
+        raise HTTPException(400, str(exc)) from None
+    return {"recovery_code": code, "status": c.autobackup.status()}
+
+
 class BackupSettingsIn(BaseModel):
     location: str
     password: str = Field(min_length=8)
@@ -513,7 +541,12 @@ def backup_run(request: Request):
 
 
 @router.post("/restore")
-async def restore_route(request: Request, file: Annotated[UploadFile, File()], password: Annotated[str, Form()]):
+async def restore_route(
+    request: Request,
+    file: Annotated[UploadFile, File()],
+    password: Annotated[str, Form()] = "",
+    recovery_code: Annotated[str, Form()] = "",
+):
     from starlette.concurrency import run_in_threadpool
 
     from app.services.backup import BackupError, restore_backup
@@ -522,10 +555,13 @@ async def restore_route(request: Request, file: Annotated[UploadFile, File()], p
     c = real(request)
     data = await file.read()
     try:
-        summary = await run_in_threadpool(restore_backup, c, data, password)
+        summary = await run_in_threadpool(
+            lambda: restore_backup(c, data, password or None, recovery_code=recovery_code or None)
+        )
     except (BackupError, LedgerError) as exc:
         raise HTTPException(400, str(exc)) from None
     # Same password, same folder (if it exists on this Mac): automatic backups simply continue.
-    c.autobackup.adopt_restored_password(password)
+    # Opened with the recovery code: the status asks for a new backup password.
+    c.autobackup.adopt_restored_password(password if summary["opened_with"] == "password" else None)
     report = await run_in_threadpool(verify_database, c.ledger, c.anchors)
     return {**summary, "verification": report_json(report), "backup": c.autobackup.status()}

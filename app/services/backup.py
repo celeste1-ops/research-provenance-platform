@@ -1,19 +1,29 @@
-"""Full backup and restore (PRD §14 S4, S7).
+"""Full backup and restore (PRD §14 S4, S7; DECISIONS D-028, D-031, D-039).
 
-A backup file (``*.rprovbackup``) is fully encrypted with the backup password:
+A backup file (``*.rprovbackup``) is fully encrypted:
 
-    RPROV-BACKUP-ENC/1\n        magic
-    {"kdf": "scrypt", ...}\n     header: KDF parameters, salt, nonce (no content)
-    AES-256-GCM ciphertext       of the inner zip; the header is authenticated too
+    RPROV-BACKUP-ENC/2\n        magic
+    {"slots": [...], ...}\n     header: key slots, nonce (no content)
+    AES-256-GCM ciphertext       of the inner zip, under a random backup key;
+                                 the header is authenticated too
 
-The inner zip (format ``rprov.backup/1``) holds:
+The random backup key is stored in the header twice, each copy encrypted ("wrapped"):
+
+* ``password`` slot — with a key derived from the backup password (scrypt);
+* ``recovery`` slot — for the printable recovery code. The app keeps only the public
+  half of an X25519 key derived from that code, so the code itself is never stored;
+  each backup wraps the key to it with a fresh ephemeral key (X25519 + HKDF + AES-GCM).
+
+Either the password or the recovery code opens the backup. The inner zip (format
+``rprov.backup/1``) holds:
 
     rprov-backup.json          index: installation, counts, SHA-256 of every member
     db/rprov.sqlite3           consistent snapshot of the database
     blobs/ab/cd/<sha256>       every stored file
-    key/signing-key.pem        the signing key, additionally encrypted with the password
+    key/signing-key.pem        the signing key, additionally encrypted on its own
 
-Older, unencrypted ``rprov.backup/1`` zips can still be restored.
+Older formats still restore: ``RPROV-BACKUP-ENC/1`` (password only) and the original
+unencrypted zips.
 
 Restore only goes into an installation without records: rows are inserted (never
 updated) and the key returns to the keychain, so the restored app signs new records
@@ -28,6 +38,7 @@ import hashlib
 import io
 import json
 import re
+import secrets
 import sqlite3
 import stat
 import tempfile
@@ -36,7 +47,10 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from cryptography.exceptions import InvalidTag
+from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives.asymmetric.x25519 import X25519PrivateKey, X25519PublicKey
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+from cryptography.hazmat.primitives.kdf.hkdf import HKDF
 from cryptography.hazmat.primitives.kdf.scrypt import Scrypt
 from sqlalchemy import insert, select
 
@@ -45,12 +59,20 @@ from app.services.ledger import LedgerError
 from provenance_core.signing import KeyBackupError, export_private_key_encrypted, load_private_key_encrypted
 
 BACKUP_FORMAT = "rprov.backup/1"
-ENCRYPTED_MAGIC = b"RPROV-BACKUP-ENC/1\n"
+ENCRYPTED_MAGIC_V1 = b"RPROV-BACKUP-ENC/1\n"  # password only; still restorable
+ENCRYPTED_MAGIC = b"RPROV-BACKUP-ENC/2\n"
+ENCRYPTED_FORMAT = "rprov.backup-enc/2"
 BACKUP_SUFFIX = ".rprovbackup"
+RECOVERY_META = "backup_recovery"  # public half of the recovery key (JSON), see make_recovery
 # scrypt cost: 2**17 * 8 * 128 bytes = 128 MiB of memory, about half a second.
 SCRYPT_N = 2**17
 SCRYPT_R = 8
 SCRYPT_P = 1
+# The recovery code carries 120 random bits, so a lighter scrypt is enough for it.
+RECOVERY_SCRYPT_N = 2**14
+RECOVERY_ALPHABET = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"  # Crockford base32: no I, L, O, U
+RECOVERY_LENGTH = 24
+_SLOT_AAD = {"password": b"rprov-backup/2 password slot", "recovery": b"rprov-backup/2 recovery slot"}
 MAX_RESTORE_BYTES = 20 * 1024**3  # 20 GiB uncompressed (S4)
 _BLOB_NAME = re.compile(r"\Ablobs/([0-9a-f]{2})/([0-9a-f]{2})/([0-9a-f]{64})\Z")
 _FIXED_NAMES = {"rprov-backup.json", "db/rprov.sqlite3", "key/signing-key.pem"}
@@ -71,8 +93,7 @@ def _derive_key(password: str, salt: bytes, n: int, r: int, p: int) -> bytes:
 
 
 def encrypt_backup(plain: bytes, password: str) -> bytes:
-    import secrets
-
+    """Format 1 (password only). Kept so older backups and their tests stay readable."""
     salt = secrets.token_bytes(16)
     nonce = secrets.token_bytes(12)
     header = {
@@ -87,13 +108,13 @@ def encrypt_backup(plain: bytes, password: str) -> bytes:
     }
     header_line = json.dumps(header, sort_keys=True).encode() + b"\n"
     key = _derive_key(password, salt, SCRYPT_N, SCRYPT_R, SCRYPT_P)
-    return ENCRYPTED_MAGIC + header_line + AESGCM(key).encrypt(nonce, plain, ENCRYPTED_MAGIC + header_line)
+    return ENCRYPTED_MAGIC_V1 + header_line + AESGCM(key).encrypt(nonce, plain, ENCRYPTED_MAGIC_V1 + header_line)
 
 
 def decrypt_backup(data: bytes, password: str) -> bytes:
-    if not data.startswith(ENCRYPTED_MAGIC):
+    if not data.startswith(ENCRYPTED_MAGIC_V1):
         raise BackupError("not an encrypted backup")
-    rest = data[len(ENCRYPTED_MAGIC) :]
+    rest = data[len(ENCRYPTED_MAGIC_V1) :]
     newline = rest.find(b"\n")
     if newline < 0 or newline > 4096:
         raise BackupError("damaged backup header")
@@ -108,22 +129,176 @@ def decrypt_backup(data: bytes, password: str) -> bytes:
         raise BackupError("unsupported backup encryption")
     key = _derive_key(password, salt, n, r, p)
     try:
-        return AESGCM(key).decrypt(nonce, rest[newline + 1 :], ENCRYPTED_MAGIC + header_line)
+        return AESGCM(key).decrypt(nonce, rest[newline + 1 :], ENCRYPTED_MAGIC_V1 + header_line)
     except InvalidTag as exc:
         raise BackupError("wrong backup password (or damaged backup)") from exc
 
 
+# ---------------------------------------------------------------- recovery code
+
+
+def new_recovery_code() -> str:
+    """24 characters from Crockford base32 (120 random bits), printed in four groups."""
+    chars = "".join(secrets.choice(RECOVERY_ALPHABET) for _ in range(RECOVERY_LENGTH))
+    return "-".join(chars[i : i + 6] for i in range(0, RECOVERY_LENGTH, 6))
+
+
+def normalize_recovery_code(code: str) -> str:
+    text = "".join(code.split()).replace("-", "").upper()
+    text = text.translate(str.maketrans({"O": "0", "I": "1", "L": "1"}))
+    if len(text) != RECOVERY_LENGTH or any(c not in RECOVERY_ALPHABET for c in text):
+        raise BackupError("a recovery code has 24 letters and digits (the dashes are optional)")
+    return text
+
+
+def _recovery_private_key(code: str, salt: bytes, n: int, r: int, p: int) -> X25519PrivateKey:
+    raw = Scrypt(salt=salt, length=32, n=n, r=r, p=p).derive(normalize_recovery_code(code).encode())
+    return X25519PrivateKey.from_private_bytes(raw)
+
+
+def _raw_public(key) -> bytes:
+    return key.public_bytes_raw()
+
+
+def make_recovery(code: str) -> dict:
+    """The public half kept by the app (the code itself is shown once and never stored)."""
+    salt = secrets.token_bytes(16)
+    public = _raw_public(_recovery_private_key(code, salt, RECOVERY_SCRYPT_N, 8, 1).public_key())
+    return {
+        "public_key": public.hex(),
+        "salt": salt.hex(),
+        "n": RECOVERY_SCRYPT_N,
+        "r": 8,
+        "p": 1,
+        "id": hashlib.sha256(public).hexdigest()[:8],
+        "created_local": _now(),
+    }
+
+
+def _hkdf(secret: bytes, salt: bytes, info: bytes) -> bytes:
+    return HKDF(algorithm=hashes.SHA256(), length=32, salt=salt, info=info).derive(secret)
+
+
+def key_passphrase(backup_key: bytes) -> str:
+    """Protects the signing key inside the inner zip; derived from the random backup key."""
+    return _hkdf(backup_key, b"", b"rprov-backup/2 signing key").hex()
+
+
+# ---------------------------------------------------------------- format 2
+
+
+def seal_backup(plain: bytes, backup_key: bytes, password: str, recovery: dict | None) -> bytes:
+    slots = []
+    salt, slot_nonce = secrets.token_bytes(16), secrets.token_bytes(12)
+    kek = _derive_key(password, salt, SCRYPT_N, SCRYPT_R, SCRYPT_P)
+    slots.append({
+        "kind": "password", "kdf": "scrypt", "n": SCRYPT_N, "r": SCRYPT_R, "p": SCRYPT_P, "salt": salt.hex(),
+        "nonce": slot_nonce.hex(), "wrapped": AESGCM(kek).encrypt(slot_nonce, backup_key, _SLOT_AAD["password"]).hex(),
+    })
+    if recovery:
+        public = bytes.fromhex(recovery["public_key"])
+        ephemeral = X25519PrivateKey.generate()
+        epk = _raw_public(ephemeral.public_key())
+        kek = _hkdf(ephemeral.exchange(X25519PublicKey.from_public_bytes(public)), epk + public, _SLOT_AAD["recovery"])
+        slot_nonce = secrets.token_bytes(12)
+        slots.append({
+            "kind": "recovery", "id": recovery["id"], "kdf": "scrypt", "n": recovery["n"], "r": recovery["r"],
+            "p": recovery["p"], "salt": recovery["salt"], "public_key": recovery["public_key"], "epk": epk.hex(),
+            "nonce": slot_nonce.hex(),
+            "wrapped": AESGCM(kek).encrypt(slot_nonce, backup_key, _SLOT_AAD["recovery"]).hex(),
+        })
+    nonce = secrets.token_bytes(12)
+    header = {"format": ENCRYPTED_FORMAT, "inner": BACKUP_FORMAT, "cipher": "AES-256-GCM", "nonce": nonce.hex(),
+              "slots": slots}
+    line = json.dumps(header, sort_keys=True).encode() + b"\n"
+    return ENCRYPTED_MAGIC + line + AESGCM(backup_key).encrypt(nonce, plain, ENCRYPTED_MAGIC + line)
+
+
+def _kdf_params(slot: dict) -> tuple[bytes, int, int, int]:
+    n, r, p = int(slot["n"]), int(slot["r"]), int(slot["p"])
+    if slot.get("kdf") != "scrypt" or not (2**10 <= n <= 2**20) or not (1 <= r <= 16) or not (1 <= p <= 4):
+        raise BackupError("unsupported backup encryption")
+    return bytes.fromhex(slot["salt"]), n, r, p
+
+
+def _unwrap(slot: dict, password: str | None, recovery_code: str | None) -> bytes | None:
+    salt, n, r, p = _kdf_params(slot)
+    nonce, wrapped = bytes.fromhex(slot["nonce"]), bytes.fromhex(slot["wrapped"])
+    if slot["kind"] == "password" and password is not None:
+        kek = _derive_key(password, salt, n, r, p)
+    elif slot["kind"] == "recovery" and recovery_code is not None:
+        key = _recovery_private_key(recovery_code, salt, n, r, p)
+        public = _raw_public(key.public_key())
+        if public.hex() != slot["public_key"]:
+            return None
+        epk = bytes.fromhex(slot["epk"])
+        kek = _hkdf(key.exchange(X25519PublicKey.from_public_bytes(epk)), epk + public, _SLOT_AAD["recovery"])
+    else:
+        return None
+    try:
+        return AESGCM(kek).decrypt(nonce, wrapped, _SLOT_AAD[slot["kind"]])
+    except InvalidTag:
+        return None
+
+
+def open_backup(data: bytes, password: str | None = None, recovery_code: str | None = None):
+    """Returns (inner zip bytes, backup key or None, what opened it).
+
+    Unencrypted legacy zips pass through unchanged (the zip checks come later)."""
+    if data.startswith(ENCRYPTED_MAGIC_V1):
+        if not password:
+            raise BackupError("this older backup has no recovery code; it opens with its password only")
+        return decrypt_backup(data, password), None, "password"
+    if not data.startswith(ENCRYPTED_MAGIC):
+        return data, None, "password"
+    rest = data[len(ENCRYPTED_MAGIC) :]
+    newline = rest.find(b"\n")
+    if newline < 0 or newline > 16384:
+        raise BackupError("damaged backup header")
+    line = rest[: newline + 1]
+    try:
+        header = json.loads(line)
+        slots = list(header["slots"])
+        nonce = bytes.fromhex(header["nonce"])
+        if header.get("format") != ENCRYPTED_FORMAT or header.get("cipher") != "AES-256-GCM" or len(slots) > 4:
+            raise BackupError("unsupported backup encryption")
+        backup_key, opened_with = None, None
+        for slot in slots:
+            backup_key = _unwrap(slot, password or None, recovery_code or None)
+            if backup_key is not None:
+                opened_with = "recovery code" if slot["kind"] == "recovery" else "password"
+                break
+    except (ValueError, KeyError, TypeError) as exc:
+        if isinstance(exc, BackupError):
+            raise
+        raise BackupError("damaged backup header") from exc
+    if backup_key is None:
+        if recovery_code and not any(s.get("kind") == "recovery" for s in slots):
+            raise BackupError("this backup was made before a recovery code was set up; use its password")
+        if recovery_code:
+            raise BackupError("wrong recovery code (or damaged backup)")
+        raise BackupError("wrong backup password (or damaged backup)")
+    try:
+        plain = AESGCM(backup_key).decrypt(nonce, rest[newline + 1 :], ENCRYPTED_MAGIC + line)
+    except InvalidTag as exc:
+        raise BackupError("damaged backup (the contents do not match)") from exc
+    return plain, backup_key, opened_with
+
+
 def create_backup(ctx, password: str) -> tuple[str, bytes]:
-    """Returns (file name, encrypted backup bytes)."""
-    name, plain = create_plain_backup(ctx, password)
-    return name, encrypt_backup(plain, password)
+    """Returns (file name, encrypted backup bytes): opens with the password or the recovery code."""
+    recovery = ctx.ledger.meta(RECOVERY_META)
+    backup_key = secrets.token_bytes(32)
+    name, plain = create_plain_backup(ctx, key_passphrase(backup_key), key_protection="backup-key")
+    return name, seal_backup(plain, backup_key, password, json.loads(recovery) if recovery else None)
 
 
-def create_plain_backup(ctx, password: str) -> tuple[str, bytes]:
-    """The inner zip only (the signing key inside is still password-protected)."""
+def create_plain_backup(ctx, key_passphrase: str, *, key_protection: str = "password") -> tuple[str, bytes]:
+    """The inner zip only. ``key_protection`` says what the signing key inside is encrypted with:
+    ``password`` (older backups) or ``backup-key`` (derived from the random backup key)."""
     ledger = ctx.ledger
     key = ledger.signing_key()
-    key_pem = export_private_key_encrypted(key, password)
+    key_pem = export_private_key_encrypted(key, key_passphrase)
     members: dict[str, bytes] = {}
     with tempfile.TemporaryDirectory(dir=ctx.settings.data_dir) as tmp:
         snap = Path(tmp) / "snapshot.sqlite3"
@@ -142,6 +317,7 @@ def create_plain_backup(ctx, password: str) -> tuple[str, bytes]:
     index = {
         "format": BACKUP_FORMAT,
         "installation": ledger.installation,
+        "key_protection": key_protection,
         "created_local": _now(),
         "record_count": ledger.record_count(),
         "blob_count": len(digests),
@@ -211,12 +387,16 @@ def _read_capped(zf: zipfile.ZipFile, info: zipfile.ZipInfo) -> bytes:
     return data
 
 
-def restore_backup(ctx, data: bytes, password: str, *, max_bytes: int = MAX_RESTORE_BYTES) -> dict:
+def restore_backup(
+    ctx, data: bytes, password: str | None = None, *, recovery_code: str | None = None,
+    max_bytes: int = MAX_RESTORE_BYTES,
+) -> dict:
     ledger = ctx.ledger
     if ledger.record_count() > 0 or ledger.installation is not None:
         raise LedgerError("restore only works into an empty installation (this one already has records)")
-    if data.startswith(ENCRYPTED_MAGIC):
-        data = decrypt_backup(data, password)
+    if not password and not recovery_code:
+        raise BackupError("enter the backup password or the recovery code")
+    data, backup_key, opened_with = open_backup(data, password or None, recovery_code or None)
     try:
         zf = zipfile.ZipFile(io.BytesIO(data))
     except zipfile.BadZipFile as exc:
@@ -240,8 +420,16 @@ def restore_backup(ctx, data: bytes, password: str, *, max_bytes: int = MAX_REST
             contents[name] = blob
         if set(expected) != set(contents):
             raise BackupError("backup index and contents differ")
+    if index.get("key_protection", "password") == "backup-key":
+        if backup_key is None:
+            raise BackupError("damaged backup (the key file needs the encrypted backup around it)")
+        passphrase = key_passphrase(backup_key)
+    else:
+        if not password:
+            raise BackupError("this older backup opens with its password only")
+        passphrase = password
     try:
-        key = load_private_key_encrypted(contents["key/signing-key.pem"], password)
+        key = load_private_key_encrypted(contents["key/signing-key.pem"], passphrase)
     except KeyBackupError as exc:
         raise BackupError("wrong backup password (or damaged key file)") from exc
 
@@ -272,4 +460,9 @@ def restore_backup(ctx, data: bytes, password: str, *, max_bytes: int = MAX_REST
             if batch:
                 s.execute(insert(table), batch)
     ledger.adopt_identity(installation, key)
-    return {"installation": installation, "records": len(rows["records"]), "files": len(rows["blobs"])}
+    return {
+        "installation": installation,
+        "records": len(rows["records"]),
+        "files": len(rows["blobs"]),
+        "opened_with": opened_with,
+    }

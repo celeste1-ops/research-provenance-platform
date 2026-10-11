@@ -128,20 +128,34 @@ def test_backup_and_restore_in_the_browser(tmp_path, browser):
         pill.click()
         dlg = page.get_by_test_id("backup-dialog")
         dlg.get_by_label("Backup folder").fill(str(folder))
+        # While choosing, the dialog says where the folder really is.
+        check = dlg.get_by_test_id("location-check")
+        check.get_by_text("This Mac's own disk", exact=True).wait_for()
+        assert "lost with it" in check.inner_text()
+        assert "can't be opened" in dlg.get_by_test_id("password-warning").inner_text()
         dlg.get_by_label("Backup password (at least 8 characters)").fill("backup password 1")
         dlg.get_by_label("Repeat the password").fill("backup password 1")
         dlg.get_by_role("button", name="Turn on automatic backup").click()
+        # The printable recovery code is shown once; continuing needs a tick.
+        sheet = dlg.get_by_test_id("recovery-code")
+        sheet.wait_for()
+        code = sheet.get_by_test_id("recovery-code-value").inner_text().strip()
+        assert len(code) == 27 and code not in (a.ctx.ledger.meta("backup_recovery") or "")
+        assert sheet.get_by_role("button", name="Continue").is_disabled()
+        sheet.get_by_label("I have printed it or written it down").check()
+        sheet.get_by_role("button", name="Continue").click()
         page.get_by_test_id("notice").get_by_text("Automatic backup is on").wait_for()
         # The test folder is on the same disk as the records: the app says it would not survive a lost Mac.
         assert "Backup is on this Mac only" in pill.inner_text()
         pill.click()
         dlg = page.get_by_test_id("backup-dialog")
-        assert "same disk" in dlg.inner_text()
+        assert "lost with it" in dlg.inner_text()
+        assert "Recovery code:" in dlg.get_by_test_id("recovery-status").inner_text()
         dlg.get_by_role("button", name="Close").click()
         page.close()
     (backup,) = list(folder.iterdir())
     assert backup.name.endswith(".rprovbackup")
-    assert backup.read_bytes().startswith(b"RPROV-BACKUP-ENC/1\n")
+    assert backup.read_bytes().startswith(b"RPROV-BACKUP-ENC/2\n")
     assert b"Formula" not in backup.read_bytes()  # nothing readable without the password
     with LiveServer(tmp_path / "b") as b:
         page = browser.new_page(viewport={"width": 1400, "height": 900})
@@ -153,13 +167,15 @@ def test_backup_and_restore_in_the_browser(tmp_path, browser):
         form.get_by_role("button", name="Restore my research").click()
         form.get_by_text("wrong backup password").wait_for()
         assert b.ctx.ledger.record_count() == 0
-        form.get_by_label("Backup password").fill("backup password 1")
+        # Password forgotten: the printed recovery code opens the backup instead.
+        form.get_by_role("button", name="Forgot the password? Use the recovery code instead").click()
+        form.get_by_label("Recovery code").fill(code.lower())
         form.get_by_role("button", name="Restore my research").click()
         page.get_by_test_id("graph").locator(".record-node").nth(13).wait_for()
         wait_for_step_count(page, "14 steps")
         assert b.ctx.ledger.record_count() == count
-        # Same folder and password: automatic backups simply continue on the new install.
-        assert "Backup is on this Mac only" in page.get_by_test_id("backup-pill").inner_text()
+        # The old password is unknown now, so automatic backup asks for a new one.
+        assert "Backup needs your password" in page.get_by_test_id("backup-pill").inner_text()
         page.close()
 
 
@@ -179,6 +195,11 @@ def test_first_run_with_automatic_backup(tmp_path, browser):
         setup.get_by_text("The two passwords are not the same.").wait_for()
         setup.get_by_label("Repeat the password").fill("first password")
         setup.get_by_role("button", name="Turn on automatic backup").click()
+        sheet = page.get_by_test_id("recovery-code")
+        sheet.wait_for()
+        assert page.get_by_role("button", name="Skip for now").count() == 0  # the code can't be skipped past
+        sheet.get_by_label("I have printed it or written it down").check()
+        sheet.get_by_role("button", name="Continue").click()
         page.get_by_test_id("empty-state").wait_for()
         assert len(list(folder.glob("*.rprovbackup"))) == 1
         wait_for_step_count(page, "0 steps")

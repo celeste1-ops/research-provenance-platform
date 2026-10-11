@@ -89,13 +89,7 @@ export function Setup({ onDone, onPractice }: { onDone: () => void; onPractice: 
               Your research lives on this Mac. If the Mac is lost or breaks, a backup is what brings it back — the
               stamps alone can't. Choose a folder once; after that every new step is backed up automatically.
             </p>
-            <BackupSetup onDone={onDone} />
-            <p className="small center">
-              <button type="button" className="link muted" onClick={onDone}>
-                Skip for now
-              </button>{" "}
-              <span className="muted">(you can turn it on later from the backup button at the top)</span>
-            </p>
+            <BackupSetup onDone={onDone} onSkip={onDone} />
           </>
         )}
 

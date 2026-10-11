@@ -143,6 +143,18 @@ export interface BackupStatus {
   where?: BackupWhere;
   needs_password?: boolean;
   state: "off" | "ok" | "same-disk" | "error";
+  recovery?: { configured: boolean; id?: string; created_local?: string };
+  data_dir_warning?: string | null;
+  recovery_code?: string; // only in the response that created it; never stored
+}
+
+export interface LocationCheck {
+  ok: boolean;
+  kind: string;
+  label: string;
+  safe: boolean;
+  warning?: string;
+  creates?: boolean;
 }
 
 export interface BackupSuggestion {
@@ -167,6 +179,7 @@ export interface Status {
   backup_location: string | null;
   space: "real" | "practice";
   practice_dir: string;
+  data_dir_warning: string | null;
 }
 
 export interface Project {
