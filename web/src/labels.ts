@@ -65,12 +65,14 @@ export function stampText(p: ProofStatus): string {
   return s === "✓" ? `${stampName(p.kind)} ✓` : t("{stamp}: {state}", { stamp: stampName(p.kind), state: s });
 }
 
-export function help(key: "addStep" | "list" | "keySteps" | "share" | "dateStamp" | "publicStamp"): string {
+export function help(key: "addStep" | "list" | "story" | "keySteps" | "share" | "dateStamp" | "publicStamp"): string {
   switch (key) {
     case "addStep":
       return t("Write down one step of your research — an idea, a result, a file. It gets its date stamp within seconds.");
     case "list":
       return t("Every step and every later addition in the order you added them, with both stamps.");
+    case "story":
+      return t("Your research told in sentences, written from the steps with fixed wording — no AI. Each paragraph names the step it comes from; your own reasons and notes are highlighted. It also goes into the report you share.");
     case "keySteps":
       return t("Show only the steps you marked as key steps, and how they lead to each other.");
     case "share":

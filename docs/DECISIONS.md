@@ -561,3 +561,31 @@ verification rules or what leaves the machine for time proofs.
   7. *Where the list lives.* `<data folder>/git_sources.json`, per space (the practice space
      has its own). It is not part of backups: folder paths differ between computers, and
      every recorded step is in the backup anyway.
+  8. *Tags are key steps.* A commit that has a tag when it is recorded, and a history entry
+     that ends at a tag, is recorded as a key step. A tag made later marks the commit's entry
+     with a milestone record (a later addition, visibly later). Each tag is applied once:
+     the list keeps the tags already handled, so a mark the author takes off stays off.
+
+- **D-048 · The research told in sentences, without AI ("Story").** The author asked for an
+  automatic account that does not need AI, to read alongside the map and to put in reports.
+  1. *Fixed sentences, nothing added.* `app/services/narrative.py` walks the records in
+     recording order and writes one paragraph per step and per later addition from fixed
+     templates (English and Chinese): what was recorded and when, older material with its
+     claimed date, the links the author declared, the author's reason (quoted as written),
+     the commit, DOI or files it refers to, key-step marks, notes, corrections and
+     retractions. It never uses the body text and never states a cause the author did not
+     write.
+  2. *Every sentence keeps its source.* Each sentence lists the records it comes from and is
+     either "record" (what was recorded) or "author" (reasons, notes, claimed dates and the
+     links between steps — author statements, PRD §2). The interface and the report
+     highlight author sentences and show, once per paragraph, the record number and its
+     date (✓ when it is a date-stamp time; otherwise the computer's clock), linked to the
+     step. The three kinds of information stay apart: this text is not a verified record
+     and not an AI inference; it is labelled as generated from the records.
+  3. *Parts.* A part ends at each step the author marked as a key step; without key steps,
+     one part per month.
+  4. *Where it appears.* A "Story" tab next to the map and the list (per project, with
+     "Save as Markdown" and print), and a section "The research, step by step" in
+     `report.html`. The report builds it only from what the bundle discloses: a record
+     disclosed as existence only appears as "record #n is not disclosed here", and nothing
+     of its content (a test checks this), exactly like the rest of the report.

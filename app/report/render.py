@@ -227,7 +227,13 @@ def build_model(plan, meta, mats, contents, report, trust) -> dict:
                             "note": tr("self-reported, unverified")})
         details.append(d)
 
+    from app.services.narrative import build_narrative
+
+    narrative = build_narrative([(r.id, r.seq, r.kind, payloads.get(r.id)) for r in plan.chain], when,
+                                title=meta["title"])
+    anchors = {d["id"] for d in details}  # records with their own section below
     return {
+        "narrative": narrative, "anchors": anchors,
         "meta": meta, "plan": plan, "report": report, "counts": report.counts, "trust": trust,
         "graph_svg": Markup(render_graph_svg(nodes, edges)), "timeline": timeline, "details": details,
         "proves": [tr(x) for x in PROVES], "does_not_prove": [tr(x) for x in DOES_NOT_PROVE],

@@ -251,3 +251,17 @@ export type GitInspect = {
   history_steps: number;
   already: boolean;
 };
+
+// The research told in sentences from fixed templates (DECISIONS D-048).
+export type NarrativeSentence = {
+  text: string;
+  source: "record" | "author";
+  refs: { id: string; seq: number | null }[];
+  date: { time: string | null; verified: boolean; from: string } | null;
+};
+export type Narrative = {
+  title: string;
+  intro: NarrativeSentence[];
+  chapters: { heading: string | null; paragraphs: NarrativeSentence[][] }[];
+  steps: number;
+};

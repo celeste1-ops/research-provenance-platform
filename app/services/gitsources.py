@@ -44,6 +44,7 @@ class Batch:
     label: str  # tag name, YYYY-MM or YYYY
     commits: list[Commit] = field(default_factory=list)
     precision: str = "month"
+    tagged: bool = False  # ends at a tagged commit: a key step
 
     @property
     def claimed_date(self) -> str:
@@ -67,7 +68,7 @@ def history_batches(commits: list[Commit], tags: dict[str, list[str]]) -> list[B
                 cur = Batch(key, precision="month" if period == 7 else "year")
             cur.commits.append(c)
             if c.sha in tags:  # a tag closes the batch and names it
-                cur.label, cur.precision = sorted(tags[c.sha])[0], "day"
+                cur.label, cur.precision, cur.tagged = sorted(tags[c.sha])[0], "day", True
                 out.append(cur)
                 cur = None
         if cur is not None:
@@ -224,7 +225,7 @@ class GitSources:
                 commits = repo.commits(head)
                 if not history:  # start from where the code stands now
                     self._busy[source_id] = {"done": 0, "total": 1}
-                    self._record_commit(source, repo, commits[-1])
+                    self._record_commit(source, repo, commits[-1], milestone=commits[-1].sha in repo.tags())
                     batches = []
                 else:
                     batches = history_batches(commits, repo.tags())
@@ -270,6 +271,15 @@ class GitSources:
         head = repo.head(source["branch"])
         if head is None:
             raise GitError("the branch is gone or has no commits")
+        tags = repo.tags()
+        recorded = self._record_new(source, repo, head, tags)
+        names = sorted(n for ns in tags.values() for n in ns)
+        if names != source.get("seen_tags"):
+            self._mark_tagged(source, tags)
+            self._update(source["id"], seen_tags=names)
+        return recorded
+
+    def _record_new(self, source: dict, repo: Repo, head: str, tags: dict[str, list[str]]) -> int:
         last = source.get("last_commit")
         if head == last:
             return 0
@@ -289,8 +299,26 @@ class GitSources:
             self._record_batch(source, repo, Batch(f"{new[0].sha[:7]}…{new[-1].sha[:7]}", new, precision="day"))
             return 1
         for c in new:
-            self._record_commit(source, repo, c)
+            self._record_commit(source, repo, c, milestone=c.sha in tags)
         return len(new)
+
+    def _mark_tagged(self, source: dict, tags: dict[str, list[str]]) -> None:
+        """A tag marks its commit's step as a key step — once: a tag the author has already seen
+        handled is never applied again, so taking the mark off sticks. A tag made after the commit
+        was recorded marks it with a later addition, visibly later like any other."""
+        current = next((s for s in self._load() if s["id"] == source["id"]), source)
+        marked = set(current.get("marked_tags") or [])
+        fresh = {sha: names for sha, names in tags.items() if set(names) - marked}
+        if not fresh:
+            return
+        done = self._already_recorded(source)
+        state = self.ctx.ledger.state()
+        for sha, names in fresh.items():
+            entry = state.entries.get(done.get(sha, ""))
+            if entry is not None and not entry.milestone and entry.retracted_by is None:
+                self.ctx.ledger.create_milestone(entry.id, "set")
+            marked.update(names)
+        self._update(source["id"], marked_tags=sorted(marked))
 
     def _already_recorded(self, source: dict) -> dict[str, str]:
         """commit -> step, for this repository (guards against recording a commit twice after a crash)."""
@@ -320,7 +348,7 @@ class GitSources:
         return [UploadedFile(f"{source['name']}-{commit.sha[:12]}.zip", data, "application/zip")]
 
     def _append(self, source: dict, repo: Repo, commit: Commit, title: str, body: str | None,
-                claimed: dict | None) -> str:
+                claimed: dict | None, milestone: bool = False) -> str:
         current = next((s for s in self._load() if s["id"] == source["id"]), source)
         prev = current.get("last_entry")
         rid = self.ctx.ledger.create_entry(EntryInput(
@@ -328,21 +356,23 @@ class GitSources:
             body=body or None, files=self._files(current, repo, commit),
             external={"repo_url": current["repo_url"], "commit": commit.sha},
             relations=[{"to": prev, "rel": "revises"}] if prev and self.ctx.ledger.record(prev) else [],
-            import_info=claimed,
+            import_info=claimed, milestone=milestone,
         ))
         self._update(source["id"], last_commit=commit.sha, last_entry=rid,
                      recorded=int(current.get("recorded") or 0) + 1)
         source.update(last_commit=commit.sha, last_entry=rid)
         return rid
 
-    def _record_commit(self, source: dict, repo: Repo, commit: Commit) -> str:
-        """One commit, one step: the commit message is the author's own words."""
+    def _record_commit(self, source: dict, repo: Repo, commit: Commit, milestone: bool = False) -> str:
+        """One commit, one step: the commit message is the author's own words. A tagged commit
+        is a key step."""
         return self._append(source, repo, commit, commit.subject or commit.sha[:12], commit.body,
-                            self._claimed(commit))
+                            self._claimed(commit), milestone)
 
     def _record_batch(self, source: dict, repo: Repo, batch: Batch) -> str:
         """Several commits in one step that lists them; the newest is its reference."""
         lines = [f"- `{c.sha[:12]}` {c.subject}" for c in batch.commits]
         last = batch.commits[-1]
         claimed = self._claimed(last, batch.precision, batch.claimed_date)
-        return self._append(source, repo, last, f"{source['name']} · {batch.label}", "\n".join(lines), claimed)
+        return self._append(source, repo, last, f"{source['name']} · {batch.label}", "\n".join(lines), claimed,
+                            milestone=batch.tagged)

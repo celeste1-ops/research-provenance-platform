@@ -187,3 +187,36 @@ def test_the_code_copy_is_exactly_what_was_committed(tmp_path):
         assert z.read("model.py") == b"version = 1\n"
         assert sorted(z.namelist()) == [".gitattributes", "model.py"]
     assert r.archive(sha, 10) is None  # over the limit
+
+
+def test_tags_become_key_steps_once(ctx, project, repo):
+    repo.commit("v1 of the model", tag="v1")
+    ctx.git.add(str(repo.path), "main", project, history=False, keep_code=False, background=False)
+    ctx.git.check()
+    state = ctx.ledger.state()
+    [first] = state.entries.values()
+    assert first.milestone  # tagged when recorded
+
+    second = repo.commit("v2 of the model")
+    ctx.git.check()
+    step2 = next(e for e in ctx.ledger.state().entries.values() if e.payload["external"]["commit"] == second)
+    assert not step2.milestone
+    repo.git("tag", "v2")  # tagged after it was recorded: marked by a later addition
+    ctx.git.check()
+    assert ctx.ledger.state().entries[step2.id].milestone
+    kinds = [r.kind for r in ctx.ledger.records()]
+    assert kinds.count("milestone") == 1
+
+    ctx.ledger.create_milestone(step2.id, "unset")  # the author takes the mark off
+    repo.commit("v3")
+    ctx.git.check()
+    assert not ctx.ledger.state().entries[step2.id].milestone  # and it stays off
+
+
+def test_tagged_history_steps_are_key_steps(ctx, project, repo):
+    repo.commit("a", date="2025-01-05T10:00:00+00:00", tag="v0.1")
+    repo.commit("b", date="2025-02-05T10:00:00+00:00")
+    ctx.git.add(str(repo.path), "main", project, history=True, keep_code=False, background=False)
+    by_title = {e.title: e for e in ctx.ledger.state().entries.values()}
+    assert by_title["fsf-code · v0.1"].milestone
+    assert not by_title["fsf-code · 2025-02"].milestone
