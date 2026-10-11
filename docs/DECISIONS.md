@@ -39,3 +39,48 @@ each section.
   `https://freetsa.org/files/`, prints their fingerprints, and refuses to overwrite the root
   if its fingerprint differs from the one above. The `network` test for AC-09 checks a real
   FreeTSA response against the committed root.
+
+## Records and verification
+
+- **D-005 · Mock third-party timestamps are real RFC 3161 tokens.** `MockProvider("tsa")`
+  signs genuine RFC 3161 responses with a throwaway CA committed under
+  `core/provenance_core/providers/mock_tsa/` (private key included on purpose). Tests and
+  cloud development therefore run the exact verification path FreeTSA tokens take, and
+  `openssl ts -verify` accepts them. Nothing trusts the mock root unless asked to:
+  the app trusts it only when `RPROV_TSA=mock`, `verify.py` only with `--tsa-root`.
+  Mock Bitcoin anchors use a clearly marked format and are never shown as confirmed
+  outside test mode.
+- **D-006 · "No timestamp yet" is a warning in verification.** The PRD lists two warning
+  cases (later-verified referenced record; the two proofs more than 24 h apart). A record
+  with no verified proof at all passes every integrity check but has no time; reporting it
+  as a plain "pass" would invite reading a time into it, so it is a warning
+  (`NO_VERIFIED_TIME`) and no time is shown.
+- **D-007 · Genesis payload is always disclosed.** The genesis payload holds the public
+  key every signature is checked against, so evidence bundles always include it, whatever
+  disclosure level the user picks for other records. The export preview says so.
+- **D-008 · Relations must point from newer to older.** AC-12 asks for a 400 on relations
+  pointing at a "later" record. For a new `entry` every existing record is earlier, so the
+  rule bites on `link` records: `to` must have a smaller `seq` than `from` (PRD §8: "新记录
+  rel 旧记录"). The verifier stays lenient (it only checks V7, refs earlier than the
+  referencing record) so bundles from future versions keep verifying.
+- **D-009 · Local clock time is shown with author statements.** The record's `local_time`
+  comes from the author's computer and is unverified, so the detail view lists it under
+  "Author statement" (marked "self-reported, unverified"), never under "Verified record".
+- **D-010 · No-op later additions are refused.** Setting a milestone that is already set,
+  withdrawing a relation that is not active, adding an active relation twice, or retracting
+  an entry twice returns 400 instead of appending a meaningless record.
+
+## Local app
+
+- **D-011 · Key storage outside macOS.** The signing key lives in the macOS Keychain via
+  `keyring` (PRD S5). Linux containers have no keychain, so for development only there is
+  an opt-in `RPROV_KEYSTORE=dev-insecure-file` (a 0600 file in the data directory, with a
+  warning in the log). It is never the default; tests use an in-memory keystore.
+- **D-012 · One process-wide write lock.** All write transactions (records, time proofs,
+  metadata) run under one re-entrant lock and SQLite runs in WAL mode, so there is only
+  ever one writer and readers never block it. Network calls to time-proof services happen
+  outside that lock, after the record is committed.
+- **D-013 · First start.** The UI asks for an author label (self-declared, shown as such)
+  and then creates the key pair and the genesis record (`POST /api/identity`). Renaming a
+  project uses `POST /api/projects/{id}/rename`; projects are local display data, not
+  records.
