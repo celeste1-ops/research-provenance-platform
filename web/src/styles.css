@@ -136,3 +136,4 @@ pre.diff { font-size: 12px; background: #fff; border: 1px solid var(--line); bor
 pre.diff .add { color: #14532d; background: #e9f7ef; } pre.diff .del { color: #8a1c1c; background: #fdecec; }
 .later-actions { margin: 10px 12px; }
 button.danger { color: var(--bad); border-color: #f0b8b3; }
+.restore { margin-top: 8px; padding: 10px 12px; border: 1px dashed var(--line); border-radius: 8px; }

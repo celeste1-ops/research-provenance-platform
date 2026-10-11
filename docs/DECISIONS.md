@@ -155,3 +155,20 @@ each section.
   Before recording real material, move the demo aside (`mv ~/.rprov ~/.rprov-demo`) or load
   the demo with `RPROV_HOME=~/.rprov-demo make demo` from the start. The demo uses whatever
   time-proof providers are configured. All sample text is fictional.
+
+## Backup and restore
+
+- **D-028 · Backup format and restore rules.** A backup is one zip (`rprov.backup/1`): a
+  consistent SQLite snapshot (taken under the write lock with SQLite's backup API), every
+  stored file, the signing key encrypted with the backup password, and an index with the
+  SHA-256 of every member. The database and files are not encrypted (they are the
+  author's own data, kept in a place the author chooses); the key always is (PRD S5).
+  Restore only goes into an installation without records and only inserts rows, so it
+  never edits anything; afterwards the whole chain is re-verified and the key returns to
+  the keychain. S4: only the expected member names are accepted, absolute paths, `..`,
+  backslashes and symbolic links are refused, the total uncompressed size is capped
+  (20 GiB) and every member is read with a size cap and checked against the index.
+- **D-029 · Backup location.** The backup folder is an absolute path typed in the backup
+  dialog (a browser cannot hand a folder path to the local server); it is remembered and
+  the button stays highlighted until one is set. After the first record the app reminds
+  the author to set it (PRD S7).

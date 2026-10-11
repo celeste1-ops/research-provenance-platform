@@ -404,3 +404,51 @@ def export_bundle(body: ExportIn, request: Request):
     (exports / name).write_bytes(data)
     return Response(data, media_type="application/zip",
                     headers={"Content-Disposition": f'attachment; filename="{name}"'})
+
+
+# ---------------------------------------------------------------- backup & restore
+
+
+class BackupIn(BaseModel):
+    password: str = Field(min_length=8)
+    location: str | None = None  # also write the backup into this folder, and remember it
+
+
+@router.post("/backup")
+def create_backup_route(body: BackupIn, request: Request):
+    from app.services.backup import BackupError, create_backup, write_backup_to
+
+    c = ctx(request)
+    try:
+        name, data = create_backup(c, body.password)
+    except NotInitialized as exc:
+        raise _bad(exc) from None
+    headers = {"Content-Disposition": f'attachment; filename="{name}"'}
+    location = body.location or c.ledger.meta("backup_location")
+    if location:
+        try:
+            path = write_backup_to(location, name, data)
+        except BackupError as exc:
+            raise HTTPException(400, str(exc)) from None
+        c.ledger.set_meta("backup_location", location)
+        headers["X-Backup-Path"] = str(path)
+    c.ledger.set_meta("last_backup_local", name)
+    c.ledger.set_meta("key_backup_done", "1")
+    return Response(data, media_type="application/zip", headers=headers)
+
+
+@router.post("/restore")
+async def restore_route(request: Request, file: Annotated[UploadFile, File()], password: Annotated[str, Form()]):
+    from starlette.concurrency import run_in_threadpool
+
+    from app.services.backup import BackupError, restore_backup
+    from app.services.verification import report_json, verify_database
+
+    c = ctx(request)
+    data = await file.read()
+    try:
+        summary = await run_in_threadpool(restore_backup, c, data, password)
+    except (BackupError, LedgerError) as exc:
+        raise HTTPException(400, str(exc)) from None
+    report = await run_in_threadpool(verify_database, c.ledger, c.anchors)
+    return {**summary, "verification": report_json(report)}

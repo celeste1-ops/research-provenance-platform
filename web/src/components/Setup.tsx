@@ -1,11 +1,13 @@
 import { useState } from "react";
 import { api } from "../api";
+import { RestoreForm } from "./BackupDialog";
 
 export function Setup({ onDone }: { onDone: () => void }) {
   const [label, setLabel] = useState("");
   const [project, setProject] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [restoring, setRestoring] = useState(false);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -24,7 +26,8 @@ export function Setup({ onDone }: { onDone: () => void }) {
 
   return (
     <div className="setup">
-      <form className="card" onSubmit={submit}>
+      <div className="card">
+      <form onSubmit={submit}>
         <h1>Set up your research record</h1>
         <p>
           This creates your <b>signing key</b>, kept in the macOS Keychain on this computer. Every record you make
@@ -47,6 +50,13 @@ export function Setup({ onDone }: { onDone: () => void }) {
           Create signing key
         </button>
       </form>
+      <p className="small">
+        <button type="button" className="link" onClick={() => setRestoring(!restoring)}>
+          Restore from a backup instead
+        </button>
+      </p>
+      {restoring && <RestoreForm onDone={onDone} />}
+      </div>
     </div>
   );
 }

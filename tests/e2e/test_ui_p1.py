@@ -106,3 +106,32 @@ def test_200_nodes_render_within_a_second(tmp_path, browser):
         page.close()
     print(f"200-node first render: {elapsed:.3f}s")
     assert elapsed < 1.0, f"first render took {elapsed:.2f}s"
+
+
+def test_backup_and_restore_in_the_browser(tmp_path, browser):
+    folder = tmp_path / "backups"
+    folder.mkdir()
+    with LiveServer(tmp_path / "a") as a:
+        load_demo(a.ctx)
+        count = a.ctx.ledger.record_count()
+        page = browser.new_page()
+        page.goto(a.url)
+        page.get_by_role("button", name="Backup…").click()
+        dlg = page.get_by_test_id("backup-dialog")
+        dlg.get_by_label("Password for the key (at least 8 characters)").fill("backup password 1")
+        dlg.get_by_placeholder("/Volumes/Backup/rprov").fill(str(folder))
+        dlg.get_by_role("button", name="Create backup").click()
+        page.get_by_text("Backup written to").wait_for()
+        page.close()
+    (backup,) = list(folder.iterdir())
+    with LiveServer(tmp_path / "b") as b:
+        page = browser.new_page()
+        page.goto(b.url)
+        page.get_by_role("button", name="Restore from a backup instead").click()
+        form = page.get_by_test_id("restore-form")
+        form.get_by_label("Backup file").set_input_files(str(backup))
+        form.get_by_label("Backup password").fill("backup password 1")
+        form.get_by_role("button", name="Restore").click()
+        page.get_by_text(f"Demo author (fictional) · {count} records").wait_for()
+        assert b.ctx.ledger.record_count() == count
+        page.close()

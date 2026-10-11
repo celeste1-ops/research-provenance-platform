@@ -52,7 +52,11 @@ make freetsa-certs    # 第一次：从 freetsa.org 核对并更新内置的 Fre
 make run              # 打开 http://127.0.0.1:8765
 ```
 
-第一次打开时填一个**作者标签**（真名或笔名都可以，报告里标为「自我声明」）。程序生成签名钥匙并存进 macOS 钥匙串，不以明文文件存放。**第一条记录之后请导出一份带密码的钥匙备份**：钥匙丢了，以后的新记录就是另一个身份（旧记录仍可验证）。
+第一次打开时填一个**作者标签**（真名或笔名都可以，报告里标为「自我声明」）。程序生成签名钥匙并存进 macOS 钥匙串，不以明文文件存放。
+
+**第一条记录之后请设置备份**：点 **Backup…**，填一个密码和一个备份文件夹（例如外接硬盘上的目录）。备份是一个 zip，包含数据库、全部文件和用密码加密的签名钥匙；以后一键就能再备份。电脑坏了，在新电脑上第一次打开时选「Restore from a backup instead」即可恢复，恢复后记录、时间证明、验证结果都和原来一致，新记录仍属于同一身份。只想单独备份钥匙，用 **Back up key…**。钥匙丢了且没有备份，以后的新记录就是另一个身份（旧记录仍可验证）。
+
+**想先看看样例？** `make demo && make run` 会把虚构的 FSF 样例（14 条记录，9 种类型，3 种关系，里程碑、后来补加的关系、补充说明、L1/L2 导入、撤回）载入一个空的数据目录。记录不能删除，所以开始记真实材料之前，把样例挪开：`mv ~/.rprov ~/.rprov-demo`（以后用 `RPROV_HOME=~/.rprov-demo make run` 再看样例）。也可以一开始就 `RPROV_HOME=~/.rprov-demo make demo`。
 
 数据都在 `~/.rprov/`（权限 0700）。原文、附件、标题、说明都不离开本机；对外只发送时间证明所需的哈希（记录 ID），时间证明服务能看到请求的 IP 地址和时间。没有账号，没有云同步，没有任何统计或崩溃上报。
 
@@ -101,6 +105,8 @@ pip install "cryptography>=44" "rfc3161-client>=1.0.6"
 python3 verify.py provenance-FSF-2026-10-12.zip      # 也可以对解压后的目录运行
 ```
 
+检查比特币时间锚定时，`verify.py` 会向两个公开区块浏览器（blockstream.info、mempool.space）查询区块头，只发送区块高度；有自己的比特币节点可以用 `--bitcoin-node http://user:pass@127.0.0.1:8332`，完全不联网用 `--offline`（这时比特币锚定显示为「未核对」，不算失败也不给时间）。
+
 它逐条检查：内容的哈希（V1）、清单和载荷（V2）、签名（V3）、第三方签名时间证明（V4，对照内置的 FreeTSA 根证书）、比特币时间锚定（V5）、日志链（V6）、引用（V7）。每条记录的结果是 *Pass*、*Pass (Bitcoin anchor pending)*、*Warning* 或 *Fail*（附失败代码）。退出码 0 表示没有任何记录失败。
 
 不想运行程序的人，可以照 `VERIFY.md` 用 `sha256sum`、`openssl` 和 `ots` 命令手工检查同样的内容。
@@ -110,7 +116,7 @@ python3 verify.py provenance-FSF-2026-10-12.zip      # 也可以对解压后的�
 ```bash
 make dev              # 后端（自动重载）+ Vite 开发服务器 http://127.0.0.1:5173
 make test             # ruff + 全部测试（单元、接口、篡改、端到端）；联网测试跳过
-make test-network     # 需要真实 FreeTSA / OpenTimestamps 的测试（AC-09），在联网的 Mac 上跑
+make test-network     # 需要真实 FreeTSA / OpenTimestamps / 区块浏览器的测试（含 AC-09），在联网的 Mac 上跑
 make verify-py        # 从核心库重新生成 dist/verify.py
 ```
 
@@ -121,4 +127,5 @@ make verify-py        # 从核心库重新生成 dist/verify.py
 ## 当前进度
 
 - **P0 已完成**：只追加的记录、签名、重放；第三方签名时间证明（RFC 3161）；导出证据包、`report.html`（含静态演化图）、`verify.py`、篡改测试；记录表单和演化图。
-- **P1 进行中**：比特币时间锚定（OpenTimestamps，未启用前界面显示「Bitcoin anchor: not enabled」）、「只看里程碑」视图、时间线视图、详情侧栏的完整分区、**备份与恢复（开始用真实 FSF 资料之前必须完成）**、FSF 样例数据、区块浏览器核对。
+- **P1 已完成**：比特币时间锚定（OpenTimestamps）和区块浏览器核对；「只看里程碑」视图；时间线视图；详情侧栏的完整分区（Verified record / Author statement / Later additions / Changes，以及在侧栏里追加关系、里程碑、说明、撤回）；备份与恢复；FSF 样例数据。
+- **需要在联网的 Mac 上完成**：`make freetsa-certs`、`make test-network`（AC-09：真实 FreeTSA 的 `.tsr` 用 `openssl ts -verify` 验证；真实 OpenTimestamps 日历和区块浏览器），以及 PRD 第 16 节的 4 项人工检查。

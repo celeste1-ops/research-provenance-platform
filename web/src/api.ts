@@ -75,9 +75,31 @@ export const api = {
   verifyAll: () => request<{ ok: boolean; counts: Record<string, number> }>("POST", "/api/verify/all"),
   exportPreview: (body: { title: string; records: Record<string, string>; default: string }) =>
     request<ExportPreview>("POST", "/api/export/preview", body),
+  backup: (password: string, location?: string) => backupRequest(password, location),
+  restore: (file: File, password: string) => {
+    const form = new FormData();
+    form.set("file", file, file.name);
+    form.set("password", password);
+    return request<{ installation: string; records: number; verification: { ok: boolean } }>("POST", "/api/restore", form);
+  },
   exportBundle: (body: { title: string; records: Record<string, string>; default: string }) =>
     request<Blob>("POST", "/api/export", body),
 };
+
+export async function backupRequest(password: string, location?: string) {
+  const res = await fetch("/api/backup", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "X-RPROV-Token": sessionToken() },
+    body: JSON.stringify({ password, location }),
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({ detail: res.statusText }));
+    throw new ApiError(res.status, typeof data.detail === "string" ? data.detail : JSON.stringify(data.detail));
+  }
+  const disposition = res.headers.get("content-disposition") ?? "";
+  const filename = /filename="([^"]+)"/.exec(disposition)?.[1] ?? "rprov-backup.zip";
+  return { blob: await res.blob(), path: res.headers.get("x-backup-path"), filename };
+}
 
 export function download(blob: Blob, filename: string) {
   const url = URL.createObjectURL(blob);

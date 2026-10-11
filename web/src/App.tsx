@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { api } from "./api";
 import type { Graph as GraphData, Project, Status, TimelineRow } from "./types";
+import { BackupDialog } from "./components/BackupDialog";
 import { Detail } from "./components/Detail";
 import { ExportDialog } from "./components/ExportDialog";
 import { Graph } from "./components/Graph";
@@ -19,6 +20,7 @@ export function App() {
   const [showForm, setShowForm] = useState(false);
   const [showExport, setShowExport] = useState(false);
   const [showKeyBackup, setShowKeyBackup] = useState(false);
+  const [showBackup, setShowBackup] = useState(false);
   const [version, setVersion] = useState(0);
   const [view, setView] = useState<"graph" | "timeline">("graph");
   const [milestonesOnly, setMilestonesOnly] = useState(false);
@@ -96,6 +98,13 @@ export function App() {
           title="Download a password-protected backup of your signing key"
         >
           Back up key…
+        </button>
+        <button
+          className={status.backup_location ? "secondary" : "secondary attention"}
+          onClick={() => setShowBackup(true)}
+          title="Full backup: database, files and the encrypted signing key"
+        >
+          Backup…
         </button>
         <button className="secondary" onClick={refresh} title="Check pending and missing time proofs now">
           Check time proofs
@@ -178,13 +187,26 @@ export function App() {
                 setShowForm(false);
                 setSelected(id);
                 await reload();
-                if (!status.key_backup_done) {
-                  setMessage("Recorded. Now back up your signing key (“Back up key…”): without it, a lost key means a new identity.");
+                if (!status.backup_location) {
+                  setMessage(
+                    "Recorded. Now set a backup location (“Backup…”): a lost computer or key means lost records or a new identity.",
+                  );
                 }
               }}
             />
           </div>
         </div>
+      )}
+      {showBackup && (
+        <BackupDialog
+          defaultLocation={status.backup_location}
+          onClose={() => setShowBackup(false)}
+          onDone={(msg) => {
+            setShowBackup(false);
+            setMessage(msg);
+            reload();
+          }}
+        />
       )}
       {showKeyBackup && (
         <KeyBackupDialog
