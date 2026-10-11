@@ -500,6 +500,18 @@ def backup_check(location: str, request: Request):
     return check_location(location, real(request).settings.data_dir)
 
 
+@router.post("/backup/resume")
+def backup_resume(request: Request):
+    """After a restore, automatic backup waits until the author confirms the folder (D-040)."""
+    from app.services.backup import BackupError
+
+    c = real(request)
+    try:
+        return c.autobackup.resume()
+    except BackupError as exc:
+        raise HTTPException(400, str(exc)) from None
+
+
 @router.post("/backup/recovery-code")
 def backup_new_recovery_code(request: Request):
     """Make a new printable recovery code (shown once; the app keeps only its public half)."""

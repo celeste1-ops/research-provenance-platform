@@ -27,7 +27,7 @@ from provenance_core import records as R
 from provenance_core.chain import next_position
 from provenance_core.jcs import JcsError, parse_json_strict
 from provenance_core.replay import ReplayState, replay
-from provenance_core.signing import generate_private_key, public_key_hex, sign_record_id
+from provenance_core.signing import generate_private_key, private_key_raw, public_key_hex, sign_record_id
 
 _MEDIA_TYPE = re.compile(r"\A[a-z0-9][a-z0-9!#$&^_.+-]*/[a-z0-9][a-z0-9!#$&^_.+-]*\Z")
 
@@ -136,8 +136,15 @@ class Ledger:
         return rid
 
     def adopt_identity(self, installation: str, key: Ed25519PrivateKey) -> None:
-        """Used by restore: the key from a backup goes back into the keychain."""
-        self.keystore.save(installation, key)
+        """Used by restore: the key from a backup goes back into the keychain.
+
+        If the keychain already holds this installation's key (a restore on the same Mac),
+        it is left alone; a different key is never overwritten."""
+        existing = self.keystore.load(installation)
+        if existing is None:
+            self.keystore.save(installation, key)
+        elif private_key_raw(existing) != private_key_raw(key):
+            raise LedgerError("the keychain already holds a different signing key for this installation")
         self._key = key
 
     # ------------------------------------------------------------------ projects

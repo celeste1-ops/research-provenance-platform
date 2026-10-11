@@ -142,7 +142,8 @@ export interface BackupStatus {
   keep: number;
   where?: BackupWhere;
   needs_password?: boolean;
-  state: "off" | "ok" | "same-disk" | "error";
+  state: "off" | "ok" | "same-disk" | "error" | "paused";
+  paused_after_restore?: boolean;
   recovery?: { configured: boolean; id?: string; created_local?: string };
   data_dir_warning?: string | null;
   recovery_code?: string; // only in the response that created it; never stored

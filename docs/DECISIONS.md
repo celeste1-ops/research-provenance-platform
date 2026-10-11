@@ -294,3 +294,22 @@ verification rules or what leaves the machine for time proofs.
   folder is refused; and if the live data folder itself sits inside iCloud Drive, Dropbox
   or another synced folder the app warns on every page, because syncing can damage a
   database in use — only the encrypted backup files belong in such a folder.
+- **D-040 · A restored copy never backs up by itself; each copy prunes only its own files.**
+  Found in a restore drill on the author's Mac: a restore copies the backup settings
+  (folder, "automatic on"), and on the same Mac the keychain already holds the backup
+  password for that installation ID, so the drill copy would have written into the real
+  iCloud folder within the hour and pruned the real copy's files together with its own
+  (both used the same file-name prefix). A password restore would also have replaced the
+  keychain's current backup password with the older one from the backup. Now: (1) every
+  restore pauses automatic backup (`backup_auto = 0`, marked "restored"); the top bar says
+  "Backup paused — confirm to resume" and the Backup dialog offers "Resume automatic
+  backup to this folder" or a different folder, with the advice not to resume a test
+  copy or a second Mac sharing the folder. (2) Backup file names carry a short per-copy
+  id (`rprov-backup-<installation>-<copy>-<time>`), reset by every restore, and rotation
+  only removes files with this copy's id. Files named before this change are never
+  removed automatically. (3) A restore never replaces keychain entries that already
+  exist for the installation: the backup password is kept as it is, and the signing key
+  is only written when missing; if the keychain holds a *different* key for that
+  installation the restore stops before changing anything. The recommended drill still
+  uses a separate data folder and `RPROV_KEYSTORE=memory`, so the copy does not touch the
+  keychain at all (README).

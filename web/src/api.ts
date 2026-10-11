@@ -116,6 +116,7 @@ export const api = {
   backupRun: () => request<{ ran: boolean; path: string; status: BackupStatus }>("POST", "/api/backup/run"),
   backupCheck: (location: string) =>
     request<LocationCheck>("GET", `/api/backup/check?location=${encodeURIComponent(location)}`),
+  backupResume: () => request<BackupStatus>("POST", "/api/backup/resume"),
   backupNewRecoveryCode: () =>
     request<{ recovery_code: string; status: BackupStatus }>("POST", "/api/backup/recovery-code"),
   restore: (file: File, secret: { password?: string; recoveryCode?: string }) => {

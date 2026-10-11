@@ -236,3 +236,5 @@ ul.plain { list-style: none; padding: 0; margin: 0; }
   .print-sheet, .print-sheet * { visibility: visible !important; }
   .print-sheet { position: absolute; left: 0; top: 0; width: 100%; padding: 24px; }
 }
+.pill-paused .dot { background: #e0a100; } .pill-paused { color: var(--warn); border-color: #f0d9a8; }
+.status-box.state-paused { background: #fff8e6; }

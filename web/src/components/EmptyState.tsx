@@ -79,11 +79,13 @@ export function EmptyState({
           <div className="callout">
             {backup?.state === "same-disk" ? (
               <>Your backup folder is on this Mac only, so it won't help if the Mac is lost.</>
+            ) : backup?.state === "paused" ? (
+              <>Automatic backup is paused after restoring — confirm the folder to resume it.</>
             ) : (
               <>Automatic backup is not on yet — if this Mac is lost or breaks, your research would be lost too.</>
             )}{" "}
             <button className="secondary small" onClick={onBackup}>
-              Set up backup
+              {backup?.state === "paused" ? "Review backup" : "Set up backup"}
             </button>
           </div>
         )}

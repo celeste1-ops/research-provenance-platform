@@ -358,6 +358,11 @@ export function App() {
                 const b = (await api.status()).backup;
                 if (practice) {
                   setNotice({ text: "Saved in practice. It is not part of your real record." });
+                } else if (b?.state === "paused") {
+                  setNotice({
+                    text: "Saved. Automatic backup is paused since the restore — confirm the folder to resume it.",
+                    action: { label: "Review backup", onClick: () => setDialog("backup") },
+                  });
                 } else if (b?.state === "ok") {
                   setNotice({ text: "Saved. It gets its date stamp in a few seconds and goes into the next automatic backup." });
                 } else {

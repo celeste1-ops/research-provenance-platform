@@ -187,7 +187,9 @@ export function BackupPill({ status, onClick }: { status: BackupStatus | null; o
   const text =
     st === "ok"
       ? `Last backup: ${timeAgo(status?.last_backup)} ✓`
-      : st === "same-disk"
+      : st === "paused"
+        ? "Backup paused — confirm to resume"
+        : st === "same-disk"
         ? "Backup is on this Mac only"
         : st === "error"
           ? "Backup failed"
@@ -222,6 +224,19 @@ export function BackupDialog({
     try {
       const out = await api.backupRun();
       onChanged(`Backup written to ${out.path}`);
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function resume() {
+    setBusy(true);
+    setError(null);
+    try {
+      await api.backupResume();
+      onChanged("Automatic backup resumed. A new backup was written.");
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -272,7 +287,31 @@ export function BackupDialog({
               lost or breaks, install the app on a new Mac and choose <b>Restore from a backup</b>.
             </p>
             {status?.data_dir_warning && <p className="error small">{status.data_dir_warning}</p>}
-            {status?.configured && !editing && (
+            {status?.state === "paused" && !editing && (
+              <div className="status-box state-paused" data-testid="backup-paused">
+                <div>
+                  <b>Automatic backup is paused</b>
+                  {status.paused_after_restore ? " because this copy was restored from a backup." : "."}
+                </div>
+                <div className="small">
+                  Folder: <span className="mono">{status.location}</span> ({status.where?.label})
+                </div>
+                <p className="warning small">
+                  Resume only on the Mac you will keep using. If another Mac — or the copy you restored from — still
+                  backs up into this folder, choose a different folder instead. If this was only a test of your backup,
+                  don't resume: close this copy and delete its folder.
+                </p>
+                <div className="row">
+                  <button className="primary small" onClick={resume} disabled={busy}>
+                    Resume automatic backup to this folder
+                  </button>
+                  <button className="secondary small" onClick={() => setEditing(true)}>
+                    Choose a different folder
+                  </button>
+                </div>
+              </div>
+            )}
+            {status?.configured && status.state !== "paused" && !editing && (
               <div className={`status-box state-${status.state}`}>
                 <div>
                   <b>Automatic backup is on</b> — after every change, keeping the last {status.keep}.
@@ -293,7 +332,7 @@ export function BackupDialog({
                 </div>
               </div>
             )}
-            {status?.configured && !editing && (
+            {status?.configured && status.state !== "paused" && !editing && (
               <div className="status-box" data-testid="recovery-status">
                 {status.recovery?.configured ? (
                   <>

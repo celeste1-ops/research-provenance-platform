@@ -340,3 +340,31 @@ def test_practice_before_setting_up(tmp_path, browser):
         page.get_by_test_id("space-real").click()
         page.get_by_placeholder("Name or pen name").wait_for()  # the real record is still to be set up
         page.close()
+
+
+def test_restored_copy_waits_before_backing_up(tmp_path, browser):
+    """D-040: after a restore, automatic backup is paused until the author confirms the folder."""
+    folder = tmp_path / "shared-backups"
+    with LiveServer(tmp_path / "a") as a:
+        load_demo(a.ctx)
+        a.ctx.autobackup.configure(str(folder), "backup password 1", create=True)
+    (backup,) = list(folder.iterdir())
+    with LiveServer(tmp_path / "b") as b:
+        page = browser.new_page(viewport={"width": 1400, "height": 900})
+        page.goto(b.url)
+        page.get_by_role("button", name="Restore from a backup").click()
+        form = page.get_by_test_id("restore-form")
+        form.get_by_label("Backup file").set_input_files(str(backup))
+        form.get_by_label("Backup password").fill("backup password 1")
+        form.get_by_role("button", name="Restore my research").click()
+        pill = page.get_by_test_id("backup-pill")
+        pill.get_by_text("Backup paused — confirm to resume").wait_for()
+        assert list(folder.iterdir()) == [backup]  # nothing written by the restored copy
+        pill.click()
+        paused = page.get_by_test_id("backup-paused")
+        assert "restored from a backup" in paused.inner_text() and "only a test" in paused.inner_text()
+        paused.get_by_role("button", name="Resume automatic backup to this folder").click()
+        page.get_by_test_id("notice").get_by_text("Automatic backup resumed").wait_for()
+        assert len(list(folder.iterdir())) == 2 and backup.exists()
+        assert "Backup is on this Mac only" in pill.inner_text()
+        page.close()

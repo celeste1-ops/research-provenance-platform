@@ -19,6 +19,7 @@ from app.services.keystore import MemoryKeyStore
 from app.services.ledger import EntryInput, LedgerError
 from app.services.verification import report_json, verify_database
 from provenance_core.jcs import parse_json_strict
+from provenance_core.signing import private_key_raw
 from tests.conftest import make_ctx
 from tests.sample import build_log
 
@@ -198,8 +199,12 @@ def test_backup_and_restore_over_http(tmp_path):
                     files={"file": ("x.rprovbackup", latest, "application/octet-stream")})
         assert r.status_code == 200, r.text
         assert r.json()["verification"]["ok"] is True
-        # Same folder, same password: automatic backups continue on the restored install.
-        assert r.json()["backup"]["configured"] is True
+        # Same folder, same password — but the restored copy waits until the author confirms (D-040).
+        assert r.json()["backup"]["configured"] is True and r.json()["backup"]["state"] == "paused"
+        files_before = len(list(folder.iterdir()))
+        r = cl.post("/api/backup/resume")
+        assert r.status_code == 200 and r.json()["state"] != "paused"
+        assert len(list(folder.iterdir())) == files_before + 1
         status = cl.get("/api/status").json()
         assert status["author_label"] == "HTTP" and status["entry_count"] == 1
         again = cl.post("/api/restore", data={"password": PASSWORD},
@@ -456,3 +461,81 @@ def test_recovery_code_over_http(tmp_path):
         assert r.status_code == 200, r.text
         assert r.json()["opened_with"] == "recovery code" and r.json()["backup"]["needs_password"]
     b.close()
+
+
+# ---------------------------------------------------------------- restoring on the same Mac (D-040)
+
+
+def _shared_keychain_pair(tmp_path):
+    """The real install and a restore-drill copy on the same Mac: one keychain for both."""
+    keychain = MemoryKeyStore()
+    real = make_ctx(tmp_path / "real", keystore=keychain)
+    build_log(real)
+    folder = tmp_path / "icloud"
+    code = real.autobackup.configure(str(folder), PASSWORD, create=True)["recovery_code"]
+    drill = make_ctx(tmp_path / "drill", keystore=keychain)
+    return real, drill, folder, code, keychain
+
+
+@pytest.mark.parametrize("secret", ["password", "recovery code"])
+def test_a_restored_copy_does_not_back_up_by_itself(tmp_path, secret):
+    real, drill, folder, code, keychain = _shared_keychain_pair(tmp_path)
+    real.autobackup.configure(str(folder), "the newer password")  # changed since that backup was made
+    before = sorted(p.name for p in folder.iterdir())
+    data = (folder / before[0]).read_bytes()  # made with PASSWORD
+    real_key = private_key_raw(keychain.load(real.ledger.installation))
+
+    if secret == "password":
+        restore_backup(drill, data, PASSWORD)
+        drill.autobackup.adopt_restored_password(PASSWORD)
+    else:
+        restore_backup(drill, data, recovery_code=code)
+        drill.autobackup.adopt_restored_password(None)
+
+    # The real install's keychain entries are untouched: same key, still the newer password.
+    assert private_key_raw(keychain.load(real.ledger.installation)) == real_key
+    assert keychain.load_secret(f"backup-password:{real.ledger.installation}") == "the newer password"
+    # The copy knows the folder but stays paused until the author confirms it.
+    st = drill.autobackup.status()
+    assert st["location"] == str(folder) and st["state"] == "paused" and st["paused_after_restore"]
+    assert drill.autobackup.maybe_run("hourly")["ran"] is False
+    drill.autobackup.debounce = 0
+    drill.ledger.create_project("a change in the copy")
+    drill.autobackup.schedule()
+    assert sorted(p.name for p in folder.iterdir()) == before  # nothing written
+    real.close()
+    drill.close()
+
+
+def test_resuming_after_restore_keeps_each_copys_files_apart(tmp_path, monkeypatch):
+    from app.services import autobackup
+
+    monkeypatch.setattr(autobackup, "KEEP_BACKUPS", 2)
+    real, drill, folder, code, _ = _shared_keychain_pair(tmp_path)
+    for _ in range(2):
+        real.autobackup.run("more")
+    real_files = sorted(p.name for p in folder.iterdir())
+    assert len(real_files) == 2
+    restore_backup(drill, (folder / real_files[-1]).read_bytes(), PASSWORD)
+    st = drill.autobackup.resume()
+    assert st["state"] != "paused" and st["auto"]
+    for _ in range(3):
+        drill.autobackup.run("drill")
+    names = sorted(p.name for p in folder.iterdir())
+    assert set(real_files) <= set(names)  # the copy never prunes the other copy's backups
+    assert len(names) == 4
+    real.close()
+    drill.close()
+
+
+def test_restore_refuses_to_replace_a_different_key_in_the_keychain(tmp_path):
+    real, drill, folder, code, keychain = _shared_keychain_pair(tmp_path)
+    from provenance_core.signing import generate_private_key
+
+    keychain.save(real.ledger.installation, generate_private_key())
+    data = next(folder.iterdir()).read_bytes()
+    with pytest.raises(BackupError, match="different signing key"):
+        restore_backup(drill, data, PASSWORD)
+    assert drill.ledger.record_count() == 0
+    real.close()
+    drill.close()

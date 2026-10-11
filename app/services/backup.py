@@ -56,7 +56,12 @@ from sqlalchemy import insert, select
 
 from app.db.models import WRITE_LOCK, AnchorRow, BlobRow, MetaRow, ProjectRow, RecordFileRow, RecordRow
 from app.services.ledger import LedgerError
-from provenance_core.signing import KeyBackupError, export_private_key_encrypted, load_private_key_encrypted
+from provenance_core.signing import (
+    KeyBackupError,
+    export_private_key_encrypted,
+    load_private_key_encrypted,
+    private_key_raw,
+)
 
 BACKUP_FORMAT = "rprov.backup/1"
 ENCRYPTED_MAGIC_V1 = b"RPROV-BACKUP-ENC/1\n"  # password only; still restorable
@@ -64,6 +69,7 @@ ENCRYPTED_MAGIC = b"RPROV-BACKUP-ENC/2\n"
 ENCRYPTED_FORMAT = "rprov.backup-enc/2"
 BACKUP_SUFFIX = ".rprovbackup"
 RECOVERY_META = "backup_recovery"  # public half of the recovery key (JSON), see make_recovery
+COPY_META = "backup_copy"  # which copy of the installation wrote a backup file (D-040)
 # scrypt cost: 2**17 * 8 * 128 bytes = 128 MiB of memory, about half a second.
 SCRYPT_N = 2**17
 SCRYPT_R = 8
@@ -293,6 +299,19 @@ def create_backup(ctx, password: str) -> tuple[str, bytes]:
     return name, seal_backup(plain, backup_key, password, json.loads(recovery) if recovery else None)
 
 
+def backup_copy_id(ledger) -> str:
+    """A short id for this copy of the installation, part of every backup file name.
+
+    A restored copy (a new Mac, or a restore drill on the same Mac) has the same
+    installation ID; the copy id keeps their backup files apart, so one copy never
+    prunes the other's backups. It is reset by every restore."""
+    copy = ledger.meta(COPY_META)
+    if not copy:
+        copy = "c" + secrets.token_hex(3)[:5]
+        ledger.set_meta(COPY_META, copy)
+    return copy
+
+
 def create_plain_backup(ctx, key_passphrase: str, *, key_protection: str = "password") -> tuple[str, bytes]:
     """The inner zip only. ``key_protection`` says what the signing key inside is encrypted with:
     ``password`` (older backups) or ``backup-key`` (derived from the random backup key)."""
@@ -330,9 +349,10 @@ def create_plain_backup(ctx, key_passphrase: str, *, key_protection: str = "pass
         for name in sorted(members):
             zf.writestr(name, members[name])
     inst = (ledger.installation or "unknown")[:8]
+    copy = backup_copy_id(ledger)
     now = datetime.now(UTC)
     # Millisecond precision so two backups in the same second never share a name.
-    name = f"rprov-backup-{inst}-{now:%Y%m%d-%H%M%S}-{now.microsecond // 1000:03d}{BACKUP_SUFFIX}"
+    name = f"rprov-backup-{inst}-{copy}-{now:%Y%m%d-%H%M%S}-{now.microsecond // 1000:03d}{BACKUP_SUFFIX}"
     return name, buf.getvalue()
 
 
@@ -443,6 +463,13 @@ def restore_backup(
     installation = next((r["value"] for r in rows["meta"] if r["key"] == "installation"), None)
     if installation is None or installation != index.get("installation"):
         raise BackupError("backup does not name its installation consistently")
+    # On the same Mac the keychain may already hold this installation's key (a restore drill).
+    # It must be the very same key; a different one is never overwritten.
+    existing = ctx.keystore.load(installation)
+    if existing is not None and private_key_raw(existing) != private_key_raw(key):
+        raise BackupError(
+            "this Mac's keychain already holds a different signing key for this installation; nothing was restored"
+        )
     # Files first (content-addressed, harmless), then all rows in one transaction.
     for name, blob in contents.items():
         if name.startswith("blobs/"):
@@ -453,6 +480,11 @@ def restore_backup(
             if table is MetaRow:  # local settings: merge with whatever the fresh install has
                 for r in batch:
                     s.merge(MetaRow(**r))
+                # A restored copy remembers the backup folder but never writes there by itself:
+                # the author confirms first (another Mac may still be backing up into it). D-040.
+                for meta_key, meta_value in (("backup_auto", "0"), ("backup_paused", "restored"), (COPY_META, ""),
+                                             ("backup_last_error", ""), ("backup_last_fingerprint", "")):
+                    s.merge(MetaRow(key=meta_key, value=meta_value))
                 continue
             if table is AnchorRow:
                 for r in batch:

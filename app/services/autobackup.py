@@ -26,6 +26,7 @@ from app.services.backup import (
     BACKUP_SUFFIX,
     RECOVERY_META,
     BackupError,
+    backup_copy_id,
     create_backup,
     make_recovery,
     new_recovery_code,
@@ -196,6 +197,7 @@ class AutoBackup:
         self.ctx.keystore.save_secret(self._secret_name(), password)
         ledger.set_meta("backup_location", str(folder))
         ledger.set_meta("backup_auto", "1")
+        ledger.set_meta("backup_paused", "")
         code = None if ledger.meta(RECOVERY_META) else self._store_recovery()
         self.run("set up")
         out = self.status()
@@ -217,10 +219,23 @@ class AutoBackup:
         return code
 
     def adopt_restored_password(self, password: str | None) -> None:
-        """After a restore the same password keeps automatic backups going. After a restore with
-        the recovery code the password is unknown: the app asks for a new one."""
-        if password:
+        """Remember the password a backup was restored with, for when the author resumes backups.
+
+        After a restore with the recovery code the password is unknown: the app asks for a new
+        one. A password already in the keychain for this installation (a restore drill on the
+        same Mac) is never replaced: it may be newer than the backup's."""
+        if password and self._password() is None:
             self.ctx.keystore.save_secret(self._secret_name(), password)
+
+    def resume(self) -> dict:
+        """After a restore: the author confirms that this copy should back up to the folder again."""
+        if not self.status()["configured"]:
+            raise BackupError("set a backup password first")
+        ledger = self.ctx.ledger
+        ledger.set_meta("backup_auto", "1")
+        ledger.set_meta("backup_paused", "")
+        self.run("resumed")
+        return self.status()
 
     # ------------------------------------------------------------------ state
 
@@ -249,6 +264,7 @@ class AutoBackup:
             st["where"] = classify_location(Path(location), self.ctx.settings.data_dir)
         if location and not configured:
             st["needs_password"] = True
+        st["paused_after_restore"] = ledger.meta("backup_paused") == "restored"
         recovery = ledger.meta(RECOVERY_META)
         st["recovery"] = (
             {"configured": True, **{k: v for k, v in json.loads(recovery).items() if k in ("id", "created_local")}}
@@ -258,6 +274,8 @@ class AutoBackup:
         st["data_dir_warning"] = data_dir_warning(self.ctx.settings.data_dir)
         if not configured:
             st["state"] = "off"
+        elif not st["auto"]:
+            st["state"] = "paused"
         elif st["last_error"]:
             st["state"] = "error"
         elif not st["where"]["safe"]:
@@ -295,8 +313,10 @@ class AutoBackup:
             return {"ran": True, "path": str(path)}
 
     def _prune(self, folder: Path) -> None:
+        # Only this copy's own files: another Mac (or a restored copy) may share the folder.
         inst = (self.ctx.ledger.installation or "")[:8]
-        mine = sorted(folder.glob(f"rprov-backup-{inst}-*{BACKUP_SUFFIX}"))
+        copy = backup_copy_id(self.ctx.ledger)
+        mine = sorted(folder.glob(f"rprov-backup-{inst}-{copy}-*{BACKUP_SUFFIX}"))
         for old in mine[:-KEEP_BACKUPS]:
             try:
                 old.unlink()
