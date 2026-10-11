@@ -2,14 +2,22 @@ import { useState } from "react";
 import { api, type Space } from "../api";
 import type { GraphNode } from "../types";
 import { ConfirmReal, type SummaryItem } from "./Confirm";
-import { TYPE_LABELS } from "../labels";
+import { typeLabel } from "../labels";
+import { t, tx } from "../i18n";
 import { MarkdownEditor } from "./MarkdownEditor";
 
-const REL_LABELS: Record<string, string> = {
-  revises: "is a new version of (revises)",
-  derived_from: "grew out of (derived from)",
-  uses: "builds on (uses)",
-};
+function relChoice(rel: string): string {
+  switch (rel) {
+    case "revises":
+      return t("is a new version of (revises)");
+    case "derived_from":
+      return t("grew out of (derived from)");
+    case "uses":
+      return t("builds on (uses)");
+    default:
+      return rel;
+  }
+}
 
 interface Props {
   projectId: string;
@@ -65,31 +73,31 @@ export function RecordForm({ projectId, nodeTypes, relationTypes, existing, onCr
 
   function summary(): SummaryItem[] {
     const items: SummaryItem[] = [
-      { label: "Type", value: TYPE_LABELS[nodeType] ?? nodeType },
-      { label: "Title", value: title },
+      { label: t("Type"), value: typeLabel(nodeType) },
+      { label: t("Title"), value: title },
     ];
-    if (body.trim()) items.push({ label: "Text", value: body.length > 280 ? `${body.slice(0, 280)}…` : body });
-    if (files.length) items.push({ label: "Files", value: files.map((f) => f.name).join(", ") });
-    if (nodeType === "code" && (repoUrl || commit)) items.push({ label: "Code reference", value: `${repoUrl} ${commit}`.trim() });
+    if (body.trim()) items.push({ label: t("Text"), value: body.length > 280 ? `${body.slice(0, 280)}…` : body });
+    if (files.length) items.push({ label: t("Files"), value: files.map((f) => f.name).join(", ") });
+    if (nodeType === "code" && (repoUrl || commit)) items.push({ label: t("Code reference"), value: `${repoUrl} ${commit}`.trim() });
     if (nodeType === "publication" && pubRef.trim()) items.push({ label: pubKind.toUpperCase(), value: pubRef.trim() });
     const rels = relations.filter((r) => r.to && r.rel);
     if (rels.length)
       items.push({
-        label: "Connected to",
+        label: t("Connected to"),
         value: (
           <ul className="plain">
             {rels.map((r, i) => (
               <li key={i}>
-                {REL_LABELS[r.rel] ?? r.rel} “{existing.find((n) => n.id === r.to)?.title ?? r.to.slice(0, 10)}”
+                {relChoice(r.rel)} “{existing.find((n) => n.id === r.to)?.title ?? r.to.slice(0, 10)}”
               </li>
             ))}
           </ul>
         ),
       });
-    if (why.trim()) items.push({ label: "Why", value: why });
-    if (milestone) items.push({ label: "Key step", value: "yes" });
+    if (why.trim()) items.push({ label: t("Why"), value: why });
+    if (milestone) items.push({ label: t("Key step"), value: t("yes") });
     if (isImport && claimedDate.trim())
-      items.push({ label: "Older material", value: `claimed date ${claimedDate.trim()} (${level})` });
+      items.push({ label: t("Older material"), value: t("claimed date {date} ({level})", { date: claimedDate.trim(), level }) });
     return items;
   }
 
@@ -133,7 +141,7 @@ export function RecordForm({ projectId, nodeTypes, relationTypes, existing, onCr
     <>
     {confirming && (
       <ConfirmReal
-        title="Save this step to your real record?"
+        title={t("Save this step to your real record?")}
         items={summary()}
         busy={busy}
         error={error}
@@ -142,27 +150,27 @@ export function RecordForm({ projectId, nodeTypes, relationTypes, existing, onCr
       />
     )}
     <form className="record-form" onSubmit={submit} data-testid="record-form" hidden={confirming}>
-      <h2>{practice ? "Add a practice step" : "Add a step"}</h2>
-      {practice && <p className="practice-note">Practice: this does not go into your real record.</p>}
+      <h2>{practice ? t("Add a practice step") : t("Add a step")}</h2>
+      {practice && <p className="practice-note">{t("Practice: this does not go into your real record.")}</p>}
       <fieldset className="types">
-        <legend>What kind of step is it?</legend>
-        {nodeTypes.map((t) => (
-          <label key={t} className={`type-chip ${nodeType === t ? "selected" : ""}`}>
-            <input type="radio" name="node_type" value={t} checked={nodeType === t} onChange={() => setNodeType(t)} />
-            {TYPE_LABELS[t] ?? t}
+        <legend>{t("What kind of step is it?")}</legend>
+        {nodeTypes.map((kind) => (
+          <label key={kind} className={`type-chip ${nodeType === kind ? "selected" : ""}`}>
+            <input type="radio" name="node_type" value={kind} checked={nodeType === kind} onChange={() => setNodeType(kind)} />
+            {typeLabel(kind)}
           </label>
         ))}
       </fieldset>
 
       <label>
-        Title
+        {t("Title")}
         <input name="title" value={title} onChange={(e) => setTitle(e.target.value)} required
-          placeholder="e.g. First version of the model" />
+          placeholder={t("e.g. First version of the model")} />
       </label>
 
       <div className="field">
         <span className="field-label">
-          What is it? <span className="muted">(text, optional — Markdown works)</span>
+          {t("What is it?")} <span className="muted">{t("(text, optional — Markdown works)")}</span>
         </span>
         <MarkdownEditor value={body} onChange={setBody} />
       </div>
@@ -180,19 +188,19 @@ export function RecordForm({ projectId, nodeTypes, relationTypes, existing, onCr
           addFiles(e.dataTransfer.files);
         }}
       >
-        Attach files: drop them here or{" "}
+        {t("Attach files: drop them here or")}{" "}
         <label className="link">
-          choose files
+          {t("choose files")}
           <input type="file" multiple hidden onChange={(e) => addFiles(e.target.files)} data-testid="file-input" />
         </label>{" "}
-        <span className="muted">(max 50 MB each)</span>
+        <span className="muted">{t("(max 50 MB each)")}</span>
         {files.length > 0 && (
           <ul className="file-list">
             {files.map((f, i) => (
               <li key={i}>
-                {f.name} <span className="muted">({f.size} bytes)</span>{" "}
+                {f.name} <span className="muted">{t("({n} bytes)", { n: f.size })}</span>{" "}
                 <button type="button" className="link" onClick={() => setFiles(files.filter((_, j) => j !== i))}>
-                  remove
+                  {t("remove")}
                 </button>
               </li>
             ))}
@@ -202,23 +210,21 @@ export function RecordForm({ projectId, nodeTypes, relationTypes, existing, onCr
 
       {nodeType === "code" && (
         <div className="group">
-          <span className="field-label">Code reference</span>
+          <span className="field-label">{t("Code reference")}</span>
           <div className="row">
-            <input placeholder="Repository URL" value={repoUrl} onChange={(e) => setRepoUrl(e.target.value)} />
-            <input placeholder="Commit hash" value={commit} onChange={(e) => setCommit(e.target.value)} />
+            <input placeholder={t("Repository URL")} value={repoUrl} onChange={(e) => setRepoUrl(e.target.value)} />
+            <input placeholder={t("Commit hash")} value={commit} onChange={(e) => setCommit(e.target.value)} />
           </div>
           <p className="note">
-            A commit hash alone is only an external reference: if the repository is deleted or rewritten the code
-            cannot be recovered or checked. Attach a <code>git archive</code> file to preserve the code itself. The
-            commit date recorded by git is the author's statement, not a verified time.
+            {tx("A commit hash alone is only an external reference: if the repository is deleted or rewritten the code cannot be recovered or checked. Attach a <code>git archive</code> file to preserve the code itself. The commit date recorded by git is the author's statement, not a verified time.", { code: (s) => <code>{s}</code> })}
           </p>
-          {codeWithoutArchive && <p className="warning">External reference, code content not saved</p>}
+          {codeWithoutArchive && <p className="warning">{t("External reference, code content not saved")}</p>}
         </div>
       )}
 
       {nodeType === "publication" && (
         <div className="group">
-          <span className="field-label">Publication reference (third-party reference, L2)</span>
+          <span className="field-label">{t("Publication reference (third-party reference, L2)")}</span>
           <div className="row">
             <select value={pubKind} onChange={(e) => setPubKind(e.target.value as "doi" | "url")}>
               <option value="doi">DOI</option>
@@ -231,19 +237,19 @@ export function RecordForm({ projectId, nodeTypes, relationTypes, existing, onCr
       )}
 
       <div className="group">
-        <span className="field-label">How does it connect to earlier steps?</span>
+        <span className="field-label">{t("How does it connect to earlier steps?")}</span>
         {relations.map((r, i) => (
           <div className="row" key={i}>
-            <span className="muted">this step</span>
+            <span className="muted">{t("this step")}</span>
             <select value={r.rel} onChange={(e) => setRelations(relations.map((x, j) => (j === i ? { ...x, rel: e.target.value } : x)))}>
-              {relationTypes.map((t) => (
-                <option key={t} value={t}>
-                  {REL_LABELS[t] ?? t}
+              {relationTypes.map((rel) => (
+                <option key={rel} value={rel}>
+                  {relChoice(rel)}
                 </option>
               ))}
             </select>
             <select value={r.to} onChange={(e) => setRelations(relations.map((x, j) => (j === i ? { ...x, to: e.target.value } : x)))}>
-              <option value="">choose an earlier step…</option>
+              <option value="">{t("choose an earlier step…")}</option>
               {[...existing].reverse().map((n) => (
                 <option key={n.id} value={n.id}>
                   #{n.seq} {n.title}
@@ -251,46 +257,45 @@ export function RecordForm({ projectId, nodeTypes, relationTypes, existing, onCr
               ))}
             </select>
             <button type="button" className="link" onClick={() => setRelations(relations.filter((_, j) => j !== i))}>
-              remove
+              {t("remove")}
             </button>
           </div>
         ))}
         <button type="button" className="secondary small" disabled={existing.length === 0}
           onClick={() => setRelations([...relations, { to: "", rel: relationTypes[0] ?? "revises" }])}>
-          + Connect to an earlier step
+          {t("+ Connect to an earlier step")}
         </button>
-        {existing.length === 0 && <p className="note">This is the first step — later steps can connect to it.</p>}
+        {existing.length === 0 && <p className="note">{t("This is the first step — later steps can connect to it.")}</p>}
       </div>
 
       <label>
-        Why? <span className="muted">(optional — shown as your own statement, not as a verified fact)</span>
+        {t("Why?")} <span className="muted">{t("(optional — shown as your own statement, not as a verified fact)")}</span>
         <textarea value={why} onChange={(e) => setWhy(e.target.value)} rows={2} />
       </label>
 
       <label className="check">
-        <input type="checkbox" checked={milestone} onChange={(e) => setMilestone(e.target.checked)} /> Mark as a
-        key step <span className="muted">(an important step — shown in “Key steps only”)</span>
+        <input type="checkbox" checked={milestone} onChange={(e) => setMilestone(e.target.checked)} /> {t("Mark as a key step")}{" "}
+        <span className="muted">{t("(an important step — shown in “Key steps only”)")}</span>
       </label>
 
       <label className="check">
-        <input type="checkbox" checked={isImport} onChange={(e) => setIsImport(e.target.checked)} /> This is older
-        material I'm adding now
+        <input type="checkbox" checked={isImport} onChange={(e) => setIsImport(e.target.checked)} />{" "}
+        {t("This is older material I'm adding now")}
       </label>
       {isImport && (
         <div className="group">
           <p className="note">
-            Imported material is only proven to exist from today. The earlier date you enter is shown as an author
-            statement; with an external record (DOI, sent e-mail, web archive) mark it L2.
+            {t("Imported material is only proven to exist from today. The earlier date you enter is shown as an author statement; with an external record (DOI, sent e-mail, web archive) mark it L2.")}
           </p>
           <div className="row">
-            <input placeholder="Claimed date: 2025, 2025-11 or 2025-11-03" value={claimedDate}
+            <input placeholder={t("Claimed date: 2025, 2025-11 or 2025-11-03")} value={claimedDate}
               onChange={(e) => setClaimedDate(e.target.value)} />
             <select value={level} onChange={(e) => setLevel(e.target.value as "L1" | "L2")}>
-              <option value="L1">L1 — author statement only</option>
-              <option value="L2">L2 — third-party reference</option>
+              <option value="L1">{t("L1 — author statement only")}</option>
+              <option value="L2">{t("L2 — third-party reference")}</option>
             </select>
           </div>
-          <textarea placeholder="Reference links, one per line" value={references}
+          <textarea placeholder={t("Reference links, one per line")} value={references}
             onChange={(e) => setReferences(e.target.value)} rows={2} />
         </div>
       )}
@@ -298,16 +303,16 @@ export function RecordForm({ projectId, nodeTypes, relationTypes, existing, onCr
       {error && <p className="error">{error}</p>}
       <div className="actions">
         <button type="button" className="secondary" onClick={onCancel}>
-          Cancel
+          {t("Cancel")}
         </button>
         <button className="primary" disabled={busy || !nodeType || !title.trim()} data-testid="submit-record">
-          {practice ? "Save practice step" : "Save step"}
+          {practice ? t("Save practice step") : t("Save step")}
         </button>
       </div>
       <p className="note center">
         {practice
-          ? "Practice steps work like real ones, but they stay in the practice space and can be thrown away."
-          : "Saved steps can't be edited later — changes are added as new steps or notes, so the history stays honest."}
+          ? t("Practice steps work like real ones, but they stay in the practice space and can be thrown away.")
+          : t("Saved steps can't be edited later — changes are added as new steps or notes, so the history stays honest.")}
       </p>
     </form>
     </>

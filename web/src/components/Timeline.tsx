@@ -1,16 +1,40 @@
 import type { TimelineRow } from "../types";
-import { HELP, TYPE_LABELS, stampState } from "../labels";
+import { help, stampState, typeLabel } from "../labels";
+import { t } from "../i18n";
 import { Help } from "./Help";
 import { ProofIcon } from "./ProofBadge";
 
-const KIND_LABELS: Record<string, string> = {
-  genesis: "Start (genesis)",
-  entry: "Step",
-  link: "Link (added later)",
-  milestone: "Key step change",
-  statement: "Note (added later)",
-  retraction: "Retraction",
-};
+function kindLabel(kind: string): string {
+  switch (kind) {
+    case "genesis":
+      return t("Start (genesis)");
+    case "entry":
+      return t("Step");
+    case "link":
+      return t("Link (added later)");
+    case "milestone":
+      return t("Key step change");
+    case "statement":
+      return t("Note (added later)");
+    case "retraction":
+      return t("Retraction");
+    default:
+      return kind;
+  }
+}
+
+export function relLabel(rel: string): string {
+  switch (rel) {
+    case "revises":
+      return t("revises");
+    case "derived_from":
+      return t("derived from");
+    case "uses":
+      return t("uses");
+    default:
+      return rel.replace("_", " ");
+  }
+}
 
 // Timeline view (PRD §11): every record in seq order; the two proofs in separate columns;
 // local time in grey marked "unverified".
@@ -22,18 +46,18 @@ export function Timeline({ rows, onSelect }: { rows: TimelineRow[]; onSelect: (i
           <tr>
             <th>#</th>
             <th>
-              Date stamp <Help id="list-tsa" label="a date stamp">{HELP.dateStamp}</Help>
+              {t("Date stamp")} <Help id="list-tsa" label={t("a date stamp")}>{help("dateStamp")}</Help>
             </th>
             <th>
-              Public stamp <Help id="list-btc" label="a public stamp">{HELP.publicStamp}</Help>
+              {t("Public stamp")} <Help id="list-btc" label={t("a public stamp")}>{help("publicStamp")}</Help>
             </th>
             <th>
-              Local time <span className="unverified">(unverified)</span>
+              {t("Local time")} <span className="unverified">{t("(unverified)")}</span>
             </th>
-            <th>Kind / type</th>
-            <th>Title</th>
-            <th>Relations</th>
-            <th>Source</th>
+            <th>{t("Kind / type")}</th>
+            <th>{t("Title")}</th>
+            <th>{t("Relations")}</th>
+            <th>{t("Source")}</th>
           </tr>
         </thead>
         <tbody>
@@ -48,20 +72,20 @@ export function Timeline({ rows, onSelect }: { rows: TimelineRow[]; onSelect: (i
               </td>
               <td className="unverified">{r.local_time.value}</td>
               <td>
-                {KIND_LABELS[r.kind] ?? r.kind}
-                {r.node_type && <span className="muted"> · {TYPE_LABELS[r.node_type] ?? r.node_type}</span>}
+                {kindLabel(r.kind)}
+                {r.node_type && <span className="muted"> · {typeLabel(r.node_type)}</span>}
               </td>
               <td>{r.title}</td>
               <td className="small">
                 {r.relations.map((x, i) => (
                   <div key={i}>
-                    {x.rel.replace("_", " ")} {x.to_title} <span className="muted">(author)</span>
+                    {relLabel(x.rel)} {x.to_title} <span className="muted">{t("(author)")}</span>
                   </div>
                 ))}
               </td>
               <td className="small">
-                <span className="tag-verified">verified</span>
-                {r.relations.length > 0 && <span className="tag-author">author</span>}
+                <span className="tag-verified">{t("verified")}</span>
+                {r.relations.length > 0 && <span className="tag-author">{t("author")}</span>}
               </td>
             </tr>
           ))}

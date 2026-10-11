@@ -14,6 +14,8 @@ import threading
 import time
 from pathlib import Path
 
+from app.i18n import tr
+
 SUGGESTED_FOLDER_NAME = "Research Provenance Backups"
 _GOOGLE_DRIVE_ROOTS = ("My Drive", "我的云端硬盘", "Meine Ablage", "Mon Drive", "Mi unidad")
 
@@ -155,17 +157,18 @@ def external_drives(data_dir: Path, platform: str | None = None) -> list[tuple[s
     if platform == "darwin":
         candidates = []
         try:
-            candidates = [(f"Drive “{v.name}”", v) for v in sorted(Path("/Volumes").iterdir()) if not v.is_symlink()]
+            candidates = [(tr("Drive “{name}”", name=v.name), v) for v in sorted(Path("/Volumes").iterdir())
+                          if not v.is_symlink()]
         except OSError:
             pass
     elif platform == "win32":
-        candidates = [(f"Drive {str(d).rstrip(chr(92))}", d) for d in windows_drives()]
+        candidates = [(tr("Drive {name}", name=str(d).rstrip(chr(92))), d) for d in windows_drives()]
     else:
         user = os.environ.get("USER", "")
         candidates = []
         for base in (Path("/media") / user, Path("/run/media") / user):
             try:
-                candidates += [(f"Drive “{v.name}”", v) for v in sorted(base.iterdir())]
+                candidates += [(tr("Drive “{name}”", name=v.name), v) for v in sorted(base.iterdir())]
             except OSError:
                 pass
     for label, root in candidates:

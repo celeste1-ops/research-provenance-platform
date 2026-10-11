@@ -22,6 +22,7 @@ from pathlib import Path
 from sqlalchemy import func, select
 
 from app.db.models import AnchorRow, RecordRow
+from app.i18n import device_word, tr
 from app.services.backup import (
     BACKUP_SUFFIX,
     COPY_ANCHOR_META,
@@ -62,10 +63,11 @@ def data_dir_warning(data_dir: Path) -> str | None:
     service = synced_service(data_dir)
     if service is None:
         return None
-    return (
-        f"Your working data folder ({data_dir}) is inside {service}. Syncing can damage a database that is "
+    return tr(
+        "Your working data folder ({folder}) is inside {service}. Syncing can damage a database that is "
         "in use. Move it out (set RPROV_HOME to a normal folder) and let only the encrypted backups go into "
-        f"{service}."
+        "{service}.",
+        folder=data_dir, service=service,
     )
 
 
@@ -81,10 +83,11 @@ def check_location(location: str, data_dir: Path, device: str = "computer") -> d
     """What the backup dialog shows while the author types or picks a folder."""
     folder = Path(location).expanduser()
     if not location.strip() or not folder.is_absolute():
-        return {"ok": False, "kind": "invalid", "label": "Choose a full folder path", "safe": False}
+        return {"ok": False, "kind": "invalid", "label": tr("Choose a full folder path"), "safe": False}
     if inside(folder, data_dir):
-        return {"ok": False, "kind": "inside-data", "label": "Inside the app's own data folder", "safe": False,
-                "warning": f"Choose a folder outside the app's data folder — and ideally not on this {device} at all."}
+        return {"ok": False, "kind": "inside-data", "label": tr("Inside the app's own data folder"), "safe": False,
+                "warning": tr("Choose a folder outside the app's data folder — and ideally not on this {device} at all.",
+                              device=device_word(device))}
     if folder.is_dir():
         return {"ok": True, **classify_location(folder, data_dir, device)}
     if folder.parent.is_dir():
@@ -100,7 +103,7 @@ def classify_location(folder: Path, data_dir: Path, device: str = "computer") ->
     """
     folder = folder.expanduser()
     if not folder.is_dir():
-        return {"kind": "missing", "label": "Folder not found (is the drive connected?)", "safe": False}
+        return {"kind": "missing", "label": tr("Folder not found (is the drive connected?)"), "safe": False}
     resolved = folder.resolve()
     service = synced_service(resolved)
     if service is not None:
@@ -110,14 +113,14 @@ def classify_location(folder: Path, data_dir: Path, device: str = "computer") ->
     except OSError:
         same = True
     if not same:
-        return {"kind": "external", "label": "Another disk", "safe": True}
+        return {"kind": "external", "label": tr("Another disk"), "safe": True}
     return {
         "kind": "same-disk",
-        "label": f"This {device}'s own disk",
+        "label": tr("This {device}'s own disk", device=device_word(device)),
         "safe": False,
-        "warning": f"This folder is on this {device}'s own disk: if this {device} is lost or breaks, this backup "
-        "is lost with it. Choose an external drive or a folder your sync service (iCloud Drive, OneDrive, "
-        "Dropbox…) copies elsewhere.",
+        "warning": tr("This folder is on this {device}'s own disk: if this {device} is lost or breaks, this backup "
+                      "is lost with it. Choose an external drive or a folder your sync service (iCloud Drive, OneDrive, "
+                      "Dropbox…) copies elsewhere.", device=device_word(device)),
     }
 
 

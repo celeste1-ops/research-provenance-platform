@@ -4,7 +4,8 @@ import type { GraphNode, RecordDetail } from "../types";
 import { Changes } from "./Changes";
 import { LaterActions, WithdrawRelation } from "./LaterActions";
 import { Markdown } from "./Markdown";
-import { STAMP_NAMES } from "../labels";
+import { stampName } from "../labels";
+import { t } from "../i18n";
 import { ProofLine } from "./ProofBadge";
 
 interface Props {
@@ -35,7 +36,7 @@ export function Detail({ id, version, onClose, onSelect, entries, relationTypes,
       .then((d) => {
         if (!live) return;
         setDetail(d);
-        if (d.verified.has_body) api.body(id).then((t) => live && setBody(t));
+        if (d.verified.has_body) api.body(id).then((text) => live && setBody(text));
         else setBody(null);
       })
       .catch((e) => live && setError((e as Error).message));
@@ -45,7 +46,7 @@ export function Detail({ id, version, onClose, onSelect, entries, relationTypes,
   }, [id, version]);
 
   if (error) return <aside className="detail"><p className="error">{error}</p></aside>;
-  if (!detail) return <aside className="detail"><p className="muted">Loading…</p></aside>;
+  if (!detail) return <aside className="detail"><p className="muted">{t("Loading…")}</p></aside>;
   const v = detail.verified;
 
   return (
@@ -54,17 +55,17 @@ export function Detail({ id, version, onClose, onSelect, entries, relationTypes,
         <div>
           <div className="muted small">
             #{detail.seq} · {v.node_type_label ?? detail.kind}
-            {detail.retracted && <span className="badge retracted"> retracted</span>}
+            {detail.retracted && <span className="badge retracted"> {t("retracted")}</span>}
           </div>
           <h2>{v.title}</h2>
         </div>
-        <button className="link" onClick={onClose} aria-label="Close">
+        <button className="link" onClick={onClose} aria-label={t("Close")}>
           ✕
         </button>
       </header>
 
       <section className="src src-verified" data-source="verified" data-testid="section-verified">
-        <h3 className="src-tag">Verified record</h3>
+        <h3 className="src-tag">{t("Verified record")}</h3>
         {body !== null && (
           <div className="body-view">
             <Markdown text={body} />
@@ -76,13 +77,13 @@ export function Detail({ id, version, onClose, onSelect, entries, relationTypes,
               .filter(([k]) => !["note", "kind", "evidence_level"].includes(k))
               .map(([k, val]) => (
                 <div key={k}>
-                  {k === "repo_url" ? "Repository" : k === "commit" ? "Commit" : k.toUpperCase()}:{" "}
+                  {k === "repo_url" ? t("Repository") : k === "commit" ? t("Commit") : k.toUpperCase()}:{" "}
                   <span className="mono">{val}</span>
                 </div>
               ))}
             {v.external.evidence_level && <div className="muted">{v.external.evidence_level}</div>}
             {v.external.note && (
-              <div className={v.external.note.startsWith("External reference") ? "warning" : "muted"}>
+              <div className={v.external.saved === false ? "warning" : "muted"}>
                 {v.external.note}
               </div>
             )}
@@ -95,7 +96,7 @@ export function Detail({ id, version, onClose, onSelect, entries, relationTypes,
               .map((h) => (
                 <li key={h.name}>
                   📎 <a href={contentUrl(detail.id, h.name)}>{h.name}</a>{" "}
-                  <span className="muted">({h.size} bytes)</span>
+                  <span className="muted">{t("({n} bytes)", { n: h.size })}</span>
                 </li>
               ))}
           </ul>
@@ -108,28 +109,28 @@ export function Detail({ id, version, onClose, onSelect, entries, relationTypes,
         </div>
         <p className="small" data-testid="earliest">
           {v.earliest_verified
-            ? `Proven to exist by ${v.earliest_verified.time} (from the ${
-                v.earliest_verified.from === v.timestamps.tsa.label ? "date stamp" : "public stamp"
-              })`
-            : "No stamp yet — no time is shown."}
+            ? v.earliest_verified.from === v.timestamps.tsa.label
+              ? t("Proven to exist by {time} (from the date stamp)", { time: v.earliest_verified.time })
+              : t("Proven to exist by {time} (from the public stamp)", { time: v.earliest_verified.time })
+            : t("No stamp yet — no time is shown.")}
         </p>
         <p className="note">{v.note}</p>
         <details className="tech small">
-          <summary>Technical details</summary>
+          <summary>{t("Technical details")}</summary>
           <dl>
-            <dt>Record ID</dt>
+            <dt>{t("Record ID")}</dt>
             <dd className="mono">{v.record_id}</dd>
-            <dt>Stamps, as named in reports</dt>
+            <dt>{t("Stamps, as named in reports")}</dt>
             <dd>
-              {STAMP_NAMES.tsa} = {v.timestamps.tsa.label}
-              {v.timestamps.tsa.provider && ` (${v.timestamps.tsa.provider})`} · {STAMP_NAMES.btc} ={" "}
+              {stampName("tsa")} = {v.timestamps.tsa.label}
+              {v.timestamps.tsa.provider && ` (${v.timestamps.tsa.provider})`} · {stampName("btc")} ={" "}
               {v.timestamps.btc.label}
             </dd>
-            <dt>Signature</dt>
-            <dd>{v.signature === "valid" ? "valid (same key as all other records)" : v.signature}</dd>
+            <dt>{t("Signature")}</dt>
+            <dd>{v.signature === "valid" ? t("valid (same key as all other records)") : v.signature}</dd>
             {v.project_title && (
               <>
-                <dt>Project (as recorded)</dt>
+                <dt>{t("Project (as recorded)")}</dt>
                 <dd>{v.project_title}</dd>
               </>
             )}
@@ -137,7 +138,7 @@ export function Detail({ id, version, onClose, onSelect, entries, relationTypes,
               <div key={h.name} className="hash-row">
                 <dt>{h.name}</dt>
                 <dd>
-                  <span className="mono">sha256 {h.sha256}</span> · {h.size} bytes
+                  <span className="mono">sha256 {h.sha256}</span> · {t("{n} bytes", { n: h.size })}
                 </dd>
               </div>
             ))}
@@ -146,7 +147,7 @@ export function Detail({ id, version, onClose, onSelect, entries, relationTypes,
       </section>
 
       <section className="src src-author" data-source="author" data-testid="section-author">
-        <h3 className="src-tag">Author statement</h3>
+        <h3 className="src-tag">{t("Author statement")}</h3>
         <ul>
           {detail.author.items.map((a, i) => (
             <li key={i} data-field={a.field}>
@@ -162,7 +163,7 @@ export function Detail({ id, version, onClose, onSelect, entries, relationTypes,
                         label={a.text} />
                     </>
                   ) : (
-                    <span className="muted small"> · withdrawn later</span>
+                    <span className="muted small"> · {t("withdrawn later")}</span>
                   )}
                 </>
               ) : (
@@ -175,9 +176,9 @@ export function Detail({ id, version, onClose, onSelect, entries, relationTypes,
       </section>
 
       <section className="src src-later" data-source="later" data-testid="section-later">
-        <h3 className="src-tag">Later additions</h3>
+        <h3 className="src-tag">{t("Later additions")}</h3>
         {detail.later.items.length === 0 ? (
-          <p className="muted small">None.</p>
+          <p className="muted small">{t("None.")}</p>
         ) : (
           <ul>
             {detail.later.items.map((l) => (
@@ -185,8 +186,8 @@ export function Detail({ id, version, onClose, onSelect, entries, relationTypes,
                 <b>{l.title}</b>
                 {l.text && <>: {l.text}</>}
                 <div className="muted small">
-                  added {l.date.time.slice(0, 10)}
-                  {!l.date.verified && " (unverified)"} · author statement
+                  {t("added {date}", { date: l.date.time.slice(0, 10) })}
+                  {!l.date.verified && ` (${t("unverified")})`} · {t("author statement")}
                 </div>
               </li>
             ))}
@@ -196,7 +197,7 @@ export function Detail({ id, version, onClose, onSelect, entries, relationTypes,
 
       {detail.kind === "entry" && (
         <section className="src src-changes" data-testid="section-changes">
-          <h3 className="src-tag">Changes</h3>
+          <h3 className="src-tag">{t("Changes")}</h3>
           <Changes id={detail.id} revises={detail.revises ?? []}
             titleOf={(rid) => entries.find((e) => e.id === rid)?.title ?? rid.slice(0, 10)} />
         </section>
@@ -211,12 +212,12 @@ export function Detail({ id, version, onClose, onSelect, entries, relationTypes,
 // One plain sentence under each proof status. The two kinds of proof stay separate.
 function proofHelp(p: { kind: string; state: string; time: string | null }): string {
   if (p.kind === "tsa") {
-    if (p.state === "confirmed") return `An independent timestamp service signed that this step existed at ${p.time}.`;
-    if (p.state === "not_enabled") return "Turned off.";
-    return "Not received yet — the app keeps trying automatically (e.g. when you are back online).";
+    if (p.state === "confirmed") return t("An independent timestamp service signed that this step existed at {time}.", { time: p.time ?? "" });
+    if (p.state === "not_enabled") return t("Turned off.");
+    return t("Not received yet — the app keeps trying automatically (e.g. when you are back online).");
   }
-  if (p.state === "confirmed") return "Written into the public Bitcoin blockchain — checkable without trusting any company.";
-  if (p.state === "pending") return "Waiting for the Bitcoin network; usually confirms within a few hours. Nothing to do.";
-  if (p.state === "not_enabled") return "Turned off.";
-  return "Not submitted yet — the app keeps trying automatically.";
+  if (p.state === "confirmed") return t("Written into the public Bitcoin blockchain — checkable without trusting any company.");
+  if (p.state === "pending") return t("Waiting for the Bitcoin network; usually confirms within a few hours. Nothing to do.");
+  if (p.state === "not_enabled") return t("Turned off.");
+  return t("Not submitted yet — the app keeps trying automatically.");
 }

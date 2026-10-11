@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { api } from "../api";
+import { t, tx } from "../i18n";
 
 interface Diff {
   body_diff: string;
@@ -21,7 +22,7 @@ export function Changes({ id, revises, titleOf }: { id: string; revises: string[
   }, [id, revises]);
 
   if (revises.length === 0) {
-    return <p className="muted small">This record does not revise another record.</p>;
+    return <p className="muted small">{t("This record does not revise another record.")}</p>;
   }
   return (
     <>
@@ -30,10 +31,10 @@ export function Changes({ id, revises, titleOf }: { id: string; revises: string[
         return (
           <div key={r} className="change">
             <div className="small">
-              against <b>{titleOf(r)}</b>
+              {tx("against <b>{title}</b>", { b: (s) => <b>{s}</b> }, { title: titleOf(r) })}
             </div>
             {!d ? (
-              <p className="muted small">Loading…</p>
+              <p className="muted small">{t("Loading…")}</p>
             ) : (
               <>
                 {d.body_diff ? (
@@ -45,13 +46,13 @@ export function Changes({ id, revises, titleOf }: { id: string; revises: string[
                     ))}
                   </pre>
                 ) : (
-                  <p className="muted small">Body unchanged.</p>
+                  <p className="muted small">{t("Body unchanged.")}</p>
                 )}
                 <ul className="small">
                   {(["added", "removed", "modified"] as const).map((k) =>
                     d.files[k]?.length ? (
                       <li key={k}>
-                        {k}: {d.files[k].join(", ")}
+                        {k === "added" ? t("added") : k === "removed" ? t("removed") : t("modified")}: {d.files[k].join(", ")}
                       </li>
                     ) : null,
                   )}

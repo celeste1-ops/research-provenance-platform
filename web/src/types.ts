@@ -8,6 +8,7 @@ export interface ProofStatus {
   time: string | null;
   provider?: string;
   error?: string | null;
+  retrying?: boolean;
 }
 
 export interface WhenInfo {
@@ -101,7 +102,7 @@ export interface RecordDetail {
     earliest_verified: { time: string; from: string; text: string } | null;
     content_hashes: ContentHash[];
     has_body?: boolean;
-    external?: Record<string, string>;
+    external?: Record<string, string> & { saved?: boolean };
     public_key?: string;
     note: string;
   };

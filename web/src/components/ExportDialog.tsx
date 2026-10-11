@@ -1,13 +1,14 @@
 import { useEffect, useState } from "react";
 import { api, download } from "../api";
 import type { ExportPreview, TimelineRow } from "../types";
+import { lang, t, tx, type Lang } from "../i18n";
 
 type Level = "full" | "structure" | "existence";
-const LEVEL_LABELS: Record<Level, string> = {
-  full: "Everything",
-  structure: "Structure only",
-  existence: "Existence only",
-};
+const LEVELS: Level[] = ["full", "structure", "existence"];
+
+function levelLabel(l: Level): string {
+  return l === "full" ? t("Everything") : l === "structure" ? t("Structure only") : t("Existence only");
+}
 
 interface Props {
   rows: TimelineRow[];
@@ -23,6 +24,7 @@ export function ExportDialog({ rows, defaultTitle, onClose, practice = false }: 
     Object.fromEntries(entries.map((r) => [r.id, "structure" as Level])),
   );
   const [includeAdditions, setIncludeAdditions] = useState(true);
+  const [reportLang, setReportLang] = useState<Lang>(lang);
   const [preview, setPreview] = useState<ExportPreview | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -33,7 +35,7 @@ export function ExportDialog({ rows, defaultTitle, onClose, practice = false }: 
       // Later additions (links, milestones, statements, retractions) travel with structure.
       rows.filter((r) => r.kind !== "entry" && r.kind !== "genesis").forEach((r) => (records[r.id] = "structure"));
     }
-    return { title, records, default: "existence" };
+    return { title, records, default: "existence", language: reportLang };
   };
 
   useEffect(() => {
@@ -46,7 +48,7 @@ export function ExportDialog({ rows, defaultTitle, onClose, practice = false }: 
       live = false;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [levels, includeAdditions, title]);
+  }, [levels, includeAdditions, title, reportLang]);
 
   async function doExport() {
     setBusy(true);
@@ -54,7 +56,7 @@ export function ExportDialog({ rows, defaultTitle, onClose, practice = false }: 
     try {
       const blob = await api.exportBundle(selection());
       const day = new Date().toISOString().slice(0, 10);
-      download(blob, `provenance-${title.replace(/[^A-Za-z0-9._-]+/g, "-") || "evidence"}-${day}.zip`);
+      download(blob, `provenance-${title.replace(/[^\p{L}\p{N}._-]+/gu, "-") || "evidence"}-${day}.zip`);
       onClose();
     } catch (e) {
       setError((e as Error).message);
@@ -66,45 +68,52 @@ export function ExportDialog({ rows, defaultTitle, onClose, practice = false }: 
   const setAll = (lvl: Level) => setLevels(Object.fromEntries(entries.map((r) => [r.id, lvl])));
 
   return (
-    <div className="modal-backdrop" role="dialog" aria-modal="true" aria-label="Share">
+    <div className="modal-backdrop" role="dialog" aria-modal="true" aria-label={t("Share")}>
       <div className="modal wide" data-testid="export-dialog">
-        <h2>Share</h2>
+        <h2>{t("Share")}</h2>
         <p className="small">
-          Makes one zip file to send: a web report, a checking program (<code>verify.py</code>) and step-by-step
-          instructions. The reader needs neither this app nor trust in you.
+          {tx("Makes one zip file to send: a web report, a checking program (<code>verify.py</code>) and step-by-step instructions. The reader needs neither this app nor trust in you.", { code: (c) => <code>{c}</code> })}
         </p>
         {practice && (
           <p className="warning">
-            This is practice: the package is signed with the practice key and is not part of your real record.
+            {t("This is practice: the package is signed with the practice key and is not part of your real record.")}
           </p>
         )}
         <p className="note">
-          The report uses the formal names: the date stamp is called “Third-party timestamp” and the public stamp
-          “Bitcoin anchor”.
+          {t("The report uses the formal names: the date stamp is called “Third-party timestamp” and the public stamp “Bitcoin anchor”.")}
         </p>
-        <label>
-          Bundle name
-          <input value={title} onChange={(e) => setTitle(e.target.value)} />
-        </label>
+        <div className="row">
+          <label className="grow">
+            {t("Bundle name")}
+            <input value={title} onChange={(e) => setTitle(e.target.value)} />
+          </label>
+          <label>
+            {t("Report language")}
+            <select value={reportLang} onChange={(e) => setReportLang(e.target.value as Lang)} data-testid="report-lang">
+              <option value="en">English</option>
+              <option value="zh">中文</option>
+            </select>
+          </label>
+        </div>
         <div className="row small">
-          Set all to:
-          {(Object.keys(LEVEL_LABELS) as Level[]).map((l) => (
+          {t("Set all to:")}
+          {LEVELS.map((l) => (
             <button key={l} type="button" className="secondary small" onClick={() => setAll(l)}>
-              {LEVEL_LABELS[l]}
+              {levelLabel(l)}
             </button>
           ))}
           <label className="check">
             <input type="checkbox" checked={includeAdditions} onChange={(e) => setIncludeAdditions(e.target.checked)} />
-            include later additions
+            {t("include later additions")}
           </label>
         </div>
         <table className="export-table">
           <thead>
             <tr>
               <th>#</th>
-              <th>Record</th>
-              <th>Disclose</th>
-              <th>Will be visible</th>
+              <th>{t("Record")}</th>
+              <th>{t("Disclose")}</th>
+              <th>{t("Will be visible")}</th>
             </tr>
           </thead>
           <tbody>
@@ -119,9 +128,9 @@ export function ExportDialog({ rows, defaultTitle, onClose, practice = false }: 
                       value={levels[r.id]}
                       onChange={(e) => setLevels({ ...levels, [r.id]: e.target.value as Level })}
                     >
-                      {(Object.keys(LEVEL_LABELS) as Level[]).map((l) => (
+                      {LEVELS.map((l) => (
                         <option key={l} value={l}>
-                          {LEVEL_LABELS[l]}
+                          {levelLabel(l)}
                         </option>
                       ))}
                     </select>
@@ -140,17 +149,17 @@ export function ExportDialog({ rows, defaultTitle, onClose, practice = false }: 
               </p>
             ))}
             <p className="small muted">
-              The genesis record (author label and public key) is always included so signatures can be checked.
+              {t("The genesis record (author label and public key) is always included so signatures can be checked.")}
             </p>
           </div>
         )}
         {error && <p className="error">{error}</p>}
         <div className="actions">
           <button className="secondary" onClick={onClose}>
-            Cancel
+            {t("Cancel")}
           </button>
           <button className="primary" onClick={doExport} disabled={busy || !preview} data-testid="do-export">
-            Make the zip
+            {t("Make the zip")}
           </button>
         </div>
       </div>

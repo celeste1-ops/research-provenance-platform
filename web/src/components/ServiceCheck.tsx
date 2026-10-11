@@ -1,43 +1,44 @@
 import { useState } from "react";
 import { api } from "../api";
 import { dev } from "../device";
+import { t } from "../i18n";
 import type { ServiceCheck, ServiceCheckResult } from "../types";
 
 // “Check stamp services” (DECISIONS D-045): can this computer reach the public services the
 // stamps come from? Useful where some are blocked or slow. Runs only when asked.
 
-const GROUPS: { key: ServiceCheck["group"]; title: string; why: string }[] = [
-  {
-    key: "tsa",
-    title: "Date stamp services",
-    why: "Each step needs one of these. The app asks FreeTSA first and DigiCert when FreeTSA can't be reached.",
-  },
-  {
-    key: "calendar",
-    title: "Public stamp (Bitcoin) services",
-    why: "At least 2 of these 4 must answer for a public stamp to start.",
-  },
-  {
-    key: "explorer",
-    title: "Bitcoin block checkers",
-    why: "Used to check a finished public stamp. Both must answer and agree.",
-  },
-];
+function groups(): { key: ServiceCheck["group"]; title: string; why: string }[] {
+  return [
+    {
+      key: "tsa",
+      title: t("Date stamp services"),
+      why: t("Each step needs one of these. The app asks FreeTSA first and DigiCert when FreeTSA can't be reached."),
+    },
+    {
+      key: "calendar",
+      title: t("Public stamp (Bitcoin) services"),
+      why: t("At least 2 of these 4 must answer for a public stamp to start."),
+    },
+    {
+      key: "explorer",
+      title: t("Bitcoin block checkers"),
+      why: t("Used to check a finished public stamp. Both must answer and agree."),
+    },
+  ];
+}
 
 function summary(result: ServiceCheckResult): { text: string; ok: boolean }[] {
   const ok = (g: ServiceCheck["group"]) => result.checks.filter((c) => c.group === g && c.ok);
   const out: { text: string; ok: boolean }[] = [];
   if (result.in_use.tsa.length === 0) {
-    out.push({ text: "Date stamps are turned off in this app's settings.", ok: true });
+    out.push({ text: t("Date stamps are turned off in this app's settings."), ok: true });
   } else {
     const working = ok("tsa").map((c) => c.name);
     out.push(
       working.length > 0
-        ? { text: `Date stamps work (${working.join(" and ")} answered).`, ok: true }
+        ? { text: t("Date stamps work ({names} answered).", { names: working.join(t(" and ")) }), ok: true }
         : {
-            text:
-              "Date stamps can't be reached right now. Steps are still saved; their date stamp is added " +
-              "automatically as soon as a service answers.",
+            text: t("Date stamps can't be reached right now. Steps are still saved; their date stamp is added automatically as soon as a service answers."),
             ok: false,
           },
     );
@@ -46,9 +47,9 @@ function summary(result: ServiceCheckResult): { text: string; ok: boolean }[] {
     const n = ok("calendar").length;
     out.push(
       n >= 2
-        ? { text: `Public stamps can start (${n} of 4 services answered).`, ok: true }
+        ? { text: t("Public stamps can start ({n} of 4 services answered).", { n }), ok: true }
         : {
-            text: `Public stamps can't start right now (${n} of 4 answered, 2 needed). They are retried automatically.`,
+            text: t("Public stamps can't start right now ({n} of 4 answered, 2 needed). They are retried automatically.", { n }),
             ok: false,
           },
     );
@@ -57,9 +58,9 @@ function summary(result: ServiceCheckResult): { text: string; ok: boolean }[] {
     const n = ok("explorer").length;
     out.push(
       n >= 2
-        ? { text: "Finished public stamps can be checked.", ok: true }
+        ? { text: t("Finished public stamps can be checked."), ok: true }
         : {
-            text: "Finished public stamps can't be checked from here right now; they stay “waiting” until they can.",
+            text: t("Finished public stamps can't be checked from here right now; they stay “waiting” until they can."),
             ok: false,
           },
     );
@@ -86,22 +87,21 @@ export function ServiceCheckDialog({ onClose }: { onClose: () => void }) {
 
   const lines = result ? summary(result) : [];
   return (
-    <div className="modal-backdrop" role="dialog" aria-modal="true" aria-label="Check stamp services">
+    <div className="modal-backdrop" role="dialog" aria-modal="true" aria-label={t("Check stamp services")}>
       <div className="modal" data-testid="service-check">
         <div className="modal-head">
-          <h2>Check stamp services</h2>
-          <button className="link" onClick={onClose} aria-label="Close">✕</button>
+          <h2>{t("Check stamp services")}</h2>
+          <button className="link" onClick={onClose} aria-label={t("Close")}>✕</button>
         </div>
         <p>
-          Your stamps come from a few public services on the internet. In some places (for example in mainland China)
-          some of them can be blocked or slow. This check tries each one from this {dev()}.
+          {t("Your stamps come from a few public services on the internet. In some places (for example in mainland China) some of them can be blocked or slow. This check tries each one from this {device}.", { device: dev() })}
         </p>
         <p className="note">
-          What is sent: a random test value to each service — nothing from your notes. It takes at most about half a minute.
+          {t("What is sent: a random test value to each service — nothing from your notes. It takes at most about half a minute.")}
         </p>
         <div className="actions start">
           <button className="primary" onClick={run} disabled={busy} data-testid="service-check-run">
-            {busy ? "Checking…" : result ? "Check again" : "Check now"}
+            {busy ? t("Checking…") : result ? t("Check again") : t("Check now")}
           </button>
         </div>
         {error && <p className="error">{error}</p>}
@@ -114,7 +114,7 @@ export function ServiceCheckDialog({ onClose }: { onClose: () => void }) {
                 </p>
               ))}
             </div>
-            {GROUPS.map((g) => {
+            {groups().map((g) => {
               const rows = result.checks.filter((c) => c.group === g.key);
               if (rows.length === 0) return null;
               return (
@@ -138,8 +138,7 @@ export function ServiceCheckDialog({ onClose }: { onClose: () => void }) {
             })}
             {lines.some((l) => !l.ok) && (
               <p className="note">
-                Nothing is lost while a service can't be reached: steps are saved on this {dev()} right away and the
-                missing stamps are fetched automatically later. You can also try again on a different network.
+                {t("Nothing is lost while a service can't be reached: steps are saved on this {device} right away and the missing stamps are fetched automatically later. You can also try again on a different network.", { device: dev() })}
               </p>
             )}
           </>

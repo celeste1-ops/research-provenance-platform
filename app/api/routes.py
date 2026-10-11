@@ -406,6 +406,27 @@ def refresh_anchors(request: Request):
     return ctx(request).anchors.refresh(force=True)
 
 
+class PreferencesIn(BaseModel):
+    language: str
+
+
+@router.get("/preferences")
+def get_preferences(request: Request):
+    from app import preferences
+
+    return {"language": preferences.language(real(request).settings.data_dir)}
+
+
+@router.post("/preferences")
+def set_preferences(body: PreferencesIn, request: Request):
+    """Remembered for the menu bar / tray menu and as the default report language (D-046)."""
+    from app import preferences
+    from app.i18n import normalize
+
+    prefs = preferences.save(real(request).settings.data_dir, language=normalize(body.language))
+    return {"language": prefs["language"]}
+
+
 @router.post("/network/check")
 def network_check(request: Request):
     """“Check stamp services” (D-045): only on request, and only random values are sent."""

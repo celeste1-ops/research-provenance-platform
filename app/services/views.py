@@ -11,11 +11,13 @@ import difflib
 from dataclasses import dataclass
 
 from app.db.models import AnchorRow, RecordRow
+from app.i18n import tr
 from provenance_core.jcs import parse_json_strict
 from provenance_core.replay import ReplayState, milestone_view, replay
 
 TSA_LABEL = "Third-party timestamp"
 BTC_LABEL = "Bitcoin anchor"
+# English names; tr() gives them in the interface language when they are shown.
 NODE_TYPE_LABELS = {
     "idea": "Idea",
     "note": "Note",
@@ -31,33 +33,43 @@ REL_LABELS = {"revises": "revises", "derived_from": "derived from", "uses": "use
 CODE_NOT_SAVED = "External reference, code content not saved"
 
 
+def node_type_label(node_type: str) -> str:
+    return tr(NODE_TYPE_LABELS.get(node_type, "Other"))
+
+
+def rel_label(rel: str) -> str:
+    return tr(REL_LABELS.get(rel, "other relation"))
+
+
 def proof_status(row: AnchorRow | None, kind: str, enabled: bool) -> dict:
     """Status of one kind of time proof, for display. Never merged with the other kind."""
-    label = TSA_LABEL if kind == "tsa" else BTC_LABEL
+    label = tr(TSA_LABEL if kind == "tsa" else BTC_LABEL)
     if not enabled and row is None:
-        return {"kind": kind, "label": label, "state": "not_enabled", "text": f"{label}: not enabled", "time": None}
+        return {"kind": kind, "label": label, "state": "not_enabled", "text": tr("{label}: not enabled", label=label),
+                "time": None}
     if row is None or (row.proof_bytes is None and row.status != "confirmed"):
         failing = row is not None and row.status == "failed"
-        retry = " (retrying)" if row is not None and row.last_error else ""
+        retrying = row is not None and bool(row.last_error)
         return {
             "kind": kind,
             "label": label,
             "state": "failed" if failing else "none",
-            "text": f"{label}: no timestamp yet{retry}",
+            "text": tr("{label}: no timestamp yet (retrying)", label=label) if retrying
+            else tr("{label}: no timestamp yet", label=label),
+            "retrying": retrying,
             "time": None,
             "error": row.last_error if row is not None else None,
         }
     if row.status == "confirmed":
-        word = "verified" if kind == "tsa" else "confirmed"
         return {
             "kind": kind,
             "label": label,
             "state": "confirmed",
-            "text": f"{label}: {word}",
+            "text": tr("{label}: verified", label=label) if kind == "tsa" else tr("{label}: confirmed", label=label),
             "time": row.verified_time_utc,
             "provider": row.provider_name,
         }
-    return {"kind": kind, "label": label, "state": "pending", "text": f"{label}: pending", "time": None,
+    return {"kind": kind, "label": label, "state": "pending", "text": tr("{label}: pending", label=label), "time": None,
             "provider": row.provider_name}
 
 
@@ -67,7 +79,7 @@ def earliest_verified(tsa: dict, btc: dict) -> dict | None:
     if not candidates:
         return None
     time, label = min(candidates)
-    return {"time": time, "from": label, "text": f"Earliest verified time: {time} (from {label})"}
+    return {"time": time, "from": label, "text": tr("Earliest verified time: {time} (from {label})", time=time, label=label)}
 
 
 @dataclass
@@ -101,7 +113,7 @@ class Snapshot:
         ev = earliest_verified(tsa, btc)
         if ev:
             return {"time": ev["time"], "verified": True, "from": ev["from"]}
-        return {"time": self.payloads[rid]["local_time"], "verified": False, "from": "local clock (unverified)"}
+        return {"time": self.payloads[rid]["local_time"], "verified": False, "from": tr("local clock (unverified)")}
 
     def row(self, rid: str) -> RecordRow | None:
         return next((r for r in self.rows if r.id == rid), None)
@@ -121,7 +133,7 @@ def graph_view(snap: Snapshot, project_id: str | None = None, milestones_only: b
                 "seq": e.seq,
                 "title": e.title,
                 "node_type": e.node_type,
-                "node_type_label": NODE_TYPE_LABELS.get(e.node_type, "Other"),
+                "node_type_label": node_type_label(e.node_type),
                 "project_id": e.project_id,
                 "milestone": e.milestone,
                 "retracted": e.retracted_by is not None,
@@ -139,7 +151,7 @@ def graph_view(snap: Snapshot, project_id: str | None = None, milestones_only: b
             "from": edge.target,  # arrows run from the older record to the newer one
             "to": edge.source,
             "rel": edge.rel,
-            "rel_label": REL_LABELS.get(edge.rel, "other relation"),
+            "rel_label": rel_label(edge.rel),
             "origin": edge.origin,
             "source_label": "author",
             "active": edge.active,
@@ -159,7 +171,7 @@ def graph_view(snap: Snapshot, project_id: str | None = None, milestones_only: b
     out["milestone_view"] = {
         "nodes": [m for m in milestones if m in ids],
         "connectors": [
-            {"from": a, "to": b, "hidden": n, "label": f"{n} in between"}
+            {"from": a, "to": b, "hidden": n, "label": tr("{n} in between", n=n)}
             for a, b, n in connectors
             if a in ids and b in ids
         ],
@@ -177,16 +189,17 @@ def _record_title(snap: Snapshot, rid: str) -> str:
     if kind == "entry":
         return p["title"]
     if kind == "genesis":
-        return f"Genesis — author label: {p['author_label']}"
+        return tr("Genesis — author label: {label}", label=p["author_label"])
     if kind == "link":
-        verb = "Added" if p["op"] == "add" else "Withdrew"
-        return f"{verb} relation: {_short(snap, p['from'])} {REL_LABELS.get(p['rel'], p['rel'])} {_short(snap, p['to'])}"
+        parts = {"a": _short(snap, p["from"]), "rel": rel_label(p["rel"]), "b": _short(snap, p["to"])}
+        return tr("Added relation: {a} {rel} {b}", **parts) if p["op"] == "add" else tr("Withdrew relation: {a} {rel} {b}", **parts)
     if kind == "milestone":
-        return f"{'Marked' if p['op'] == 'set' else 'Unmarked'} key step: {_short(snap, p['target'])}"
+        target = _short(snap, p["target"])
+        return tr("Marked key step: {target}", target=target) if p["op"] == "set" else tr("Unmarked key step: {target}", target=target)
     if kind == "statement":
-        return f"Statement on {_short(snap, p['target'])}"
+        return tr("Statement on {target}", target=_short(snap, p["target"]))
     if kind == "retraction":
-        return f"Retracted: {_short(snap, p['target'])}"
+        return tr("Retracted: {target}", target=_short(snap, p["target"]))
     return kind or "record"
 
 
@@ -216,7 +229,7 @@ def timeline_view(snap: Snapshot, project_id: str | None = None) -> list[dict]:
                 "tsa": tsa,
                 "btc": btc,
                 "earliest_verified": earliest_verified(tsa, btc),
-                "local_time": {"value": p["local_time"], "note": "unverified"},
+                "local_time": {"value": p["local_time"], "note": tr("unverified")},
                 "relations": rels,
                 "source_label": "verified",
             }
@@ -232,7 +245,7 @@ def record_detail(snap: Snapshot, rid: str, verification: dict | None = None) ->
     tsa, btc = snap.proofs(rid)
     files = snap.files.get(rid, [])
     verified: dict = {
-        "label": "Verified record",
+        "label": tr("Verified record"),
         "source": "verified",
         "record_id": rid,
         "seq": row.seq,
@@ -242,18 +255,20 @@ def record_detail(snap: Snapshot, rid: str, verification: dict | None = None) ->
         "timestamps": {"tsa": tsa, "btc": btc},
         "earliest_verified": earliest_verified(tsa, btc),
         "content_hashes": [],
-        "note": "Shows that this record existed by the verified time and has not changed since. "
-        "It does not show that what it says is true.",
+        "note": tr("Shows that this record existed by the verified time and has not changed since. "
+                   "It does not show that what it says is true."),
     }
     author_items: list[dict] = []
     declared = snap.when(rid)
-    declared_text = f"Author declared on {declared['time'][:10]}" + ("" if declared["verified"] else " (unverified date)")
+    declared_text = (tr("Author declared on {date}", date=declared["time"][:10]) if declared["verified"]
+                     else tr("Author declared on {date} (unverified date)", date=declared["time"][:10]))
     author_items.append(
-        {"field": "local_time", "text": f"Local clock time: {p['local_time']}", "note": "self-reported, unverified"}
+        {"field": "local_time", "text": tr("Local clock time: {time}", time=p["local_time"]),
+         "note": tr("self-reported, unverified")}
     )
     if row.kind == "entry":
         verified["node_type"] = p["node_type"]
-        verified["node_type_label"] = NODE_TYPE_LABELS.get(p["node_type"], "Other")
+        verified["node_type_label"] = node_type_label(p["node_type"])
         verified["project_title"] = p["project"]["title"]
         content = p.get("content") or {}
         if content.get("body"):
@@ -267,24 +282,26 @@ def record_detail(snap: Snapshot, rid: str, verification: dict | None = None) ->
             if "commit" in ext:
                 has_archive = bool(content.get("files"))
                 verified["external"]["note"] = (
-                    "Code archive attached: the code content itself is preserved."
+                    tr("Code archive attached: the code content itself is preserved.")
                     if has_archive
-                    else CODE_NOT_SAVED
+                    else tr(CODE_NOT_SAVED)
                 )
+                verified["external"]["saved"] = has_archive
                 verified["external"]["kind"] = "code"
             else:
                 verified["external"]["kind"] = "publication"
-                verified["external"]["evidence_level"] = "L2 (third-party reference)"
+                verified["external"]["evidence_level"] = tr("L2 (third-party reference)")
         if p.get("author_statement"):
             author_items.append({"field": "why", "text": p["author_statement"], "note": declared_text})
         if p.get("import"):
             imp = p["import"]
-            level = "L2 (third-party reference)" if imp["level"] == "L2" else "L1 (author statement only)"
+            level = tr("L2 (third-party reference)") if imp["level"] == "L2" else tr("L1 (author statement only)")
             author_items.append(
                 {
                     "field": "claimed_date",
-                    "text": f"Claimed date: {imp['claimed_date']} ({imp['precision']})",
-                    "note": f"{declared_text}; evidence level {level}",
+                    "text": tr("Claimed date: {date} ({precision})", date=imp["claimed_date"],
+                               precision=tr(imp["precision"])),
+                    "note": tr("{declared}; evidence level {level}", declared=declared_text, level=level),
                     "level": imp["level"],
                     "references": imp["references"],
                 }
@@ -293,18 +310,18 @@ def record_detail(snap: Snapshot, rid: str, verification: dict | None = None) ->
             author_items.append(
                 {
                     "field": "relation",
-                    "text": f"{REL_LABELS.get(rel['rel'], 'other relation')} {_short(snap, rel['to'])}",
+                    "text": f"{rel_label(rel['rel'])} {_short(snap, rel['to'])}",
                     "note": declared_text,
                     "to": rel["to"],
                     "rel": rel["rel"],
                 }
             )
         if p.get("milestone"):
-            author_items.append({"field": "milestone", "text": "Marked as a key step when recorded", "note": declared_text})
+            author_items.append({"field": "milestone", "text": tr("Marked as a key step when recorded"), "note": declared_text})
     elif row.kind == "genesis":
         verified["public_key"] = p["public_key"]
-        author_items.append({"field": "author_label", "text": f"Author label: {p['author_label']}",
-                             "note": "self-declared; a key does not identify a person"})
+        author_items.append({"field": "author_label", "text": tr("Author label: {label}", label=p["author_label"]),
+                             "note": tr("self-declared; a key does not identify a person")})
     elif row.kind in ("link", "statement", "retraction", "milestone"):
         text = {"link": p.get("statement"), "statement": p.get("text"), "retraction": p.get("reason")}.get(row.kind)
         if text:
@@ -330,8 +347,8 @@ def record_detail(snap: Snapshot, rid: str, verification: dict | None = None) ->
         "seq": row.seq,
         "kind": row.kind,
         "verified": verified,
-        "author": {"label": "Author statement", "source": "author", "items": author_items},
-        "later": {"label": "Later additions", "items": later},
+        "author": {"label": tr("Author statement"), "source": "author", "items": author_items},
+        "later": {"label": tr("Later additions"), "items": later},
         "retracted": bool(entry and entry.retracted_by),
         "files": [{"role": f.role, "name": f.name, "size": f.size, "media_type": f.media_type, "sha256": f.sha256}
                   for f in files],

@@ -10,6 +10,7 @@ import type {
   Status,
   TimelineRow,
 } from "./types";
+import { lang } from "./i18n";
 
 // The per-launch session token is embedded in the page by the local server — never in a URL.
 function sessionToken(): string {
@@ -30,8 +31,11 @@ export function getSpace(): Space {
   return currentSpace;
 }
 
+// Every request names the space and the interface language (texts the server writes, D-046).
 function spaceHeaders(): Record<string, string> {
-  return currentSpace === "practice" ? { "X-RPROV-Space": "practice" } : {};
+  const h: Record<string, string> = { "X-RPROV-Lang": lang() };
+  if (currentSpace === "practice") h["X-RPROV-Space"] = "practice";
+  return h;
 }
 
 // For plain links (attachments), which cannot carry a header.
@@ -107,8 +111,9 @@ export const api = {
     request<{ id: string }>("POST", "/api/retractions", { target, reason }),
   refreshAnchors: () => request<Record<string, number>>("POST", "/api/anchors/refresh"),
   networkCheck: () => request<ServiceCheckResult>("POST", "/api/network/check"),
+  setPreferences: (prefs: { language: string }) => request<{ language: string }>("POST", "/api/preferences", prefs),
   verifyAll: () => request<{ ok: boolean; counts: Record<string, number> }>("POST", "/api/verify/all"),
-  exportPreview: (body: { title: string; records: Record<string, string>; default: string }) =>
+  exportPreview: (body: { title: string; records: Record<string, string>; default: string; language?: string }) =>
     request<ExportPreview>("POST", "/api/export/preview", body),
   backupDownload: (password: string) => downloadRequest("/api/backup", { password }),
   backupStatus: () => request<BackupStatus>("GET", "/api/backup/status"),
@@ -140,7 +145,7 @@ export const api = {
       form,
     );
   },
-  exportBundle: (body: { title: string; records: Record<string, string>; default: string }) =>
+  exportBundle: (body: { title: string; records: Record<string, string>; default: string; language?: string }) =>
     request<Blob>("POST", "/api/export", body),
   practiceReset: (sample: boolean) =>
     request<{ space: string; record_count: number }>("POST", "/api/practice/reset", { sample }),
