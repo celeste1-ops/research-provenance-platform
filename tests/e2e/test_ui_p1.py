@@ -8,6 +8,8 @@ from app.demo import load_demo
 from tests.e2e.server import LiveServer, wait_for_step_count
 
 pytestmark = pytest.mark.e2e
+# Auto-retrying assertions: after an action the page updates in steps (notice first, status after).
+expect = pytest.importorskip("playwright.sync_api").expect
 
 
 @pytest.fixture
@@ -124,7 +126,7 @@ def test_backup_and_restore_in_the_browser(tmp_path, browser):
         page = browser.new_page(viewport={"width": 1400, "height": 900})
         page.goto(a.url)
         pill = page.get_by_test_id("backup-pill")
-        assert "Backup not set up" in pill.inner_text()
+        expect(pill).to_contain_text("Backup not set up")
         pill.click()
         dlg = page.get_by_test_id("backup-dialog")
         dlg.get_by_label("Backup folder").fill(str(folder))
@@ -148,11 +150,11 @@ def test_backup_and_restore_in_the_browser(tmp_path, browser):
         sheet.get_by_role("button", name="Continue").click()
         page.get_by_test_id("notice").get_by_text("Automatic backup is on").wait_for()
         # The test folder is on the same disk as the records: the app says it would not survive a lost Mac.
-        assert "Backup is on this Mac only" in pill.inner_text()
+        expect(pill).to_contain_text("Backup is on this Mac only")
         pill.click()
         dlg = page.get_by_test_id("backup-dialog")
-        assert "lost with it" in dlg.inner_text()
-        assert "Recovery code:" in dlg.get_by_test_id("recovery-status").inner_text()
+        expect(dlg).to_contain_text("lost with it")
+        expect(dlg.get_by_test_id("recovery-status")).to_contain_text("Recovery code:")
         dlg.get_by_role("button", name="Close").click()
         page.close()
     (backup,) = list(folder.iterdir())
@@ -182,7 +184,7 @@ def test_backup_and_restore_in_the_browser(tmp_path, browser):
         assert b.ctx.ledger.record_count() == count
         # Paused until confirmed; the old password is unknown, so resuming asks for a new one.
         pill = page.get_by_test_id("backup-pill")
-        assert "Backup paused" in pill.inner_text()
+        expect(pill).to_contain_text("Backup paused")
         pill.click()
         paused = page.get_by_test_id("backup-paused")
         assert "restored from a backup" in paused.inner_text()
@@ -219,7 +221,7 @@ def test_first_run_with_automatic_backup(tmp_path, browser):
         assert len(list(folder.glob("*.rprovbackup"))) == 1
         wait_for_step_count(page, "0 steps")
         # No project name given: a default one is created so the first step can be added right away.
-        assert page.get_by_label("Project").locator("option:checked").inner_text() == "My research"
+        expect(page.get_by_label("Project").locator("option:checked")).to_have_text("My research")
         page.close()
 
 
@@ -307,7 +309,7 @@ def test_practice_space(tmp_path, browser):
         assert "nothing here goes into your real record" in banner.inner_text()
         assert "space-practice" in (page.locator(".app").get_attribute("class") or "")
         assert page.get_by_test_id("backup-pill").count() == 0  # practice is never backed up
-        assert page.get_by_label("Project").locator("option:checked").inner_text() == "Practice project"
+        expect(page.get_by_label("Project").locator("option:checked")).to_have_text("Practice project")
 
         page.get_by_test_id("start-idea").click()
         form = page.get_by_test_id("record-form")
@@ -381,7 +383,7 @@ def test_restored_copy_waits_before_backing_up(tmp_path, browser):
         paused.get_by_role("button", name="Resume automatic backup to this folder").click()
         page.get_by_test_id("notice").get_by_text("Automatic backup resumed").wait_for()
         assert len(list(folder.iterdir())) == 2 and backup.exists()
-        assert "Backup is on this Mac only" in pill.inner_text()
+        expect(pill).to_contain_text("Backup is on this Mac only")
         page.close()
 
 
@@ -406,12 +408,12 @@ def test_old_mac_warns_when_a_new_mac_backs_up_into_the_same_folder(tmp_path, br
         banner = page.get_by_test_id("other-copy-banner")
         banner.wait_for()
         assert "Use only one Mac" in banner.inner_text()
-        assert "Another Mac is backing up here too" in page.get_by_test_id("backup-pill").inner_text()
+        expect(page.get_by_test_id("backup-pill")).to_contain_text("Another Mac is backing up here too")
         banner.get_by_role("button", name="What to do").click()
         box = page.get_by_test_id("other-copy")
         assert "histories split" in box.inner_text()
         box.get_by_role("button", name="The other copy is gone — stop warning").click()
         page.get_by_test_id("notice").get_by_text("no more warnings").wait_for()
         page.get_by_test_id("other-copy-banner").wait_for(state="detached")
-        assert "Another Mac" not in page.get_by_test_id("backup-pill").inner_text()
+        expect(page.get_by_test_id("backup-pill")).not_to_contain_text("Another Mac")
         page.close()

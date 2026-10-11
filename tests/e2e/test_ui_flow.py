@@ -18,6 +18,8 @@ import pytest
 from tests.e2e.server import LiveServer, wait_for_step_count
 
 pytestmark = pytest.mark.e2e
+# Auto-retrying assertions: the page updates in steps (status, graph, body arrive separately).
+expect = pytest.importorskip("playwright.sync_api").expect
 SNAPSHOT = Path(__file__).resolve().parent / "snapshots" / "ui_detail_sections.json"
 
 
@@ -67,7 +69,7 @@ def test_p0_flow_in_the_browser(tmp_path, browser):
         page.get_by_role("button", name="Skip for now").click()
         page.get_by_test_id("empty-state").wait_for()
         wait_for_step_count(page, "0 steps")  # genesis is not a step
-        assert page.get_by_test_id("backup-pill").inner_text().strip().endswith("Backup not set up")
+        expect(page.get_by_test_id("backup-pill")).to_contain_text("Backup not set up")
         assert "Public stamp (Bitcoin): off" not in page.content()  # mock Bitcoin anchor is on here
 
         # 3–5. Record an idea; both proofs appear separately within a second.
@@ -83,11 +85,11 @@ def test_p0_flow_in_the_browser(tmp_path, browser):
         detail.wait_for()
         verified = page.get_by_test_id("section-verified")
         verified.locator("[data-proof=tsa]", has_text="Date stamp ✓").wait_for()
-        assert "Public stamp: waiting" in verified.inner_text()
-        assert "E = m c^2" in verified.inner_text()  # the content itself is part of the verified record
+        expect(verified).to_contain_text("Public stamp: waiting")
+        expect(verified).to_contain_text("E = m c^2")  # the content itself (loaded separately) is verified too
 
         # Saving without a backup folder says so, with a way to set it up.
-        assert "Automatic backup is not set up yet" in page.get_by_test_id("notice").inner_text()
+        expect(page.get_by_test_id("notice")).to_contain_text("Automatic backup is not set up yet")
 
         # Key backup (More menu): password-protected, opens with the password, matches the genesis key.
         page.get_by_test_id("settings-menu").click()
