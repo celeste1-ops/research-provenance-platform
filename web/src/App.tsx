@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { api, setSpace, type Space } from "./api";
+import { api, KEYCHAIN_DENIED_EVENT, setSpace, type Space } from "./api";
 import type { Graph as GraphData, Project, Status, TimelineRow } from "./types";
 import { BackupDialog, BackupPill } from "./components/BackupDialog";
 import { Detail } from "./components/Detail";
@@ -18,7 +18,7 @@ import { Setup } from "./components/Setup";
 import { Story } from "./components/Story";
 import { Timeline } from "./components/Timeline";
 import { help, homeNote } from "./labels";
-import { dev, setDevice } from "./device";
+import { dev, keychainName, setDevice } from "./device";
 import { chosenHere, lang, setLang, t, tn, tx, type Lang } from "./i18n";
 import { LangSwitch } from "./components/LangSwitch";
 
@@ -108,6 +108,13 @@ export function App() {
     reload();
   }, [reload]);
 
+  // An answer said the keychain refused access: show the banner now, not at the next refresh.
+  useEffect(() => {
+    const refresh = () => api.status().then(setStatus).catch(() => undefined);
+    window.addEventListener(KEYCHAIN_DENIED_EVENT, refresh);
+    return () => window.removeEventListener(KEYCHAIN_DENIED_EVENT, refresh);
+  }, []);
+
   // Keep the backup status fresh (automatic backups run in the background).
   useEffect(() => {
     if (!status?.initialized) return;
@@ -164,6 +171,22 @@ export function App() {
     } catch (e) {
       setNotice({ text: (e as Error).message, kind: "error" });
     }
+  }
+
+  // The keychain refused access, so the app stopped asking (a refusal is never retried on its own).
+  // Trying again makes the system ask now, while the person is looking.
+  async function retryKeychain() {
+    try {
+      const out = await api.keychainRetry();
+      if (out.keychain_denied) {
+        setNotice({ text: t("The {keychain} still refuses access. When the system asks, choose “Always Allow” and enter your login password.", { keychain: keychainName() }), kind: "error" });
+      } else {
+        setNotice({ text: t("The {keychain} gave access again. Backups and saving work as before.", { keychain: keychainName() }) });
+      }
+    } catch (e) {
+      setNotice({ text: (e as Error).message, kind: "error" });
+    }
+    await reload();
   }
 
   // Switching language redraws the interface (key below) and asks the server for its texts again.
@@ -374,6 +397,16 @@ export function App() {
       {status.data_dir_warning && (
         <div className="banner error small" data-testid="data-dir-warning">
           {status.data_dir_warning}
+        </div>
+      )}
+      {status.keychain_denied && (
+        <div className="banner error small" data-testid="keychain-denied">
+          <span>
+            {t("The {keychain} refused access, so the app has stopped asking; saving steps and automatic backups wait until you try again. Click Try again, and when the system asks, choose “Always Allow”.", { keychain: keychainName() })}
+          </span>
+          <button className="secondary small" onClick={retryKeychain} data-testid="keychain-retry">
+            {t("Try again")}
+          </button>
         </div>
       )}
       {btcOff && (

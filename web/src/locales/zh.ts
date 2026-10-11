@@ -209,6 +209,15 @@ export const ZH: Record<string, string> = {
   "The report uses the formal names: the date stamp is called “Third-party timestamp” and the public stamp “Bitcoin anchor”.": "报告里用正式名称：日期章叫“第三方签名时间证明”，公开章叫“比特币时间锚定”。",
   "Bundle name": "证据包名称",
   "Report language": "报告语言",
+  "The {keychain} still refuses access. When the system asks, choose “Always Allow” and enter your login password.":
+    "{keychain}仍然拒绝访问。系统询问时，请选「始终允许」，并输入电脑的登录密码。",
+  "The {keychain} gave access again. Backups and saving work as before.": "{keychain}已经允许访问，备份和保存恢复正常。",
+  "The {keychain} refused access, so the app has stopped asking; saving steps and automatic backups wait until you try again. Click Try again, and when the system asks, choose “Always Allow”.":
+    "{keychain}拒绝了访问，程序已经停止反复询问；在你重试之前，保存步骤和自动备份会先等着。点「重试」，系统询问时选「始终允许」。",
+  "Try again": "重试",
+  "Backup waits for the {keychain}": "备份在等{keychain}授权",
+  "The {keychain} refused access to the backup password, so automatic backups wait. Close this window and click Try again at the top of the page; when the system asks, choose “Always Allow”.":
+    "{keychain}拒绝读取备份密码，自动备份先等着。关掉这个窗口，点页面顶部的「重试」；系统询问时选「始终允许」。",
   "Set all to:": "全部设为：",
   "include later additions": "包括后来补加的内容",
   "Record": "记录",

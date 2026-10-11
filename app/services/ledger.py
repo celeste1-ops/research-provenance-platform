@@ -8,6 +8,7 @@ There is no code path that edits or deletes a record.
 
 from __future__ import annotations
 
+import json
 import mimetypes
 import re
 import uuid
@@ -103,6 +104,12 @@ class Ledger:
 
     def initialized(self) -> bool:
         return self.installation is not None
+
+    def public_key(self) -> str | None:
+        """The identity's public key (hex) from its first record — without touching the keychain."""
+        with self.sessions() as s:
+            row = s.scalar(select(RecordRow).where(RecordRow.kind == "genesis").order_by(RecordRow.seq).limit(1))
+        return json.loads(row.payload_bytes).get("public_key") if row is not None else None
 
     def signing_key(self) -> Ed25519PrivateKey:
         if self._key is None:

@@ -90,9 +90,28 @@ def status(request: Request):
         # Words for this kind of computer in the interface: "this Mac", "this PC", "this computer".
         "device": c.settings.device,
         "keychain_name": c.settings.keychain_name,
+        # The keychain refused access: the app stops asking until the person clicks Try again.
+        "keychain_denied": c.keystore.denied or real(request).keystore.denied,
         "data_dir_warning": _data_dir_warning(real(request)),
         "practice_dir": str(request.app.state.spaces.practice_dir),
     }
+
+
+@router.post("/keychain/retry")
+def keychain_retry(request: Request):
+    """The person clicked Try again: read the keychain once more, now (the system may ask them)."""
+    from app.services.keystore import KeychainDenied
+
+    c = real(request)
+    for store in {id(s): s for s in (c.keystore, ctx(request).keystore)}.values():
+        store.retry()
+    if c.ledger.initialized():
+        c.autobackup.status()  # the backup password
+        try:
+            c.ledger.signing_key()  # and the signing key, so both questions come now, not later
+        except (KeychainDenied, NotInitialized):
+            pass
+    return {"keychain_denied": c.keystore.denied}
 
 
 def _data_dir_warning(c: AppContext) -> str | None:

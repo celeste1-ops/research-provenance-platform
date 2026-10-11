@@ -41,8 +41,8 @@ from app.services.backup import (
     stamp_to_iso,
     write_backup_file,
 )
+from app.services.keystore import DENIED, KeychainDenied
 from app.services.locations import SUGGESTED_FOLDER_NAME, suggestions, synced_service  # noqa: F401
-from provenance_core.signing import public_key_hex
 
 log = logging.getLogger("rprov.backup")
 
@@ -132,6 +132,9 @@ class AutoBackup:
         # Separate locks: saving a step (which only schedules) never waits for a running backup.
         self._run_lock = threading.Lock()
         self._timer_lock = threading.Lock()
+        # The password as first read from the keychain, per keychain entry: the page asks for the
+        # status every few seconds, and an unsigned app's every read can make macOS ask the person.
+        self._password_read: tuple[str, str | None] | None = None
 
     # ------------------------------------------------------------------ settings
 
@@ -141,17 +144,26 @@ class AutoBackup:
         return f"backup-password:{self.ctx.ledger.installation}:{backup_copy_id(self.ctx)}"
 
     def _password(self) -> str | None:
+        """The backup password, read from the keychain once (raises KeychainDenied if refused)."""
         ledger = self.ctx.ledger
         if not ledger.installation:
             return None
-        password = self.ctx.keystore.load_secret(self._secret_name())
+        name = self._secret_name()
+        if self._password_read is not None and self._password_read[0] == name:
+            return self._password_read[1]
+        password = self.ctx.keystore.load_secret(name)
         if password is None and not ledger.meta(ORIGIN_META):
             # Set up before per-copy entries existed: only the original install may take it over.
             legacy = self.ctx.keystore.load_secret(f"backup-password:{ledger.installation}")
             if legacy is not None:
-                self.ctx.keystore.save_secret(self._secret_name(), legacy)
+                self.ctx.keystore.save_secret(name, legacy)
                 password = legacy
+        self._password_read = (name, password)
         return password
+
+    def _save_password(self, password: str) -> None:
+        self.ctx.keystore.save_secret(self._secret_name(), password)
+        self._password_read = (self._secret_name(), password)
 
     def detect_copied_folder(self) -> bool:
         """At start-up: is this data folder a copy (Migration Assistant, Time Machine, ``cp -r``)?
@@ -195,7 +207,7 @@ class AutoBackup:
             raise BackupError("that folder does not exist")
         if not os.access(folder, os.W_OK):
             raise BackupError("this app cannot write to that folder")
-        self.ctx.keystore.save_secret(self._secret_name(), password)
+        self._save_password(password)
         ledger.set_meta("backup_location", str(folder))
         ledger.set_meta("backup_auto", "1")
         ledger.set_meta("backup_paused", "")
@@ -214,6 +226,8 @@ class AutoBackup:
     def new_recovery_code(self) -> str:
         """Replace the recovery code: new backups open with the new one (older ones with the old one)."""
         st = self.status()
+        if st["keychain_denied"]:
+            raise BackupError(DENIED)
         if not st["configured"]:
             raise BackupError("turn on automatic backup first")
         if st["state"] == "paused":
@@ -228,12 +242,21 @@ class AutoBackup:
         After a restore with the recovery code the password is unknown: the app asks for a new
         one. A password already in the keychain for this installation (a restore drill on the
         same Mac) is never replaced: it may be newer than the backup's."""
-        if password and self._password() is None:
-            self.ctx.keystore.save_secret(self._secret_name(), password)
+        if not password:
+            return
+        try:
+            known = self._password()
+        except KeychainDenied:
+            return  # the status says so; the author can set the password once access is back
+        if known is None:
+            self._save_password(password)
 
     def resume(self) -> dict:
         """After a restore or copy: the author confirms this copy should back up to the folder."""
-        if not self.status()["configured"]:
+        st = self.status()
+        if st["keychain_denied"]:
+            raise BackupError(DENIED)
+        if not st["configured"]:
             raise BackupError("set a backup password first")
         ledger = self.ctx.ledger
         ledger.set_meta("backup_auto", "1")
@@ -293,9 +316,14 @@ class AutoBackup:
     def status(self) -> dict:
         ledger = self.ctx.ledger
         location = ledger.meta("backup_location")
-        configured = bool(location) and self._password() is not None
+        denied = False
+        try:
+            configured = bool(location) and self._password() is not None
+        except KeychainDenied:
+            configured, denied = False, True
         st: dict = {
             "configured": configured,
+            "keychain_denied": denied,
             "location": location,
             "auto": ledger.meta("backup_auto") == "1",
             "last_backup": ledger.meta("backup_last_local"),
@@ -306,7 +334,7 @@ class AutoBackup:
         }
         if location:
             st["where"] = classify_location(Path(location), self.ctx.settings.data_dir, self.ctx.settings.device)
-        if location and not configured:
+        if location and not configured and not denied:
             st["needs_password"] = True
         paused = ledger.meta("backup_paused") or ""
         st["paused_after_restore"] = paused == "restored"
@@ -320,12 +348,14 @@ class AutoBackup:
             else {"configured": False}
         )
         st["data_dir_warning"] = data_dir_warning(self.ctx.settings.data_dir)
-        try:  # printed on the recovery sheet, shown again after a recovery-code restore
-            st["key_fingerprint"] = key_fingerprint(public_key_hex(ledger.signing_key().public_key()))
-        except Exception:  # noqa: BLE001 - no key available (not set up yet)
-            st["key_fingerprint"] = None
+        # Printed on the recovery sheet, shown again after a recovery-code restore. Taken from the
+        # identity's first record, so that asking for the status never reads the keychain.
+        public_key = ledger.public_key()
+        st["key_fingerprint"] = key_fingerprint(public_key) if public_key else None
         if location and paused:
             st["state"] = "paused"  # even without a password: confirm the folder first (D-040)
+        elif location and denied:
+            st["state"] = "keychain-denied"
         elif not configured:
             st["state"] = "off"
         elif not st["auto"]:
@@ -347,15 +377,20 @@ class AutoBackup:
         with self._run_lock:
             ledger = self.ctx.ledger
             location = ledger.meta("backup_location")
-            password = self._password()
+            try:
+                password = self._password()
+            except KeychainDenied:
+                return {"ran": False, "reason": DENIED}
             if not location or password is None:
                 return {"ran": False, "reason": "backup is not set up"}
             if ledger.meta("backup_paused"):
                 return {"ran": False, "reason": "automatic backup is paused: confirm the backup folder first"}
             fingerprint = self._fingerprint()
             try:
-                path = write_backup_file(self.ctx, password, Path(location))
+                path = write_backup_file(self.ctx, password, Path(location))  # includes the signing key
                 self._prune(Path(location))
+            except KeychainDenied:
+                return {"ran": False, "reason": DENIED}  # the top of the page says so; no error kept
             except Exception as exc:  # noqa: BLE001 - report, keep the app running
                 msg = f"{type(exc).__name__}: {exc}"
                 ledger.set_meta("backup_last_error", msg)

@@ -230,6 +230,8 @@ export function BackupPill({ status, onClick }: { status: BackupStatus | null; o
         ? t("Another {device} is backing up here too", { device: dev() })
         : st === "same-disk"
         ? t("Backup is on this {device} only", { device: dev() })
+        : st === "keychain-denied"
+        ? t("Backup waits for the {keychain}", { keychain: keychainName() })
         : st === "error"
           ? t("Backup failed")
           : status?.needs_password
@@ -252,7 +254,7 @@ export function BackupDialog({
   onChanged: (message: string) => void;
 }) {
   // A paused copy first sees why it is paused (D-040), even when it has no password yet.
-  const [editing, setEditing] = useState(!status?.configured && status?.state !== "paused");
+  const [editing, setEditing] = useState(!status?.configured && status?.state !== "paused" && !status?.keychain_denied);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [oneOff, setOneOff] = useState("");
@@ -341,6 +343,11 @@ export function BackupDialog({
               {tx("A backup holds everything — your steps, files, stamps and signing key — fully encrypted. If this {device} is lost or breaks, install the app on a new {device} and choose <b>Restore from a backup</b>.", bold, { device: dev() })}
             </p>
             {status?.data_dir_warning && <p className="error small">{status.data_dir_warning}</p>}
+            {status?.keychain_denied && !editing && (
+              <div className="status-box state-error" data-testid="backup-keychain-denied">
+                {t("The {keychain} refused access to the backup password, so automatic backups wait. Close this window and click Try again at the top of the page; when the system asks, choose “Always Allow”.", { keychain: keychainName() })}
+              </div>
+            )}
             {status?.state === "paused" && !editing && (
               <div className="status-box state-paused" data-testid="backup-paused">
                 <div>
