@@ -36,4 +36,4 @@ macOS and Windows warn about apps from unidentified developers. Make sure you do
 - On a Mac, the first time the app stores its signing key it asks to use the keychain: click **Always Allow**. Because the app is unsigned, it asks again after each upgrade; the key is still there.
 - **Windows:** if "Windows protected your PC" (SmartScreen) appears, click **More info → Run anyway**. On a new Windows 11 with Smart App Control turned on, unsigned apps may be blocked with no way to run them until a signed version is available.
 
-A Chinese guide is in the README (中文说明见 README).
+A Chinese guide is in [README.zh.md](https://github.com/celeste1-ops/research-provenance-platform/blob/main/README.zh.md) (中文说明见 README.zh.md).

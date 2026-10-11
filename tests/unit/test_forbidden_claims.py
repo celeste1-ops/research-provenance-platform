@@ -15,7 +15,7 @@ ROOT = Path(__file__).resolve().parent.parent.parent
 
 
 def _scanned_files() -> list[Path]:
-    files = [ROOT / "README.md", ROOT / "packaging" / "RELEASE_NOTES.md"]
+    files = [ROOT / "README.md", ROOT / "README.zh.md", ROOT / "packaging" / "RELEASE_NOTES.md"]
     files += sorted((ROOT / "web" / "src").rglob("*.ts*"))
     files += sorted((ROOT / "app" / "report").rglob("*"))
     files += [ROOT / "web" / "index.html", ROOT / "app" / "services" / "views.py",
@@ -29,7 +29,7 @@ def _hits(text: str) -> list[str]:
 
 def test_no_forbidden_claims_in_sources():
     files = _scanned_files()
-    assert any(f.name == "README.md" for f in files)
+    assert any(f.name == "README.md" for f in files) and any(f.name == "README.zh.md" for f in files)
     assert any(f.suffix == ".tsx" for f in files)
     assert any(f.name == "report.html.j2" for f in files)
     problems = {str(f.relative_to(ROOT)): _hits(f.read_text(encoding="utf-8")) for f in files}
