@@ -146,8 +146,8 @@ def test_p0_flow_in_the_browser(tmp_path, browser):
         }
         if not SNAPSHOT.exists():
             SNAPSHOT.parent.mkdir(exist_ok=True)
-            SNAPSHOT.write_text(json.dumps(snapshot, indent=2) + "\n")
-        assert snapshot == json.loads(SNAPSHOT.read_text())
+            SNAPSHOT.write_text(json.dumps(snapshot, indent=2) + "\n", encoding="utf-8")
+        assert snapshot == json.loads(SNAPSHOT.read_text(encoding="utf-8"))
 
         # Graph: two nodes, one milestone, both proof icons on each node.
         graph = page.get_by_test_id("graph")
@@ -186,7 +186,7 @@ def test_p0_flow_in_the_browser(tmp_path, browser):
         res = subprocess.run(
             [sys.executable, "-I", str(out_dir / "verify.py"), str(out_dir),
              "--tsa-root", str(out_dir / "certs" / "mock-tsa-root.pem")],
-            capture_output=True, text=True,
+            capture_output=True, text=True, encoding="utf-8",
         )
         assert res.returncode == 0, res.stdout + res.stderr
         assert "Result: OK" in res.stdout

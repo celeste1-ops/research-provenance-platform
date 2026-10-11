@@ -245,7 +245,7 @@ def test_rotation_keeps_the_newest_backups(tmp_path, monkeypatch):
     ctx.ledger.init_identity("R")
     folder = tmp_path / "bk"
     folder.mkdir()
-    (folder / "unrelated.txt").write_text("keep me")
+    (folder / "unrelated.txt").write_text("keep me", encoding="utf-8")
     ctx.autobackup.configure(str(folder), PASSWORD)
     names = []
     for i in range(5):
@@ -289,22 +289,24 @@ def test_backup_failure_is_reported_and_retried(tmp_path):
 def test_location_classification(tmp_path, monkeypatch):
     import os
 
-    from app.services import autobackup
+    from app.services import autobackup, locations
 
     data = tmp_path / "data"
     data.mkdir()
+    monkeypatch.setattr(locations, "sync_roots", lambda *a, **k: [])
     assert autobackup.classify_location(tmp_path / "nope", data)["kind"] == "missing"
     assert autobackup.classify_location(tmp_path, data)["kind"] == "same-disk"
     fake_icloud = tmp_path / "Mobile Documents" / "com~apple~CloudDocs"
     (fake_icloud / "Research Provenance Backups").mkdir(parents=True)
-    monkeypatch.setattr(autobackup, "ICLOUD_DRIVE", fake_icloud)
+    fake_dropbox = tmp_path / "CloudStorage" / "Dropbox"
+    (fake_dropbox / "bk").mkdir(parents=True)
+    monkeypatch.setattr(locations, "sync_roots", lambda *a, **k: [("iCloud Drive", fake_icloud),
+                                                                   ("Dropbox", fake_dropbox)])
     got = autobackup.classify_location(fake_icloud / "Research Provenance Backups", data)
     assert got == {"kind": "synced", "label": "iCloud Drive", "safe": True}
-    fake_cloud = tmp_path / "CloudStorage"
-    (fake_cloud / "Dropbox" / "bk").mkdir(parents=True)
-    monkeypatch.setattr(autobackup, "CLOUD_STORAGE", fake_cloud)
-    assert autobackup.classify_location(fake_cloud / "Dropbox" / "bk", data)["label"] == "Dropbox"
-    sugg = autobackup.suggestions(data)
+    assert autobackup.classify_location(fake_dropbox / "bk", data)["label"] == "Dropbox"
+    monkeypatch.setattr(locations, "external_drives", lambda *a, **k: [])
+    sugg = locations.suggestions(data)
     assert sugg[0]["label"] == "iCloud Drive" and sugg[0]["path"].endswith("Research Provenance Backups")
     shm = "/dev/shm"
     if os.path.isdir(shm) and os.stat(shm).st_dev != os.stat(data).st_dev:
@@ -468,7 +470,7 @@ def test_format_1_backups_still_restore(tmp_path):
 
 
 def test_location_checks(tmp_path, monkeypatch):
-    from app.services import autobackup
+    from app.services import autobackup, locations
 
     ctx = make_ctx(tmp_path / "a")
     ctx.ledger.init_identity("L")
@@ -476,14 +478,15 @@ def test_location_checks(tmp_path, monkeypatch):
     assert autobackup.check_location(str(data_dir / "bk"), data_dir)["kind"] == "inside-data"
     with pytest.raises(BackupError, match="outside the app's data folder"):
         ctx.autobackup.configure(str(data_dir / "bk"), PASSWORD, create=True)
-    new = autobackup.check_location(str(tmp_path / "new-folder"), data_dir)
+    new = autobackup.check_location(str(tmp_path / "new-folder"), data_dir, "Mac")
     assert new["ok"] and new["creates"] and new["kind"] == "same-disk"
-    assert "lost with it" in new["warning"]
+    assert new["label"] == "This Mac's own disk" and "lost with it" in new["warning"]
+    assert autobackup.check_location(str(tmp_path / "x"), data_dir, "PC")["label"] == "This PC's own disk"
     assert not autobackup.check_location("relative/path", data_dir)["ok"]
 
     icloud = tmp_path / "Mobile Documents" / "com~apple~CloudDocs"
     icloud.mkdir(parents=True)
-    monkeypatch.setattr(autobackup, "ICLOUD_DRIVE", icloud)
+    monkeypatch.setattr(locations, "sync_roots", lambda *a, **k: [("iCloud Drive", icloud)])
     synced = autobackup.check_location(str(icloud / "Research Provenance Backups"), data_dir)
     assert synced["ok"] and synced["kind"] == "synced" and synced["label"] == "iCloud Drive" and synced["safe"]
     # The live database must not live in a synced folder; backups may.
@@ -672,7 +675,7 @@ def _reopen(path, keystore):
     from app.services.context import AppContext
     from provenance_core.providers.mock import MockProvider
 
-    settings = Settings(data_dir=path, port=8765, tsa="mock", btc="mock", keystore="memory")
+    settings = Settings(data_dir=path, port=8765, tsa="mock", btc="mock", keystore="memory", device="Mac")
     return AppContext.create(settings, keystore=keystore,
                              providers={"tsa": MockProvider("tsa"), "btc": MockProvider("btc")})
 

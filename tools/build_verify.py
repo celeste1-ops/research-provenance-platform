@@ -82,7 +82,7 @@ def _top_level_names(source: str) -> set[str]:
 
 
 def _certs_block() -> str:
-    root_pem = (CORE / "certs" / "freetsa-cacert.pem").read_text().strip()
+    root_pem = (CORE / "certs" / "freetsa-cacert.pem").read_text(encoding="ascii").strip()
     from provenance_core.certs import FREETSA_ROOT_SHA256
 
     return f'''

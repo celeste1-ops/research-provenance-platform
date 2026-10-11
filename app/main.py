@@ -99,7 +99,7 @@ def app_factory() -> FastAPI:
     if settings.dev:
         token_file = settings.data_dir / "dev-session-token"
         fd = os.open(token_file, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
-        with os.fdopen(fd, "w") as fh:
+        with os.fdopen(fd, "w", encoding="utf-8") as fh:
             fh.write(ctx.session_token)
     log.info("Serving on http://127.0.0.1:%d (data: %s)", settings.port, settings.data_dir)
     return create_app(ctx, start_jobs=True)

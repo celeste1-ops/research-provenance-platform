@@ -85,6 +85,9 @@ def status(request: Request):
         "data_dir": str(c.settings.data_dir),
         "public_key": genesis["public_key"] if genesis else None,
         "space": space_name(request),
+        # Words for this kind of computer in the interface: "this Mac", "this PC", "this computer".
+        "device": c.settings.device,
+        "keychain_name": c.settings.keychain_name,
         "data_dir_warning": _data_dir_warning(real(request)),
         "practice_dir": str(request.app.state.spaces.practice_dir),
     }
@@ -103,8 +106,13 @@ class PracticeResetIn(BaseModel):
 @router.post("/practice/reset")
 def practice_reset(body: PracticeResetIn, request: Request):
     """Start the practice space over. There is no such operation for the real record."""
+    from app.services.spaces import PracticeResetError
+
     spaces = request.app.state.spaces
-    c = spaces.reset_practice(with_sample=body.sample)
+    try:
+        c = spaces.reset_practice(with_sample=body.sample)
+    except PracticeResetError as exc:
+        raise HTTPException(409, str(exc)) from None
     return {"space": PRACTICE, "record_count": c.ledger.record_count()}
 
 
@@ -509,7 +517,8 @@ def backup_check(location: str, request: Request):
     """Where would a backup in this folder survive? Shown while the author picks a folder."""
     from app.services.autobackup import check_location
 
-    return check_location(location, real(request).settings.data_dir)
+    settings = real(request).settings
+    return check_location(location, settings.data_dir, settings.device)
 
 
 @router.post("/backup/resume")

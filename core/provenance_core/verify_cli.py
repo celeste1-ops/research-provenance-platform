@@ -104,7 +104,18 @@ def _print_report(report: LogReport, meta: dict) -> None:
     )
 
 
+def _utf8_output() -> None:
+    """Titles and labels may contain any character; on Windows a piped stdout defaults to the
+    legacy code page and would fail on them. Write UTF-8 (unknown bytes replaced) everywhere."""
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            stream.reconfigure(encoding="utf-8", errors="replace")
+        except (AttributeError, ValueError):
+            pass
+
+
 def main(argv: list[str] | None = None) -> int:
+    _utf8_output()
     parser = argparse.ArgumentParser(description="Independently verify an rprov evidence bundle.")
     parser.add_argument("bundle", help="bundle directory or .zip file")
     parser.add_argument("--json", action="store_true", help="machine-readable output")

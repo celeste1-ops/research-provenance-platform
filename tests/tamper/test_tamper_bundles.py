@@ -37,7 +37,7 @@ def _rid(s, key):
 
 
 def _chain(d: Path) -> list[str]:
-    return json.loads((d / "chain.json").read_text())["ids"]
+    return json.loads((d / "chain.json").read_text(encoding="utf-8"))["ids"]
 
 
 def _edit_json(path: Path, fn, canonical: bool = True) -> None:
@@ -48,7 +48,7 @@ def _edit_json(path: Path, fn, canonical: bool = True) -> None:
 
         path.write_bytes(canonicalize(obj))
     else:
-        path.write_text(json.dumps(obj, indent=2))
+        path.write_text(json.dumps(obj, indent=2), encoding="utf-8")
 
 
 def _attacker_tsr(record_id: str) -> bytes:
@@ -121,7 +121,7 @@ def tamper_swap_seq(d, s):  # 调换两条记录的 seq
     chain = _chain(d)
     i, j = chain.index(_rid(s, "exp")), chain.index(_rid(s, "claim"))
     chain[i], chain[j] = chain[j], chain[i]
-    (d / "chain.json").write_text(json.dumps({"format": "rprov.bundle/1", "ids": chain}))
+    (d / "chain.json").write_text(json.dumps({"format": "rprov.bundle/1", "ids": chain}), encoding="utf-8")
 
 
 def tamper_ref_missing(d, s):  # 引用不存在的记录
@@ -166,7 +166,7 @@ def _run(bundle: Path, verify_py: Path, *extra: str) -> subprocess.CompletedProc
     return subprocess.run(
         [sys.executable, "-I", str(verify_py), str(bundle), "--tsa-root", str(bundle / "certs/mock-tsa-root.pem"),
          *extra],
-        capture_output=True, text=True,
+        capture_output=True, text=True, encoding="utf-8",
     )
 
 
@@ -206,5 +206,5 @@ def test_tampered_zip_fails_too(sample, tmp_path):
             out.writestr(info, data)
     res = subprocess.run([sys.executable, "-I", str(sample.bundle_dir / "verify.py"), str(target),
                           "--tsa-root", str(sample.bundle_dir / "certs/mock-tsa-root.pem")],
-                         capture_output=True, text=True)
+                         capture_output=True, text=True, encoding="utf-8")
     assert res.returncode == 1 and "CONTENT_MISMATCH" in res.stdout

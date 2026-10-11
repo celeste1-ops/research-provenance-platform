@@ -84,12 +84,12 @@ def test_generated_verify_py_runs_in_repo_python(tmp_path):
     s = make_sample(tmp_path)
     out = subprocess.run([sys.executable, "-I", str(s.bundle_dir / "verify.py"), str(s.bundle_dir),
                           "--tsa-root", str(s.bundle_dir / "certs/mock-tsa-root.pem")],
-                         capture_output=True, text=True)
+                         capture_output=True, text=True, encoding="utf-8")
     assert out.returncode == 0, out.stdout + out.stderr
     assert "Result: OK" in out.stdout
     # Without trusting the mock root, the mock timestamps are (correctly) untrusted.
     out = subprocess.run([sys.executable, "-I", str(s.bundle_dir / "verify.py"), str(s.zip_path)],
-                         capture_output=True, text=True)
+                         capture_output=True, text=True, encoding="utf-8")
     assert out.returncode == 1 and "TSA_CHAIN_UNTRUSTED" in out.stdout
 
 

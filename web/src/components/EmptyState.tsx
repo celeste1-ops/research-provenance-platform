@@ -1,6 +1,7 @@
 import type { Space } from "../api";
-import { HOME_NOTE } from "../labels";
+import { homeNote } from "../labels";
 import type { BackupStatus } from "../types";
+import { dev } from "../device";
 
 export const STEP_TYPES: { type: string; label: string; hint: string }[] = [
   { type: "idea", label: "Idea", hint: "a first thought or intuition" },
@@ -74,15 +75,15 @@ export function EmptyState({
             <b>Watch the history grow</b> — and share it as a report anyone can check.
           </li>
         </ol>
-        <p className="note" data-testid="home-note-empty">{HOME_NOTE}</p>
+        <p className="note" data-testid="home-note-empty">{homeNote()}</p>
         {!practice && backup?.state !== "ok" && (
           <div className="callout">
             {backup?.state === "same-disk" ? (
-              <>Your backup folder is on this Mac only, so it won't help if the Mac is lost.</>
+              <>Your backup folder is on this {dev()} only, so it won't help if the {dev()} is lost.</>
             ) : backup?.state === "paused" ? (
               <>Automatic backup is paused after restoring — confirm the folder to resume it.</>
             ) : (
-              <>Automatic backup is not on yet — if this Mac is lost or breaks, your research would be lost too.</>
+              <>Automatic backup is not on yet — if this {dev()} is lost or breaks, your research would be lost too.</>
             )}{" "}
             <button className="secondary small" onClick={onBackup}>
               {backup?.state === "paused" ? "Review backup" : "Set up backup"}

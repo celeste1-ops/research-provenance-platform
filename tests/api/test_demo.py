@@ -41,8 +41,8 @@ def test_demo_has_required_variety(tmp_path):
 def test_make_demo_command(tmp_path):
     env = {**os.environ, "RPROV_HOME": str(tmp_path / "home"), "RPROV_TSA": "mock", "RPROV_BTC": "mock",
            "RPROV_KEYSTORE": "dev-insecure-file"}
-    out = subprocess.run([sys.executable, "-m", "app.demo"], cwd=ROOT, env=env, capture_output=True, text=True)
+    out = subprocess.run([sys.executable, "-m", "app.demo"], cwd=ROOT, env=env, capture_output=True, text=True, encoding="utf-8")
     assert out.returncode == 0, out.stderr
     assert "Loaded" in out.stdout
-    again = subprocess.run([sys.executable, "-m", "app.demo"], cwd=ROOT, env=env, capture_output=True, text=True)
+    again = subprocess.run([sys.executable, "-m", "app.demo"], cwd=ROOT, env=env, capture_output=True, text=True, encoding="utf-8")
     assert again.returncode == 1 and "already contains records" in again.stderr

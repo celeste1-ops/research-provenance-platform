@@ -22,6 +22,7 @@ import json
 import logging
 import shutil
 import threading
+import time
 
 from app.db.models import WRITE_LOCK
 from app.services.context import AppContext
@@ -34,6 +35,25 @@ PRACTICE = "practice"
 SPACE_HEADER = "x-rprov-space"
 PRACTICE_DIR_NAME = "practice"
 PRACTICE_PROJECT = "Practice project"
+
+
+class PracticeResetError(RuntimeError):
+    pass
+
+
+def _remove_tree(path) -> None:
+    """Delete the practice folder for real. On Windows a file another program still has open
+    (an indexer, an antivirus scan) cannot be deleted for a moment: retry, then say so instead
+    of silently reopening the old practice data."""
+    for attempt in range(5):
+        shutil.rmtree(path, ignore_errors=True)
+        if not path.exists():
+            return
+        time.sleep(0.2 * (attempt + 1))
+    raise PracticeResetError(
+        f"could not delete {path}: some file in it is still in use. Close other programs that may be "
+        "using it and try again."
+    )
 
 
 class Spaces:
@@ -94,7 +114,7 @@ class Spaces:
                     if installation:
                         old.keystore.delete(installation)
                 self._practice = None
-                shutil.rmtree(self.practice_dir, ignore_errors=True)
+                _remove_tree(self.practice_dir)
             log.info("practice space started over")
             if not with_sample:
                 return self.practice()

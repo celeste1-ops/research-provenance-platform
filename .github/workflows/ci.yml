@@ -25,6 +25,30 @@ jobs:
         run: uv run playwright install --with-deps chromium
       - run: uv run --extra ots pytest
 
+  windows:
+    # Windows 10/11 support (D-043): the whole suite, browser tests included.
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - name: Build the UI (served by the app in the browser tests)
+        run: |
+          npm ci
+          npm run build
+        working-directory: web
+      - run: uv sync --extra ots --locked
+      - run: uv run ruff check .
+      - name: Install Chromium for the Playwright smoke tests
+        run: uv run playwright install chromium
+      - run: uv run --extra ots pytest
+
   web:
     runs-on: ubuntu-latest
     steps:

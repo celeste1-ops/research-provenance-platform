@@ -38,7 +38,7 @@ def test_real_freetsa_token_verifies_with_openssl(tmp_path):
     out = subprocess.run(
         [openssl, "ts", "-verify", "-data", f"manifests/{rid}.json", "-in", f"proofs/{rid}.tsr",
          "-CAfile", str(FREETSA_ROOT_FILE), "-untrusted", str(FREETSA_TSA_FILE)],
-        cwd=tmp_path, capture_output=True, text=True,
+        cwd=tmp_path, capture_output=True, text=True, encoding="utf-8",
     )
     assert out.returncode == 0 and "Verification: OK" in out.stdout, out.stdout + out.stderr
 

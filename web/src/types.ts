@@ -184,6 +184,8 @@ export interface Status {
   space: "real" | "practice";
   practice_dir: string;
   data_dir_warning: string | null;
+  device: string;
+  keychain_name: string;
 }
 
 export interface Project {

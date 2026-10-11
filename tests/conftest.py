@@ -23,7 +23,9 @@ def pytest_collection_modifyitems(config, items):
 
 
 def make_ctx(tmp_path, *, tsa=None, btc=None, keystore=None) -> AppContext:
-    settings = Settings(data_dir=tmp_path / "rprov", port=8765, tsa="mock", btc="mock", keystore="memory")
+    # device="Mac": interface wording is fixed in tests, whatever system they run on.
+    settings = Settings(data_dir=tmp_path / "rprov", port=8765, tsa="mock", btc="mock", keystore="memory",
+                        device="Mac")
     providers = {
         "tsa": tsa if tsa is not None else MockProvider("tsa"),
         "btc": btc if btc is not None else MockProvider("btc"),

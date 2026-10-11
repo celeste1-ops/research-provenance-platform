@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -14,6 +15,10 @@ def _env(name: str, default: str | None = None):
     # Read at construction time, not import time, so values set after import
     # (e.g. `python -m app --port 8766`) take effect.
     return field(default_factory=lambda: os.environ.get(name, default))
+
+
+DEVICE_WORDS = {"darwin": "Mac", "win32": "PC"}
+KEYCHAIN_NAMES = {"Mac": "Keychain", "PC": "Windows Credential Manager"}
 
 
 @dataclass
@@ -30,6 +35,13 @@ class Settings:
     # Signing-key storage: keyring (macOS Keychain) | memory (tests) | dev-insecure-file
     keystore: str = _env("RPROV_KEYSTORE", "keyring")
     dev: bool = field(default_factory=lambda: os.environ.get("RPROV_DEV", "") == "1")
+    # What the interface calls this computer and its password store (display only; RPROV_DEVICE
+    # lets tests and screenshots pick one). Behaviour never depends on it.
+    device: str = field(default_factory=lambda: os.environ.get("RPROV_DEVICE") or DEVICE_WORDS.get(sys.platform, "computer"))
+
+    @property
+    def keychain_name(self) -> str:
+        return KEYCHAIN_NAMES.get(self.device, "system keyring")
     web_dist: Path = field(default_factory=lambda: Path(__file__).resolve().parent.parent / "web" / "dist")
     # Extra Host/Origin values allowed (tests); never used to open the server up.
     extra_hosts: tuple[str, ...] = ()
