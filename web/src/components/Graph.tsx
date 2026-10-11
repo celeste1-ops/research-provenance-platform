@@ -83,16 +83,24 @@ interface Props {
   data: GraphData;
   selected: string | null;
   onSelect: (id: string) => void;
+  milestonesOnly?: boolean;
 }
 
-export function Graph({ data, selected, onSelect }: Props) {
-  const { nodes, edges } = useMemo(() => layout(data, selected), [data, selected]);
+export function Graph({ data, selected, onSelect, milestonesOnly = false }: Props) {
+  const { nodes, edges } = useMemo(
+    () => (milestonesOnly ? milestoneLayout(data, selected) : layout(data, selected)),
+    [data, selected, milestonesOnly],
+  );
   if (data.nodes.length === 0) {
     return <div className="empty">No records yet. Use “New record” to make the first one.</div>;
+  }
+  if (milestonesOnly && data.milestone_view.nodes.length === 0) {
+    return <div className="empty">No milestones yet. Mark important records as milestones.</div>;
   }
   return (
     <div className="graph" data-testid="graph">
       <ReactFlow
+        key={milestonesOnly ? "milestones" : "all"} // re-fit the view when the mode changes
         nodes={nodes}
         edges={edges}
         nodeTypes={nodeTypes}
@@ -100,7 +108,7 @@ export function Graph({ data, selected, onSelect }: Props) {
         nodesConnectable={false}
         elementsSelectable
         fitView
-        fitViewOptions={{ padding: 0.15, maxZoom: 1 }}
+        fitViewOptions={{ padding: 0.12, maxZoom: 1, minZoom: 0.6 }}
         minZoom={0.2}
         proOptions={{ hideAttribution: true }}
         onNodeClick={(_, node) => {
@@ -112,6 +120,29 @@ export function Graph({ data, selected, onSelect }: Props) {
       </ReactFlow>
     </div>
   );
+}
+
+// Milestones only (PRD §11): other records fold away; two milestones joined by a relation
+// path get one dashed connector labelled with how many records lie in between.
+function milestoneLayout(data: GraphData, selected: string | null): { nodes: Node[]; edges: Edge[] } {
+  const keep = new Set(data.milestone_view.nodes);
+  const kept = data.nodes.filter((n) => keep.has(n.id));
+  const rows = data.rows.filter((t) => kept.some((n) => n.node_type === t));
+  const base = layout({ ...data, nodes: kept, rows, edges: [] }, selected);
+  const edges: Edge[] = data.milestone_view.connectors.map((c, i) => ({
+    id: `m${i}`,
+    source: c.from,
+    target: c.to,
+    type: "default",
+    label: c.hidden === 0 ? "directly related" : `${c.hidden} in between`,
+    labelStyle: { fontSize: 11, fill: "#1e3a8a" },
+    labelBgStyle: { fill: "#ffffff", fillOpacity: 0.9 },
+    style: { stroke: "#5b6b8c", strokeWidth: 1.6, strokeDasharray: "6 5" },
+    markerEnd: { type: MarkerType.ArrowClosed, color: "#5b6b8c" },
+    className: "milestone-connector",
+    data: { hidden: c.hidden },
+  }));
+  return { nodes: base.nodes, edges };
 }
 
 function layout(data: GraphData, selected: string | null): { nodes: Node[]; edges: Edge[] } {

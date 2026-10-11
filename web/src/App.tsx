@@ -7,6 +7,7 @@ import { Graph } from "./components/Graph";
 import { KeyBackupDialog } from "./components/KeyBackupDialog";
 import { RecordForm } from "./components/RecordForm";
 import { Setup } from "./components/Setup";
+import { Timeline } from "./components/Timeline";
 
 export function App() {
   const [status, setStatus] = useState<Status | null>(null);
@@ -19,6 +20,8 @@ export function App() {
   const [showExport, setShowExport] = useState(false);
   const [showKeyBackup, setShowKeyBackup] = useState(false);
   const [version, setVersion] = useState(0);
+  const [view, setView] = useState<"graph" | "timeline">("graph");
+  const [milestonesOnly, setMilestonesOnly] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -117,16 +120,49 @@ export function App() {
           {error}
         </div>
       )}
+      <nav className="viewbar">
+        <div className="tabs" role="tablist">
+          <button role="tab" aria-selected={view === "graph"} className={view === "graph" ? "tab active" : "tab"}
+            onClick={() => setView("graph")}>
+            Evolution graph
+          </button>
+          <button role="tab" aria-selected={view === "timeline"} className={view === "timeline" ? "tab active" : "tab"}
+            onClick={() => setView("timeline")} data-testid="tab-timeline">
+            Timeline
+          </button>
+        </div>
+        {view === "graph" && (
+          <label className="check small">
+            <input type="checkbox" checked={milestonesOnly} onChange={(e) => setMilestonesOnly(e.target.checked)}
+              data-testid="milestones-only" />
+            Milestones only
+          </label>
+        )}
+        <span className="legend small muted">
+          solid = revises · dashed = derived from · dotted = uses · T = third-party timestamp · B = Bitcoin anchor
+        </span>
+      </nav>
       <main className={`main ${selected ? "with-detail" : ""}`}>
         <section className="canvas">
-          {graph ? (
-            <Graph data={graph} selected={selected} onSelect={setSelected} />
+          {view === "timeline" ? (
+            <Timeline rows={timeline} onSelect={setSelected} />
+          ) : graph ? (
+            <Graph data={graph} selected={selected} onSelect={setSelected} milestonesOnly={milestonesOnly} />
           ) : (
             <div className="empty">Loading graph…</div>
           )}
         </section>
         {selected && (
-          <Detail id={selected} version={version} onClose={() => setSelected(null)} onSelect={setSelected} />
+          <Detail
+            id={selected}
+            version={version}
+            onClose={() => setSelected(null)}
+            onSelect={setSelected}
+            entries={graph?.nodes ?? []}
+            relationTypes={status.relation_types}
+            onChanged={reload}
+            activeRelations={new Set((graph?.edges ?? []).filter((e) => e.active).map((e) => `${e.to}|${e.from}|${e.rel}`))}
+          />
         )}
       </main>
       {showForm && graph && (

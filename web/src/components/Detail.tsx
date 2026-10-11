@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { api } from "../api";
-import type { RecordDetail } from "../types";
+import type { GraphNode, RecordDetail } from "../types";
+import { Changes } from "./Changes";
+import { LaterActions, WithdrawRelation } from "./LaterActions";
 import { Markdown } from "./Markdown";
 import { ProofLine } from "./ProofBadge";
 
@@ -9,10 +11,15 @@ interface Props {
   version: number;
   onClose: () => void;
   onSelect: (id: string) => void;
+  entries: GraphNode[];
+  relationTypes: string[];
+  onChanged: () => void;
+  activeRelations: Set<string>;
 }
 
-// Record detail, split by source with fixed labels: Verified record / Author statement / Later additions.
-export function Detail({ id, version, onClose, onSelect }: Props) {
+// Record detail, split by source with fixed labels:
+// Verified record / Author statement / Later additions / Changes.
+export function Detail({ id, version, onClose, onSelect, entries, relationTypes, onChanged, activeRelations }: Props) {
   const [detail, setDetail] = useState<RecordDetail | null>(null);
   const [body, setBody] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -119,9 +126,19 @@ export function Detail({ id, version, onClose, onSelect }: Props) {
           {detail.author.items.map((a, i) => (
             <li key={i} data-field={a.field}>
               {a.to ? (
-                <button className="link" onClick={() => onSelect(a.to!)}>
-                  {a.text}
-                </button>
+                <>
+                  <button className="link" onClick={() => onSelect(a.to!)}>
+                    {a.text}
+                  </button>
+                  {activeRelations.has(`${detail.id}|${a.to}|${a.rel}`) ? (
+                    <>
+                      {" · "}
+                      <WithdrawRelation from={detail.id} to={a.to} rel={a.rel!} onChanged={onChanged} />
+                    </>
+                  ) : (
+                    <span className="muted small"> · withdrawn later</span>
+                  )}
+                </>
               ) : (
                 a.text
               )}
@@ -150,6 +167,17 @@ export function Detail({ id, version, onClose, onSelect }: Props) {
           </ul>
         )}
       </section>
+
+      {detail.kind === "entry" && (
+        <section className="src src-changes" data-testid="section-changes">
+          <h3 className="src-tag">Changes</h3>
+          <Changes id={detail.id} revises={detail.revises ?? []}
+            titleOf={(rid) => entries.find((e) => e.id === rid)?.title ?? rid.slice(0, 10)} />
+        </section>
+      )}
+
+      <LaterActions detail={detail} node={entries.find((e) => e.id === detail.id)} entries={entries}
+        relationTypes={relationTypes} onChanged={onChanged} />
     </aside>
   );
 }
