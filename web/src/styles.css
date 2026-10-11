@@ -116,3 +116,4 @@ dt { color: var(--muted); } dd { margin: 0; }
 .setup { display: flex; justify-content: center; padding: 60px 16px; }
 .card { background: var(--panel); border-radius: 12px; padding: 24px 28px; width: min(560px, 100%); box-shadow: 0 4px 24px rgba(0, 0, 0, .08); }
 .dropzone label.link { display: inline; margin: 0; font-weight: 400; }
+button.attention { border-color: var(--warn); color: var(--warn); }

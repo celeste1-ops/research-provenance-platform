@@ -165,3 +165,22 @@ def test_milestone_statement_retraction_and_replay(api):
     report = api.client.post("/api/verify/all").json()
     assert report["ok"] is True
     assert {r["status"] for r in report["records"]} == {"pass_btc_pending"}
+
+
+def test_key_backup_export_is_password_protected(api):
+    import pytest as _pytest
+
+    from provenance_core.signing import KeyBackupError, load_private_key_encrypted, public_key_hex
+
+    api.init()
+    assert api.client.get("/api/status").json()["key_backup_done"] is False
+    assert api.client.post("/api/identity/export", json={"password": "short"}).status_code == 422
+    r = api.client.post("/api/identity/export", json={"password": "a long password"})
+    assert r.status_code == 200 and b"ENCRYPTED PRIVATE KEY" in r.content
+    key = load_private_key_encrypted(r.content, "a long password")
+    genesis = api.client.get("/api/timeline").json()[0]["id"]
+    pub = api.client.get(f"/api/records/{genesis}").json()["verified"]["public_key"]
+    assert public_key_hex(key.public_key()) == pub
+    with _pytest.raises(KeyBackupError):
+        load_private_key_encrypted(r.content, "wrong password!")
+    assert api.client.get("/api/status").json()["key_backup_done"] is True

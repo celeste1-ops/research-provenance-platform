@@ -64,6 +64,22 @@ def test_p0_flow_in_the_browser(tmp_path, browser):
         assert "Bitcoin anchor: pending" in verified.inner_text()
         assert "E = m c^2" in verified.inner_text()  # the content itself is part of the verified record
 
+        # Key backup: password-protected, opens with the password, matches the genesis key.
+        page.get_by_role("button", name="Back up key…").click()
+        kb = page.get_by_test_id("key-backup-dialog")
+        kb.get_by_label("Password (at least 8 characters)").fill("correct horse battery")
+        kb.get_by_label("Repeat password").fill("correct horse battery")
+        with page.expect_download() as key_dl:
+            kb.get_by_role("button", name="Download backup").click()
+        key_file = tmp_path / "key.pem"
+        key_dl.value.save_as(key_file)
+        from provenance_core.signing import load_private_key_encrypted, public_key_hex
+
+        key = load_private_key_encrypted(key_file.read_bytes(), "correct horse battery")
+        genesis = json.loads(srv.ctx.ledger.records()[0].payload_bytes)
+        assert public_key_hex(key.public_key()) == genesis["public_key"]
+        assert b"ENCRYPTED" in key_file.read_bytes()
+
         # A second record with a relation, a "why", a claimed date (import) and milestone.
         _new_record(page, "Claim / hypothesis", "Revised model", "now with friction")
         form = page.get_by_test_id("record-form")

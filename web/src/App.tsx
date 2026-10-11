@@ -4,6 +4,7 @@ import type { Graph as GraphData, Project, Status, TimelineRow } from "./types";
 import { Detail } from "./components/Detail";
 import { ExportDialog } from "./components/ExportDialog";
 import { Graph } from "./components/Graph";
+import { KeyBackupDialog } from "./components/KeyBackupDialog";
 import { RecordForm } from "./components/RecordForm";
 import { Setup } from "./components/Setup";
 
@@ -16,6 +17,7 @@ export function App() {
   const [selected, setSelected] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [showExport, setShowExport] = useState(false);
+  const [showKeyBackup, setShowKeyBackup] = useState(false);
   const [version, setVersion] = useState(0);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -85,6 +87,13 @@ export function App() {
         <span className="muted small" title="Author label (self-declared)">
           {status.author_label} · {status.record_count} records
         </span>
+        <button
+          className={status.key_backup_done ? "secondary" : "secondary attention"}
+          onClick={() => setShowKeyBackup(true)}
+          title="Download a password-protected backup of your signing key"
+        >
+          Back up key…
+        </button>
         <button className="secondary" onClick={refresh} title="Check pending and missing time proofs now">
           Check time proofs
         </button>
@@ -134,12 +143,22 @@ export function App() {
                 setSelected(id);
                 await reload();
                 if (!status.key_backup_done) {
-                  setMessage("Recorded. Remember to back up your signing key (Export → key backup comes in a later step).");
+                  setMessage("Recorded. Now back up your signing key (“Back up key…”): without it, a lost key means a new identity.");
                 }
               }}
             />
           </div>
         </div>
+      )}
+      {showKeyBackup && (
+        <KeyBackupDialog
+          onClose={() => setShowKeyBackup(false)}
+          onDone={() => {
+            setShowKeyBackup(false);
+            setMessage("Key backup downloaded. Store it and its password separately.");
+            reload();
+          }}
+        />
       )}
       {showExport && (
         <ExportDialog rows={timeline} defaultTitle={project?.title ?? "evidence"} onClose={() => setShowExport(false)} />
