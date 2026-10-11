@@ -313,3 +313,19 @@ verification rules or what leaves the machine for time proofs.
   installation the restore stops before changing anything. The recommended drill still
   uses a separate data folder and `RPROV_KEYSTORE=memory`, so the copy does not touch the
   keychain at all (README).
+- **D-041 · Two copies backing up into one folder are told about each other.** After a
+  move to a new Mac the old one may keep running. Since D-040 the two copies no longer
+  delete each other's files, but both could keep adding steps under the same identity,
+  and the history would split: a later restore brings back only one branch. Each copy
+  now looks at the backup folder: a file from another copy of the same installation
+  (a different per-copy id), written after this copy's starting point, means a second
+  copy is active. For a restored copy the starting point is the restore, so the files
+  it came from don't count; files named before per-copy ids existed count only for a
+  restored copy (for the original they are its own past). Then the top bar says
+  "Another Mac is backing up here too", a red banner says to use only one Mac to add
+  steps, and the Backup dialog explains why, with "The other copy is gone — stop
+  warning" (it comes back if that copy writes again) or "Choose a different folder".
+  The paused box after a restore shows the same warning before "Resume". Backups
+  continue meanwhile: each copy's own files are complete and kept apart. The app does
+  not try to decide which Mac is "the real one" or merge the two histories; it makes the
+  situation visible so the author can stop one of them.

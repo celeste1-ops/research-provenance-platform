@@ -238,3 +238,5 @@ ul.plain { list-style: none; padding: 0; margin: 0; }
 }
 .pill-paused .dot { background: #e0a100; } .pill-paused { color: var(--warn); border-color: #f0d9a8; }
 .status-box.state-paused { background: #fff8e6; }
+.pill-other-copy .dot { background: var(--bad); } .pill-other-copy { color: var(--bad); border-color: #f0b8b3; }
+.status-box.state-other-copy { background: #fdf0ef; border-color: #f0b8b3; }

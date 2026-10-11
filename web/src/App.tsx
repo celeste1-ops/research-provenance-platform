@@ -252,6 +252,17 @@ export function App() {
           </button>
         </div>
       )}
+      {!practice && status.backup?.other_copy && status.backup.state !== "paused" && (
+        <div className="banner error small" data-testid="other-copy-banner">
+          <span>
+            Another copy of this research (another Mac?) is also backing up into your backup folder. Use only one Mac to
+            add steps.
+          </span>
+          <button className="secondary small" onClick={() => setDialog("backup")}>
+            What to do
+          </button>
+        </div>
+      )}
       {status.data_dir_warning && (
         <div className="banner error small" data-testid="data-dir-warning">
           {status.data_dir_warning}

@@ -512,6 +512,12 @@ def backup_resume(request: Request):
         raise HTTPException(400, str(exc)) from None
 
 
+@router.post("/backup/other-copy/acknowledge")
+def backup_acknowledge_other_copy(request: Request):
+    """The author says the other copy writing into the folder is gone (D-041)."""
+    return real(request).autobackup.acknowledge_other_copy()
+
+
 @router.post("/backup/recovery-code")
 def backup_new_recovery_code(request: Request):
     """Make a new printable recovery code (shown once; the app keeps only its public half)."""

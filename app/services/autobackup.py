@@ -24,12 +24,16 @@ from sqlalchemy import func, select
 from app.db.models import AnchorRow, RecordRow
 from app.services.backup import (
     BACKUP_SUFFIX,
+    COPY_META,
     RECOVERY_META,
+    SINCE_META,
     BackupError,
     backup_copy_id,
     create_backup,
     make_recovery,
     new_recovery_code,
+    parse_backup_name,
+    stamp_to_iso,
     write_backup_to,
 )
 
@@ -237,6 +241,46 @@ class AutoBackup:
         self.run("resumed")
         return self.status()
 
+    # ------------------------------------------------------------------ other copies (D-041)
+
+    def _latest_other_copy(self) -> tuple[str, str | None] | None:
+        """Newest backup in the folder written by *another* copy of this installation after this
+        copy's starting point: e.g. the old Mac still running after the new Mac was restored."""
+        ledger = self.ctx.ledger
+        location = ledger.meta("backup_location")
+        if not location or not ledger.installation:
+            return None
+        folder = Path(location)
+        inst = ledger.installation[:8]
+        mine = ledger.meta(COPY_META) or None
+        since = ledger.meta(SINCE_META) or ""
+        latest = None
+        try:
+            names = [p.name for p in folder.glob(f"rprov-backup-{inst}-*{BACKUP_SUFFIX}")]
+        except OSError:
+            return None
+        for name in names:
+            parsed = parse_backup_name(name)
+            if parsed is None or parsed["inst"] != inst:
+                continue
+            copy = parsed["copy"]
+            if copy is not None and copy == mine:
+                continue
+            if copy is None and not since:
+                continue  # older file names: this copy's own past, before per-copy ids
+            if parsed["stamp"] <= since:
+                continue
+            if latest is None or parsed["stamp"] > latest[0]:
+                latest = (parsed["stamp"], copy)
+        return latest
+
+    def acknowledge_other_copy(self) -> dict:
+        """The author says the other copy is gone: stop warning until it writes again."""
+        latest = self._latest_other_copy()
+        if latest is not None:
+            self.ctx.ledger.set_meta(SINCE_META, latest[0])
+        return self.status()
+
     # ------------------------------------------------------------------ state
 
     def _fingerprint(self) -> str:
@@ -265,6 +309,8 @@ class AutoBackup:
         if location and not configured:
             st["needs_password"] = True
         st["paused_after_restore"] = ledger.meta("backup_paused") == "restored"
+        other = self._latest_other_copy() if location else None
+        st["other_copy"] = {"last_backup": stamp_to_iso(other[0]), "copy": other[1]} if other else None
         recovery = ledger.meta(RECOVERY_META)
         st["recovery"] = (
             {"configured": True, **{k: v for k, v in json.loads(recovery).items() if k in ("id", "created_local")}}
@@ -278,6 +324,8 @@ class AutoBackup:
             st["state"] = "paused"
         elif st["last_error"]:
             st["state"] = "error"
+        elif st["other_copy"]:
+            st["state"] = "other-copy"
         elif not st["where"]["safe"]:
             st["state"] = "same-disk"
         else:

@@ -368,3 +368,35 @@ def test_restored_copy_waits_before_backing_up(tmp_path, browser):
         assert len(list(folder.iterdir())) == 2 and backup.exists()
         assert "Backup is on this Mac only" in pill.inner_text()
         page.close()
+
+
+def test_old_mac_warns_when_a_new_mac_backs_up_into_the_same_folder(tmp_path, browser):
+    """D-041: two copies of the same research writing into one folder are told about each other."""
+    from app.services.backup import restore_backup
+    from app.services.keystore import MemoryKeyStore
+    from tests.conftest import make_ctx
+
+    folder = tmp_path / "icloud"
+    with LiveServer(tmp_path / "old-mac") as old:
+        load_demo(old.ctx)
+        old.ctx.autobackup.configure(str(folder), "backup password 1", create=True)
+        new = make_ctx(tmp_path / "new-mac", keystore=MemoryKeyStore())
+        restore_backup(new, next(folder.iterdir()).read_bytes(), "backup password 1")
+        new.autobackup.adopt_restored_password("backup password 1")
+        new.autobackup.resume()  # the new Mac now backs up into the same folder
+        new.close()
+
+        page = browser.new_page(viewport={"width": 1400, "height": 900})
+        page.goto(old.url)
+        banner = page.get_by_test_id("other-copy-banner")
+        banner.wait_for()
+        assert "Use only one Mac" in banner.inner_text()
+        assert "Another Mac is backing up here too" in page.get_by_test_id("backup-pill").inner_text()
+        banner.get_by_role("button", name="What to do").click()
+        box = page.get_by_test_id("other-copy")
+        assert "histories split" in box.inner_text()
+        box.get_by_role("button", name="The other copy is gone — stop warning").click()
+        page.get_by_test_id("notice").get_by_text("no more warnings").wait_for()
+        page.get_by_test_id("other-copy-banner").wait_for(state="detached")
+        assert "Another Mac" not in page.get_by_test_id("backup-pill").inner_text()
+        page.close()

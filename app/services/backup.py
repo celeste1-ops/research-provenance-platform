@@ -70,6 +70,11 @@ ENCRYPTED_FORMAT = "rprov.backup-enc/2"
 BACKUP_SUFFIX = ".rprovbackup"
 RECOVERY_META = "backup_recovery"  # public half of the recovery key (JSON), see make_recovery
 COPY_META = "backup_copy"  # which copy of the installation wrote a backup file (D-040)
+SINCE_META = "backup_since"  # other copies' files up to this time are known/expected (D-041)
+# rprov-backup-<installation[:8]>[-<copy>]-<YYYYMMDD-HHMMSS-mmm>.rprovbackup (no copy id before D-040)
+_BACKUP_NAME = re.compile(
+    r"\Arprov-backup-(?P<inst>[0-9a-z]{1,8})(?:-(?P<copy>c[0-9a-f]{5}))?-(?P<stamp>\d{8}-\d{6}-\d{3})\.rprovbackup\Z"
+)
 # scrypt cost: 2**17 * 8 * 128 bytes = 128 MiB of memory, about half a second.
 SCRYPT_N = 2**17
 SCRYPT_R = 8
@@ -299,6 +304,21 @@ def create_backup(ctx, password: str) -> tuple[str, bytes]:
     return name, seal_backup(plain, backup_key, password, json.loads(recovery) if recovery else None)
 
 
+def name_stamp(now: datetime | None = None) -> str:
+    """UTC time as used in backup file names: YYYYMMDD-HHMMSS-mmm (sorts as text)."""
+    now = now or datetime.now(UTC)
+    return f"{now:%Y%m%d-%H%M%S}-{now.microsecond // 1000:03d}"
+
+
+def parse_backup_name(name: str) -> dict | None:
+    m = _BACKUP_NAME.match(name)
+    return m.groupdict() if m else None
+
+
+def stamp_to_iso(stamp: str) -> str:
+    return f"{stamp[0:4]}-{stamp[4:6]}-{stamp[6:8]}T{stamp[9:11]}:{stamp[11:13]}:{stamp[13:15]}Z"
+
+
 def backup_copy_id(ledger) -> str:
     """A short id for this copy of the installation, part of every backup file name.
 
@@ -350,9 +370,8 @@ def create_plain_backup(ctx, key_passphrase: str, *, key_protection: str = "pass
             zf.writestr(name, members[name])
     inst = (ledger.installation or "unknown")[:8]
     copy = backup_copy_id(ledger)
-    now = datetime.now(UTC)
     # Millisecond precision so two backups in the same second never share a name.
-    name = f"rprov-backup-{inst}-{copy}-{now:%Y%m%d-%H%M%S}-{now.microsecond // 1000:03d}{BACKUP_SUFFIX}"
+    name = f"rprov-backup-{inst}-{copy}-{name_stamp()}{BACKUP_SUFFIX}"
     return name, buf.getvalue()
 
 
@@ -482,8 +501,10 @@ def restore_backup(
                     s.merge(MetaRow(**r))
                 # A restored copy remembers the backup folder but never writes there by itself:
                 # the author confirms first (another Mac may still be backing up into it). D-040.
+                # Files other copies wrote before this restore are the past it came from (D-041).
                 for meta_key, meta_value in (("backup_auto", "0"), ("backup_paused", "restored"), (COPY_META, ""),
-                                             ("backup_last_error", ""), ("backup_last_fingerprint", "")):
+                                             ("backup_last_error", ""), ("backup_last_fingerprint", ""),
+                                             (SINCE_META, name_stamp())):
                     s.merge(MetaRow(key=meta_key, value=meta_value))
                 continue
             if table is AnchorRow:

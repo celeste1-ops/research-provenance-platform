@@ -539,3 +539,65 @@ def test_restore_refuses_to_replace_a_different_key_in_the_keychain(tmp_path):
     assert drill.ledger.record_count() == 0
     real.close()
     drill.close()
+
+
+# ---------------------------------------------------------------- two Macs, one backup folder (D-041)
+
+
+def _old_and_new_mac(tmp_path):
+    """The old Mac keeps running; the new Mac restored from its backup and resumed backups."""
+    old = make_ctx(tmp_path / "old-mac", keystore=MemoryKeyStore())
+    build_log(old)
+    folder = tmp_path / "icloud"
+    old.autobackup.configure(str(folder), PASSWORD, create=True)
+    new = make_ctx(tmp_path / "new-mac", keystore=MemoryKeyStore())
+    restore_backup(new, max(folder.iterdir()).read_bytes(), PASSWORD)
+    new.autobackup.adopt_restored_password(PASSWORD)
+    return old, new, folder
+
+
+def test_both_macs_notice_each_other(tmp_path):
+    old, new, folder = _old_and_new_mac(tmp_path)
+    # Before the new Mac writes anything, nobody sees a second active copy.
+    assert old.autobackup.status()["other_copy"] is None
+    assert new.autobackup.status()["other_copy"] is None  # the old Mac's files predate the restore
+    new.autobackup.resume()
+    st = old.autobackup.status()
+    assert st["other_copy"] is not None and st["state"] == "other-copy"
+    assert new.autobackup.status()["other_copy"] is None
+    # The old Mac keeps adding steps: now the new Mac sees it too.
+    old.ledger.create_entry(EntryInput(old.ledger.projects()[0].id, "note", "Added on the old Mac"))
+    old.autobackup.run("change")
+    st = new.autobackup.status()
+    assert st["other_copy"] is not None and st["state"] == "other-copy"
+    assert st["other_copy"]["last_backup"].endswith("Z")
+    # "That copy is gone": the warning stops until the other copy writes again.
+    assert new.autobackup.acknowledge_other_copy()["other_copy"] is None
+    old.autobackup.run("again")
+    assert new.autobackup.status()["other_copy"] is not None
+    old.close()
+    new.close()
+
+
+def test_own_older_file_names_are_not_another_copy(tmp_path):
+    ctx = make_ctx(tmp_path / "a")
+    ctx.ledger.init_identity("A")
+    folder = tmp_path / "bk"
+    ctx.autobackup.configure(str(folder), PASSWORD, create=True)
+    inst = ctx.ledger.installation[:8]
+    # A file named the way versions before per-copy ids named them (this copy's own past).
+    (folder / f"rprov-backup-{inst}-20261011-044417-152.rprovbackup").write_bytes(b"x")
+    assert ctx.autobackup.status()["other_copy"] is None
+    ctx.close()
+
+
+def test_other_copy_over_http(tmp_path):
+    old, new, folder = _old_and_new_mac(tmp_path)
+    new.autobackup.resume()
+    with TestClient(create_app(old), base_url="http://127.0.0.1:8765") as cl:
+        cl.headers["X-RPROV-Token"] = old.session_token
+        assert cl.get("/api/status").json()["backup"]["state"] == "other-copy"
+        r = cl.post("/api/backup/other-copy/acknowledge")
+        assert r.status_code == 200 and r.json()["other_copy"] is None
+    old.close()
+    new.close()

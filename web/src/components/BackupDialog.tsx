@@ -189,6 +189,8 @@ export function BackupPill({ status, onClick }: { status: BackupStatus | null; o
       ? `Last backup: ${timeAgo(status?.last_backup)} ✓`
       : st === "paused"
         ? "Backup paused — confirm to resume"
+        : st === "other-copy"
+        ? "Another Mac is backing up here too"
         : st === "same-disk"
         ? "Backup is on this Mac only"
         : st === "error"
@@ -237,6 +239,19 @@ export function BackupDialog({
     try {
       await api.backupResume();
       onChanged("Automatic backup resumed. A new backup was written.");
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function acknowledge() {
+    setBusy(true);
+    setError(null);
+    try {
+      await api.backupAcknowledgeOtherCopy();
+      onChanged("OK — no more warnings unless that other copy writes a backup again.");
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -296,6 +311,13 @@ export function BackupDialog({
                 <div className="small">
                   Folder: <span className="mono">{status.location}</span> ({status.where?.label})
                 </div>
+                {status.other_copy && (
+                  <p className="error small">
+                    Another copy of this research wrote a backup into this folder at {status.other_copy.last_backup},
+                    after the backup you restored from. Is the old Mac still running? Quit the app there first, or
+                    choose a different folder.
+                  </p>
+                )}
                 <p className="warning small">
                   Resume only on the Mac you will keep using. If another Mac — or the copy you restored from — still
                   backs up into this folder, choose a different folder instead. If this was only a test of your backup,
@@ -304,6 +326,28 @@ export function BackupDialog({
                 <div className="row">
                   <button className="primary small" onClick={resume} disabled={busy}>
                     Resume automatic backup to this folder
+                  </button>
+                  <button className="secondary small" onClick={() => setEditing(true)}>
+                    Choose a different folder
+                  </button>
+                </div>
+              </div>
+            )}
+            {status?.other_copy && status.state !== "paused" && !editing && (
+              <div className="status-box state-other-copy" data-testid="other-copy">
+                <div>
+                  <b>Another copy of this research is also backing up into this folder</b> — last at{" "}
+                  {status.other_copy.last_backup}.
+                </div>
+                <p className="small">
+                  That usually means a second Mac (for example the old one, after you restored onto a new one) still
+                  runs the app. Use <b>only one Mac</b> to add steps: if both keep adding steps, the two histories split,
+                  and a restore can bring back only one of them. Quit the app on the Mac you no longer use. Your own
+                  backups are not affected — each copy keeps its own files.
+                </p>
+                <div className="row">
+                  <button className="secondary small" onClick={acknowledge} disabled={busy}>
+                    The other copy is gone — stop warning
                   </button>
                   <button className="secondary small" onClick={() => setEditing(true)}>
                     Choose a different folder
@@ -391,6 +435,7 @@ export function RestoreForm({ onDone }: { onDone: () => void }) {
   const [code, setCode] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [restoredWithProblems, setRestoredWithProblems] = useState(false);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -399,15 +444,27 @@ export function RestoreForm({ onDone }: { onDone: () => void }) {
     setError(null);
     try {
       const out = await api.restore(file, useCode ? { recoveryCode: code } : { password });
-      if (!out.verification.ok) {
-        setError("Restored, but the check reported problems — look at the records before relying on them.");
-      }
-      onDone();
+      if (out.verification.ok) onDone();
+      else setRestoredWithProblems(true);
     } catch (err) {
       setError((err as Error).message);
     } finally {
       setBusy(false);
     }
+  }
+
+  if (restoredWithProblems) {
+    return (
+      <div className="restore" data-testid="restore-problems">
+        <p className="error">
+          Restored, but the check found problems with some records. Open the app and look at the records marked as
+          failed before relying on them; keep the backup file.
+        </p>
+        <button className="primary" onClick={onDone}>
+          Open the app
+        </button>
+      </div>
+    );
   }
 
   return (
