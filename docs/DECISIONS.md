@@ -671,3 +671,30 @@ verification rules or what leaves the machine for time proofs.
      page shows (not an internal error).
   3. README and release notes say that a new version asks once or twice and that "Always
      Allow" is the answer; signing the app (README, "What signing would take") would end it.
+
+- **D-052 · One keychain item, reopening shows the page, files can be dropped anywhere, and the
+  disk image says what to do.** Feedback on 0.3.1 from the first real installation:
+  1. *One keychain item.* After the upgrade the login password was asked five times: an app
+     without a developer signature is asked about every keychain item it did not create, after
+     every upgrade, and the app had one item per key and secret (real signing key, practice
+     signing key, backup password, older backup-password entries). On macOS everything now lives in
+     one item (`rprov` / `secrets`, JSON with `keys` and `secrets`), read once per run and shared
+     by the real record and practice; so a new version asks once. (Windows Credential Manager
+     asks nothing and limits an item to 2.5 KB, so there every key and secret keeps its own.) Items of older versions are
+     moved into it the first time each is needed (asked once each, that one time) and are left
+     in place, because deleting another version's item would make the system ask again. An item
+     that cannot be read is never overwritten. Signing the app (README) would remove the
+     question entirely.
+  2. *Opening the app again shows its page.* On macOS, opening an app that is already running
+     only re-activates it; this app has no window, so nothing seemed to happen ("after closing
+     it, it won't open"). The app now answers the reopen event by opening its page, as a second
+     start already did on Windows.
+  3. *Files can be dropped anywhere.* Only the small attachment box took dropped files, and a
+     file dropped elsewhere made the browser leave the app to show it. Now the whole form takes
+     them, files dropped on the main page open a new step with them attached, and a stray drop
+     never replaces the app.
+  4. *The disk image says what to do.* The window that opens with the .dmg shows the app and
+     Applications side by side on a picture with an arrow and, in English and Chinese, "drag
+     onto Applications, then open it from Applications or Launchpad; the first time: Open
+     Anyway" (`packaging/macos/`, drawn by `tools/dmg_background.py`, laid out with dmgbuild).
+     Windows uses an ordinary installer, which needs no such step.

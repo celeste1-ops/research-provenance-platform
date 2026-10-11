@@ -24,11 +24,19 @@ codesign --force --deep --sign - "$APP"
 codesign --verify --deep --strict "$APP"
 
 DMG="dist/ResearchHistory-${VERSION}-macos-${ARCH}.dmg"
-rm -rf build/dmg "$DMG"
-mkdir -p build/dmg
-cp -R "$APP" build/dmg/
-ln -s /Applications build/dmg/Applications
-hdiutil create -volname "Research History" -srcfolder build/dmg -ov -format UDZO "$DMG"
+rm -f "$DMG"
+# The window that opens with the disk image: the app and Applications side by side on a picture
+# that says to drag one onto the other, then open the app from Applications (D-052).
+tiffutil -cathidpicheck packaging/macos/dmg-background.png packaging/macos/dmg-background@2x.png \
+  -out build/dmg-background.tiff
+uv run dmgbuild -s packaging/macos/dmg_settings.py -D app="$APP" -D background=build/dmg-background.tiff \
+  "Research History" "$DMG"
+MNT="$(mktemp -d)"
+hdiutil attach "$DMG" -nobrowse -readonly -mountpoint "$MNT" >/dev/null
+for item in "Research History.app" Applications .DS_Store .background; do
+  [ -e "$MNT/$item" ] || { hdiutil detach "$MNT" >/dev/null; echo "disk image lacks $item"; exit 1; }
+done
+hdiutil detach "$MNT" >/dev/null
 du -sh "$APP" "$DMG"
 
 bash packaging/smoke_macos.sh "$APP"

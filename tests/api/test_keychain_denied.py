@@ -8,6 +8,8 @@ the question came back without end, and a refusal turned the status into an inte
 
 from __future__ import annotations
 
+import json
+
 import keyring
 import pytest
 from fastapi.testclient import TestClient
@@ -16,7 +18,7 @@ from keyring.errors import KeyringLocked
 
 from app.main import create_app
 from app.services import backup as backup_mod
-from app.services.keystore import KeychainDenied, KeyringKeyStore
+from app.services.keystore import KeychainDenied, KeyringKeyStore, KeyStoreError
 from tests.conftest import make_ctx
 
 PASSWORD = "backup password 1"
@@ -50,13 +52,16 @@ class FakeKeychain(KeyringBackend):
 
 
 @pytest.fixture
-def chain():
+def chain(monkeypatch):
+    monkeypatch.setattr(KeyringKeyStore, "one_item", True)  # as on macOS, wherever the tests run
     previous = keyring.get_keyring()
     fake = FakeKeychain()
     keyring.set_keyring(fake)
-    KeyringKeyStore().retry()  # every test starts with the gate open
+    KeyringKeyStore().retry()  # every test starts with the gate open and nothing read yet
+    KeyringKeyStore.forget()
     yield fake
     KeyringKeyStore().retry()
+    KeyringKeyStore.forget()
     keyring.set_keyring(previous)
 
 
@@ -72,6 +77,7 @@ def _set_up(tmp_path) -> str:
     pid = ctx.ledger.create_project("P").id
     ctx.autobackup.configure(str(tmp_path / "bk"), PASSWORD, create=True)
     ctx.close()
+    KeyringKeyStore.forget()  # what follows is a new run of the app
     return pid
 
 
@@ -93,7 +99,8 @@ def test_the_gate_stops_asking_after_a_refusal(chain):
     assert chain.reads == 1  # nothing reached the keychain, so nothing asked the person
     chain.refuse = False
     store.retry()
-    assert store.load_secret("x") is None and chain.reads == 2 and not other.denied
+    assert store.load_secret("x") is None and not other.denied
+    assert chain.reads == 3  # the app's one item, then the item an older version would have used
 
 
 def test_the_status_reads_the_backup_password_once(tmp_path, chain):
@@ -105,8 +112,8 @@ def test_the_status_reads_the_backup_password_once(tmp_path, chain):
             st = cl.get("/api/status").json()
             assert st["backup"]["configured"] and st["backup"]["key_fingerprint"] and not st["keychain_denied"]
     assert chain.reads == before + 1  # once, then remembered; the signing key is not read for this
-    assert ctx.autobackup.run("test")["ran"]  # the backup itself reads only the signing key
-    assert chain.reads == before + 2
+    assert ctx.autobackup.run("test")["ran"]  # the signing key is in the same keychain item: no new question
+    assert chain.reads == before + 1
     ctx.close()
 
 
@@ -133,14 +140,15 @@ def test_a_refusal_waits_for_try_again(tmp_path, chain):
         assert not ctx.ledger.meta("backup_last_error")  # waiting is not a failed backup
         assert chain.reads == reads
 
-        # Try again, and this time the person allows it: both questions come now, then never again.
+        # Try again, and this time the person allows it: one question now (password and key are
+        # in one keychain item), then never again.
         chain.refuse = False
         assert cl.post("/api/keychain/retry").json() == {"keychain_denied": False}
-        assert chain.reads == reads + 2
+        assert chain.reads == reads + 1
         st = cl.get("/api/status").json()
         assert not st["keychain_denied"] and st["backup"]["state"] != "keychain-denied" and st["backup"]["configured"]
         assert cl.post("/api/entries", data={"project_id": pid, "node_type": "idea", "title": "first"}).status_code == 200
-        assert chain.reads == reads + 2
+        assert chain.reads == reads + 1
     ctx.close()
 
 
@@ -163,4 +171,55 @@ def test_the_refusal_message_is_translated(tmp_path, chain):
         cl.headers["X-RPROV-Lang"] = "zh"
         r = cl.post("/api/entries", data={"project_id": pid, "node_type": "idea", "title": "first"})
         assert r.status_code == 403 and "始终允许" in r.json()["detail"]
+    ctx.close()
+
+
+def test_items_of_older_versions_move_into_one(tmp_path, chain):
+    """Up to 0.3.1 every key and secret had a keychain item of its own, so each upgrade asked once
+    per item. They move into the app's one item the first time each is needed; after that a new
+    version asks once."""
+    _set_up(tmp_path)
+    bundle = json.loads(chain.items.pop(("rprov", "secrets")))
+    for inst, key in bundle["keys"].items():
+        chain.items[("rprov-signing-key", inst)] = key
+    for name, value in bundle["secrets"].items():
+        chain.items[("rprov-secret", name)] = value
+    old_items = dict(chain.items)
+
+    ctx = make_ctx(tmp_path, keystore=KeyringKeyStore())
+    with _client(ctx) as cl:
+        assert cl.get("/api/status").json()["backup"]["configured"]
+    assert ctx.autobackup.run("test")["ran"]
+    ctx.close()
+    moved = json.loads(chain.items[("rprov", "secrets")])
+    assert moved == bundle  # the same key and password, now in one item
+    assert all(chain.items[k] == v for k, v in old_items.items())  # the old items are left alone
+
+    KeyringKeyStore.forget()  # the next version
+    before = chain.reads
+    ctx = make_ctx(tmp_path, keystore=KeyringKeyStore())
+    with _client(ctx) as cl:
+        assert cl.get("/api/status").json()["backup"]["configured"]
+    assert ctx.autobackup.run("test")["ran"]
+    assert chain.reads == before + 1
+    ctx.close()
+
+
+def test_an_unreadable_item_is_never_overwritten(chain):
+    chain.items[("rprov", "secrets")] = "not json"
+    store = KeyringKeyStore()
+    with pytest.raises(KeyStoreError):
+        store.save_secret("x", "y")
+    assert chain.items[("rprov", "secrets")] == "not json"
+
+
+def test_elsewhere_every_secret_keeps_its_own_item(tmp_path, chain, monkeypatch):
+    """Windows Credential Manager asks nothing and limits the size of an item."""
+    monkeypatch.setattr(KeyringKeyStore, "one_item", False)
+    _set_up(tmp_path)
+    assert ("rprov", "secrets") not in chain.items
+    assert {service for service, _ in chain.items} == {"rprov-signing-key", "rprov-secret"}
+    ctx = make_ctx(tmp_path, keystore=KeyringKeyStore())
+    with _client(ctx) as cl:
+        assert cl.get("/api/status").json()["backup"]["configured"]
     ctx.close()

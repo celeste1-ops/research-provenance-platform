@@ -215,6 +215,7 @@ export const ZH: Record<string, string> = {
   "The {keychain} refused access, so the app has stopped asking; saving steps and automatic backups wait until you try again. Click Try again, and when the system asks, choose “Always Allow”.":
     "{keychain}拒绝了访问，程序已经停止反复询问；在你重试之前，保存步骤和自动备份会先等着。点「重试」，系统询问时选「始终允许」。",
   "Try again": "重试",
+  "Drop the files to add them to a new step": "松开鼠标，把这些文件放进新的一步",
   "Backup waits for the {keychain}": "备份在等{keychain}授权",
   "The {keychain} refused access to the backup password, so automatic backups wait. Close this window and click Try again at the top of the page; when the system asks, choose “Always Allow”.":
     "{keychain}拒绝读取备份密码，自动备份先等着。关掉这个窗口，点页面顶部的「重试」；系统询问时选「始终允许」。",

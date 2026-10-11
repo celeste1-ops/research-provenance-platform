@@ -1,6 +1,6 @@
 [project]
 name = "rprov"
-version = "0.3.1"
+version = "0.3.2"
 description = "Local research-evolution evidence tool: append-only signed records with third-party timestamps."
 requires-python = ">=3.12,<3.14"
 readme = "README.md"
@@ -32,6 +32,7 @@ dev = [
 # Building the installers (macOS .dmg, Windows setup .exe).
 package = [
     "pyinstaller>=6.10",
+    "dmgbuild>=1.6; sys_platform == 'darwin'",  # the disk image window with its "drag onto Applications" picture
 ]
 
 [build-system]

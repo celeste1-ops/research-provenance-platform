@@ -1,8 +1,13 @@
-## What's in this version (v0.3.1)
+## What's in this version (v0.3.2)
+
+**Fixed in v0.3.2**
+- **One keychain question per upgrade.** Everything the app keeps in the keychain is now in a single item, so a new version asks once — click **Always Allow**. (This first time, 0.3.2 asks once for each item older versions made, usually two or three, while it moves them into the single item.)
+- **Opening the app again shows its page.** If you closed the browser window, double-click Research History in Applications or Launchpad and the page opens again.
+- **Drag files in.** Drag files from the Finder or Explorer anywhere onto the "Add a step" form; dropped onto the main page, they open a new step with them attached.
+- **The disk image says what to do.** The window that opens with the `.dmg` shows an arrow and a short note: drag Research History onto Applications, then open it from there.
 
 **Fixed in v0.3.1**
-- After an upgrade, the keychain question no longer comes back every few seconds. The app reads the backup password once, and the signing key once, so macOS asks at most twice — click **Always Allow** each time.
-- If you click Deny, the app stops asking: the top of the page says the keychain refused access, saving steps and backups wait, and **Try again** asks once more when you're ready. The page no longer shows an internal error.
+- After an upgrade, the keychain question no longer comes back every few seconds; after Deny the app stops asking and offers **Try again** at the top of the page.
 
 **Also in this version**, from v0.3.0 (the first public installers):
 
@@ -22,7 +27,7 @@
 
 ## How to install
 
-**Mac:** click the `.dmg` file below; it goes to your Downloads folder. Double-click it: a window opens with **Research History** and **Applications**. Drag Research History onto Applications (choose Replace when upgrading). Then open Applications and double-click Research History. Your browser opens the app's page, and a blue round icon appears in the menu bar.
+**Mac:** click the `.dmg` file below; it goes to your Downloads folder. Double-click it: a window opens with **Research History**, an arrow and **Applications**. Drag Research History onto Applications (choose Replace when upgrading; quit the running app first with the menu bar icon → Quit). Then open Applications and double-click Research History. Your browser opens the app's page, and a blue round icon appears in the menu bar.
 
 **Windows:** click the `.exe` file below; it goes to your Downloads folder. Double-click it and click through the installer (Next → Install → Finish). Your browser opens the app's page; next time, open it from the Start menu.
 
@@ -45,7 +50,7 @@ macOS and Windows warn about apps from unidentified developers. Make sure you do
 
 - **macOS 14 or earlier:** drag Research History into Applications, Control-click it (or right-click) → **Open**, then **Open** again.
 - **macOS 15 or later:** double-click it once and close the warning, then go to **System Settings → Privacy & Security**, scroll to Security and click **Open Anyway** next to Research History; confirm with **Open Anyway** and your password.
-- On a Mac, the first time a new version runs, macOS asks once or twice whether it may use what the app keeps in the keychain (the backup password, the signing key): click **Always Allow** each time and enter your login password. Because the app is unsigned, this comes back after each upgrade; nothing is lost.
+- On a Mac, the first time a new version runs, macOS asks whether it may use what the app keeps in the keychain: click **Always Allow** and enter your login password. Because the app is unsigned, this comes back after each upgrade; nothing is lost.
 - **Windows:** if "Windows protected your PC" (SmartScreen) appears, click **More info → Run anyway**. On a new Windows 11 with Smart App Control turned on, unsigned apps may be blocked with no way to run them until a signed version is available.
 
 A Chinese guide is in [README.zh.md](https://github.com/celeste1-ops/research-provenance-platform/blob/main/README.zh.md) (中文说明见 README.zh.md).

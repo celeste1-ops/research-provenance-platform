@@ -129,6 +129,37 @@ def menu_language(data_dir: Path) -> str:
     return preferences.language(data_dir) or system_language()
 
 
+def reopened(url: str) -> None:
+    """The app was opened again while it runs: show its page, as the first start did."""
+    log.info("opened again while running: opening the browser")
+    open_browser(url)
+
+
+_reopen_delegate = []  # keeps the delegate alive for as long as the app runs
+
+
+def watch_reopen(url: str) -> None:
+    """macOS: opening the app again while it runs (double-click in Finder or Launchpad) only
+    re-activates the running copy — which has no window, so nothing seemed to happen. Answer
+    that by opening the page. (On Windows a second start already opens it: see main().)"""
+    if sys.platform != "darwin" or _reopen_delegate:
+        return
+    try:
+        import AppKit
+        import Foundation
+    except Exception:  # noqa: BLE001 - no Cocoa here
+        return
+
+    class ReopenDelegate(Foundation.NSObject):
+        def applicationShouldHandleReopen_hasVisibleWindows_(self, _app, _has_windows):
+            reopened(url)
+            return False
+
+    delegate = ReopenDelegate.alloc().init()
+    AppKit.NSApplication.sharedApplication().setDelegate_(delegate)
+    _reopen_delegate.append(delegate)
+
+
 def run_tray(url: str, on_quit, data_dir: Path) -> bool:
     """Show the icon and block until Quit. Returns False if no tray is available here."""
     try:
@@ -166,6 +197,7 @@ def run_tray(url: str, on_quit, data_dir: Path) -> bool:
         # elsewhere (development only) the new labels show after the next restart
 
     preferences.on_change(relabel)
+    watch_reopen(url)
     try:
         icon.run()
     except Exception:  # noqa: BLE001
