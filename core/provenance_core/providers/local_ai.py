@@ -11,7 +11,6 @@ from __future__ import annotations
 
 import ipaddress
 import json
-import socket
 from collections.abc import AsyncIterator
 from urllib.parse import urlsplit
 
@@ -51,7 +50,7 @@ class LocalModel:
         self.model = model
         self.timeout = timeout
         self._transport = transport
-        self._sockets: list[socket.socket] = []  # of the answer being streamed, for hang_up()
+        self._streams: list = []  # connections of the answer being streamed, for hang_up()
 
     def _client(self) -> httpx.Client:
         return httpx.Client(base_url=self.base, timeout=self.timeout, transport=self._transport, trust_env=False,
@@ -99,7 +98,7 @@ class LocalModel:
 
         async def trace(event: str, info: dict) -> None:
             if event == "connection.connect_tcp.complete" and info.get("return_value") is not None:
-                self._sockets.append(info["return_value"].get_extra_info("socket"))
+                self._streams.append(info["return_value"])
 
         try:
             async with httpx.AsyncClient(base_url=self.base, timeout=self.timeout, transport=self._transport,
@@ -125,16 +124,16 @@ class LocalModel:
         except httpx.HTTPError:
             raise LocalAIError("no local model answered at this address (is it running?)") from None
 
-    def hang_up(self) -> bool:
-        """Shut the connection of the answer being streamed, at once: the model stops writing, and
-        whatever waits for its next piece gets the end of the answer instead. (Cancelling that wait
-        is not enough everywhere: on Windows the connection could stay open.) False when there is
-        no connection to shut."""
-        shut = False
-        for sock in self._sockets:
+    async def hang_up(self) -> bool:
+        """Close the connection of the answer being streamed, at once: the model stops writing, and
+        whatever waits for its next piece gets an error instead. (Cancelling that wait is not
+        enough everywhere, and neither is shutting the socket: on Windows the wait can go on and
+        the connection stay open.) False when there is no connection to close."""
+        closed = False
+        for stream in self._streams:
             try:
-                sock.shutdown(socket.SHUT_RDWR)
-                shut = True
-            except OSError:  # already closed
+                await stream.aclose()
+                closed = True
+            except Exception:  # already closed or broken: nothing left to close
                 pass
-        return shut
+        return closed

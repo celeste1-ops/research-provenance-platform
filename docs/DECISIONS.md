@@ -742,8 +742,8 @@ verification rules or what leaves the machine for time proofs.
   4. *It shows up as it is written, and can be stopped.* The server asks the model for a
      streamed answer and passes it on line by line; the page shows the text growing, how long it
      has taken, and "starting the model…" while a model is loaded the first time. Stop (or
-     leaving the story) makes the server shut its connection to the model at once (cancelling the
-     wait alone could leave it open on Windows), so the model stops writing — also while it is
+     leaving the story) makes the server close its connection to the model at once (cancelling the
+     wait, or only shutting the socket, could leave it open on Windows), so the model stops writing — also while it is
      still loading. Opening the panel looks for models at the saved
      address at once, and a button at the top of the story goes to it, so one click on Write is
      enough.
