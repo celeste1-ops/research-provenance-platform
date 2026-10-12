@@ -27,7 +27,9 @@ def test_dropping_files_on_the_page_opens_a_step_with_them(tmp_path, browser):
         srv.ctx.ledger.create_project("FSF")
         page = browser.new_page(viewport={"width": 1400, "height": 900})
         page.goto(srv.url)
-        page.get_by_test_id("backup-pill").wait_for()
+        # The page takes drops once the project's steps have loaded (an empty project here); the
+        # top bar alone can show first (seen in WebKit).
+        page.get_by_test_id("empty-state").wait_for()
 
         page.evaluate(DROP, [".app", ["results.csv", "draft.txt"]])
         form = page.get_by_test_id("record-form")

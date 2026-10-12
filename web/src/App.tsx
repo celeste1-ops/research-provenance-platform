@@ -11,6 +11,7 @@ import { Legend, TechnicalDetails, WhereIsMyData } from "./components/InfoPanels
 import { KeyBackupDialog } from "./components/KeyBackupDialog";
 import { GitDialog } from "./components/GitDialog";
 import { FolderDialog, InboxDialog } from "./components/InboxDialogs";
+import { NewProject } from "./components/NewProject";
 import { QuickNote } from "./components/QuickNote";
 import { RecordForm } from "./components/RecordForm";
 import { ServiceCheckDialog } from "./components/ServiceCheck";
@@ -23,7 +24,7 @@ import { chosenHere, lang, setLang, t, tn, tx, type Lang } from "./i18n";
 import { LangSwitch } from "./components/LangSwitch";
 import { GearIcon, ListIcon, LogoMark, MapIcon, NoteIcon, PlusIcon, ShareIcon, StoryIcon } from "./components/Icons";
 
-type Dialog = null | "form" | "export" | "backup" | "key" | "where" | "tech" | "services" | "practice-reset" | "git"
+type Dialog = null | "form" | "export" | "backup" | "key" | "where" | "tech" | "services" | "practice-reset" | "new-project" | "git"
   | "quick" | "folders" | "inbox";
 const QUICK_NOTE_HASH = "#quick-note"; // the menu bar / tray icon opens the page with it (D-047)
 const SPACE_KEY = "rprov-space";
@@ -297,11 +298,9 @@ export function App() {
   if (!status.initialized)
     return <Setup key={uiLang} onDone={reload} onPractice={() => switchSpace("practice")} onLang={changeLang} />;
 
-  async function newProject() {
-    const title = window.prompt(t("Name of the new research project"));
-    if (!title) return;
-    const p = await api.createProject(title);
-    setProjectId(p.id);
+  function projectCreated(id: string) {
+    setDialog(null);
+    setProjectId(id);  // a new project id reloads the list of projects too
   }
 
   async function checkProofs() {
@@ -387,7 +386,7 @@ export function App() {
         {spaceSwitch}
         <div className="project-picker">
           <select value={projectId} aria-label={t("Project")} data-testid="project-select"
-            onChange={(e) => (e.target.value === NEW_PROJECT ? void newProject() : setProjectId(e.target.value))}>
+            onChange={(e) => (e.target.value === NEW_PROJECT ? setDialog("new-project") : setProjectId(e.target.value))}>
             {projects.length === 0 && <option value="">{t("No project")}</option>}
             {projects.map((p) => (
               <option key={p.id} value={p.id}>
@@ -665,6 +664,7 @@ export function App() {
           onWatch={() => setDialog("folders")}
         />
       )}
+      {dialog === "new-project" && <NewProject onClose={() => setDialog(null)} onCreated={projectCreated} />}
       {dialog === "quick" && projectId && (
         <QuickNote projects={projects} projectId={projectId} onClose={() => setDialog(null)} onSaved={afterSaved} />
       )}

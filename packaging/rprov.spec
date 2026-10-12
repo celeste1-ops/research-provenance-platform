@@ -6,7 +6,7 @@ import sys
 import tomllib
 from pathlib import Path
 
-from PyInstaller.utils.hooks import collect_submodules, copy_metadata
+from PyInstaller.utils.hooks import collect_data_files, collect_submodules, copy_metadata
 
 ROOT = Path(SPECPATH).parent
 BUILD = ROOT / "build"
@@ -30,17 +30,23 @@ datas = [
 ]
 assert not any("key" in Path(src).name for src, _ in datas), "a private key must never be packaged"
 datas += copy_metadata("keyring")  # keyring finds its backends through package metadata
+# The app's window (D-058): the scripts pywebview puts into the page (its PyInstaller hook only
+# collects the WebView2 libraries, on Windows).
+datas += collect_data_files("webview", subdir="js")
 
 hiddenimports = collect_submodules("uvicorn") + collect_submodules("keyring.backends")
-hiddenimports += ["pystray._win32"] if sys.platform == "win32" else []
-hiddenimports += ["pystray._darwin"] if sys.platform == "darwin" else []
+hiddenimports += ["pystray._win32", "webview.platforms.winforms", "webview.platforms.edgechromium",
+                  "webview.platforms.mshtml"] if sys.platform == "win32" else []
+hiddenimports += ["pystray._darwin", "webview.platforms.cocoa"] if sys.platform == "darwin" else []
 
 a = Analysis(
     [str(ROOT / "packaging" / "launcher.py")],
     pathex=[str(ROOT), str(ROOT / "core")],
     datas=datas,
     hiddenimports=hiddenimports,
-    excludes=["tkinter", "pytest", "_pytest", "playwright"],
+    # pywebview's other toolkits (Qt, GTK, CEF, Android) are not used on macOS or Windows.
+    excludes=["tkinter", "pytest", "_pytest", "playwright", "webview.platforms.qt", "webview.platforms.gtk",
+              "webview.platforms.cef", "webview.platforms.android", "qtpy", "gi"],
     noarchive=False,
 )
 pyz = PYZ(a.pure)
@@ -75,7 +81,8 @@ if sys.platform == "darwin":
             "CFBundleDisplayName": APP_NAME,
             "CFBundleShortVersionString": VERSION,
             "CFBundleVersion": VERSION,
-            "LSUIElement": True,  # lives in the menu bar, no Dock icon
+            # Starts as a menu bar app; the window brings a Dock icon while it is open (D-058).
+            "LSUIElement": True,
             "NSHighResolutionCapable": True,
             "LSMinimumSystemVersion": "11.0",
         },

@@ -52,9 +52,30 @@ try {
   Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue
 }
 
+# The app's own window (D-058), as you would use it: the page is drawn in the window (WebView2),
+# closing the window hides it while the app keeps running, a second start shows it again, Quit
+# ends the app.
+$wdata = Join-Path (Split-Path $data -Parent) "rprov-window"
+Remove-Item -Recurse -Force $wdata -ErrorAction SilentlyContinue
+$env:RPROV_HOME = $wdata
+$wlog = Join-Path $wdata "logs\app.log"
+$window = Start-Process $exe -ArgumentList "--check-window", "--port", "8798" -PassThru
+$null = $window.Handle  # keeps the exit code readable after the process ends
+if (-not $window.WaitForExit(180000)) {
+  Stop-Process -Id $window.Id -Force -ErrorAction SilentlyContinue
+  Get-Content $wlog -ErrorAction SilentlyContinue
+  throw "window check did not finish"
+}
+if ($window.ExitCode -ne 0 -or -not (Select-String -Path $wlog -Pattern "window check passed" -Quiet)) {
+  Get-Content $wlog -ErrorAction SilentlyContinue
+  throw "window check failed (exit code $($window.ExitCode))"
+}
+Select-String -Path $wlog -Pattern "window check"
+$env:RPROV_HOME = $data
+
 Start-Sleep -Seconds 2
 Start-Process (Join-Path $appDir "unins000.exe") -ArgumentList "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART" -Wait
 Start-Sleep -Seconds 2
 if (Test-Path $exe) { throw "uninstall left the program behind" }
 if (-not (Test-Path (Join-Path $data "rprov.sqlite3"))) { throw "uninstall touched the data folder" }
-Write-Host "Smoke test passed: installed, ran, saved a step, exported, verified, uninstalled; data kept."
+Write-Host "Smoke test passed: installed, ran, saved a step, exported, verified, opened the window, uninstalled; data kept."

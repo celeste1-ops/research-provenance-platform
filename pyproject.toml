@@ -1,6 +1,6 @@
 [project]
 name = "rprov"
-version = "0.3.4"
+version = "0.4.0"
 description = "Local research-evolution evidence tool: append-only signed records with third-party timestamps."
 requires-python = ">=3.12,<3.14"
 readme = "README.md"
@@ -19,8 +19,9 @@ dependencies = [
 
 [project.optional-dependencies]
 ots = ["opentimestamps>=0.4.5,<0.5"]
-# The double-click desktop app: menu-bar / system-tray icon (D-044).
-desktop = ["pystray>=0.19", "pillow>=10"]
+# The double-click desktop app: menu-bar / system-tray icon (D-044) and its own window, drawn by
+# the system's web engine: WKWebView on macOS, WebView2 on Windows (D-058).
+desktop = ["pystray>=0.19", "pillow>=10", "pywebview>=6.2,<7"]
 
 [dependency-groups]
 dev = [

@@ -59,17 +59,24 @@ The installers are on this repository's **Releases** page: on the repository's f
 2. Double-click the `.dmg` file. A window opens with **Research History** and an **Applications** folder side by side, and an arrow and a short note between them saying what to do.
 3. Drag **Research History** onto **Applications**. When upgrading, choose **Replace**. You can then close the window, eject "Research History" in the Finder sidebar and delete the `.dmg`.
 4. Open **Applications** (Finder → Applications, or Launchpad) and double-click **Research History**. The first time, macOS will warn you: allow it as described in the next section.
-5. Your browser opens the app's page, and a blue round icon appears in the menu bar at the top right. That browser page *is* the app: there is no other window.
+5. The app's window opens, and a blue round icon appears in the menu bar at the top right.
 
 **On Windows, step by step:**
 
 1. Click `ResearchHistory-<version>-windows-x64-setup.exe`; it goes to your **Downloads** folder.
 2. Double-click it (if Windows warns you, see the next section), then click through the installer (Next → Install → Finish).
-3. "Launch Research History" is ticked at the end, so your browser opens the app's page; next time, open it from the Start menu. Its icon sits in the notification area at the bottom right (sometimes hidden under the **^**).
+3. "Launch Research History" is ticked at the end, so the app's window opens; next time, open it from the Start menu. Its icon sits in the notification area at the bottom right (sometimes hidden under the **^**).
 
-The **中文 / English** button at the top right of the page switches the whole app between Chinese and English.
+The **中文 / English** button at the top right of the window switches the whole app between Chinese and English.
 
-**Using it:** after you open it, the app starts in the background and opens http://127.0.0.1:8765 in your browser (if 8765 is taken, the next free port). A blue round icon appears in the Mac menu bar or the Windows notification area: click it to open the page again, or **Quit**. Closing the browser window does not quit the app; to get the page back, open the app again (double-click it in Applications, Launchpad or the Start menu) or click the icon → **Open Research History**. The app never runs twice at once (the installed app and `make run` won't share one data folder either). The log is `logs/app.log` in the data folder.
+**Using it:** the app opens in a window of its own. The window shows the page the app serves at http://127.0.0.1:8765 (if 8765 is taken, the next free port), drawn by the web engine your system already has: Safari's (WKWebView) on a Mac, Edge's (WebView2) on Windows. A blue round icon appears in the Mac menu bar or the Windows notification area.
+
+- **Closing the window does not quit the app**: date stamps, backups, watched folders and git recording keep running, and the icon stays (the first time, it says so). To get the window back, click the icon → **Open Research History**, open the app again (Applications, Launchpad or the Start menu), or on a Mac click its Dock icon.
+- **To quit**, click the icon → **Quit** (on a Mac also ⌘Q while the window is in front).
+- Click the icon → **Open in browser** to use the same page in your browser. On a Windows computer without Microsoft Edge WebView2 Runtime (Windows 11 has it; Windows 10 gets it with Edge), the app opens in the browser, as all versions before 0.4.0 did.
+- In the window, downloads (evidence bundles, attachments, key backups) ask where to save, links to the web (DOI, GitHub) open in your browser, and printing uses the system's print dialog, which can also save a PDF.
+
+The app never runs twice at once: opening it again shows the window of the copy already running (the installed app and `make run` won't share one data folder either). The log is `logs/app.log` in the data folder.
 
 **Where your data is:** `~/.rprov` on a Mac, `%USERPROFILE%\.rprov` on Windows (the same place as when running from source, so you can switch between the two). To **upgrade**, install the new version over the old one; **uninstalling** (Mac: drag the app to the Trash; Windows: Settings → Apps → Research History → Uninstall) never deletes your data.
 
@@ -146,7 +153,7 @@ All data is in `~/.rprov/` (permissions 0700). Texts, attachments, titles and no
 
 ## Chinese / English
 
-The top right of the app (on the welcome page the first time) has a **中文 / English** button: one click switches the whole interface to the other language. The first time, the app follows the browser's language. The choice is remembered, and the menu bar / tray menu follows it.
+The top right of the app (on the welcome page the first time) has a **中文 / English** button: one click switches the whole interface to the other language. The first time, the app follows the system's language. The choice is remembered, and the menu bar / tray menu (and on a Mac the window's menus, from the next start) follow it.
 
 - **Only the app's own words are translated.** Your titles, texts, notes and reasons are shown exactly as you wrote them, never translated.
 - **Reports can be in either language.** Exporting has a "Report language" setting, the interface's language by default; `report.html` and `VERIFY.md` both have a Chinese version. The output and failure codes of `verify.py` are always English (it is the same checker for every reader).
@@ -281,6 +288,7 @@ Code layout: `core/provenance_core/` is the only library with trust logic (JCS, 
 - **P0 done**: append-only records, signing, replay; third-party timestamps (RFC 3161); evidence bundle export, `report.html` (with a static evolution map), `verify.py`, tamper tests; the record form and evolution map.
 - **P1 done**: Bitcoin anchors (OpenTimestamps) and block-explorer checks; the key-steps-only view; the timeline view; the full detail panel (Verified record / Author statement / Later additions / Changes, with adding relations, key steps, notes and retractions from the panel); backup and restore; the FSF sample data.
 - **Round 4 (installers)**: macOS (Apple silicon) and Windows 10/11 installers, a menu bar / notification area icon, a single running copy; Windows backup-location suggestions, and the full test suite (browser tests included) on GitHub Actions; DigiCert as a fallback for date stamps; Settings → Check stamp services checks whether each time-proof service can be reached (DECISIONS D-043 – D-045).
+- **v0.4.0**: the app opens in a window of its own, drawn by the system's web engine (WKWebView on macOS, WebView2 on Windows); closing the window keeps the app running by its icon, opening it again or the Dock icon shows the window, Quit stops it; downloads ask where to save, web links open in the browser, pictures open larger in the window; without an engine the browser is used as before (DECISIONS D-058).
 - **v0.3.4**: step cards and map boxes show what each step says — the first lines of its text, its files, its code commit or DOI — without opening it (DECISIONS D-056); pictures and text files are shown in place, DOIs and repositories open on the web, earlier dates the author gave appear as "not verified", pointing at a step on the map shows its content, and the shared report does the same on hover and says plainly what was not shared (D-057).
 - **v0.3.3**: the page no longer stays empty on Windows computers whose registry calls `.js` files plain text; a page that cannot start says what to do (DECISIONS D-055).
 - **v0.3.2**: one keychain item, so a new version asks once; opening the app again while it runs shows its page; files can be dragged onto the page and the form; a clearer two-row layout (D-053); Steps as plain-language cards first, a map with row names and a legend, and an AI summary in short sections that appears as it is written and can be stopped (D-054); the disk image window says to drag the app onto Applications (DECISIONS D-052).

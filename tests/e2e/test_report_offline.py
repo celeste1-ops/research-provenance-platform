@@ -15,7 +15,9 @@ pytestmark = pytest.mark.e2e
 def test_report_offline_no_requests(tmp_path, browser):
     s = make_sample(tmp_path)
     report = s.bundle_dir / "report.html"
-    context = browser.new_context(offline=True)
+    # WebKit's offline mode also refuses file:// pages; the list of requests below shows the
+    # report asks for nothing either way.
+    context = browser.new_context(offline=browser.browser_type.name != "webkit")
     page = context.new_page()
     requests = []
     page.on("request", lambda req: requests.append(req.url))

@@ -796,3 +796,58 @@ verification rules or what leaves the machine for time proofs.
   6. *No excerpt level for sharing.* A piece of a text cannot be checked against the step's
      fingerprint, so a reader would have to take it on trust; a step is shared whole (checkable)
      or not at all. In the app, where the whole is one click away, excerpts are fine.
+
+- **D-058 · The app has its own window.** Asked for: Research History should look like an
+  ordinary program with a window of its own instead of a browser tab, with the server, the
+  core library and verify.py unchanged.
+  1. *The system's web engine, through pywebview.* The window shows the same page as before,
+     `http://127.0.0.1:<port>/`, drawn by WKWebView on macOS and Microsoft Edge WebView2 on
+     Windows, through pywebview in the same Python process (`app/window.py`). No browser engine
+     is shipped: the installers grow by about 1 MB (macOS) and 1–2 MB (Windows). Tauri was
+     weighed and not taken: a second language (Rust), the Python server as a separate process,
+     and the icon, single instance and packaging all rewritten, for no smaller installer. The
+     server, its address checks and session token, the core and verify.py do not change; the
+     window is pointed at the address the server already serves, so there is still no network
+     code outside the providers.
+  2. *Where there is no engine, the browser.* Windows without the WebView2 runtime (pywebview
+     would fall back to Internet Explorer's engine, which cannot run the page), a computer where
+     pywebview fails to load, Linux during development, and `--browser` all open the browser as
+     before. A window whose page has not loaded after 45 s opens the browser as well.
+  3. *Closing hides, Quit quits.* The window's close button hides it; the server and the
+     background jobs (stamps, backups, watched folders, git) keep running and the menu bar /
+     tray icon stays. The first close says so by the icon, once (`<data>/window.json` remembers
+     that and the window's size). "Open", "Quick note…" (which opens the quick note box in the
+     window), a second start and, on macOS, the Dock icon all show the one window; the icon's
+     menu also has "Open in browser". "Quit" in that menu, ⌘Q, signing out and shutting down
+     quit for real: on macOS the app delegate (a subclass of pywebview's) answers "later",
+     stops the server, then lets the app end; on Windows the form's own closing handler tells a
+     close by you (hide) from Windows shutting down, signing out or an installer updating the
+     app (quit), which pywebview's own "closing" event cannot. On macOS the app has a Dock icon
+     and its menus while the window is open and is a menu bar app while it is hidden.
+  4. *A second start.* It leaves `app.show` in the data folder; the running copy looks for it
+     four times a second, removes it and shows its window. A file rather than a socket: nothing
+     else can connect to it, and no network code. A copy that does not answer within 3 s
+     (`make run`, or an older version still running) gets the browser at its address, as before.
+  5. *What a window needs that a browser has.* Downloads ask where to save (pywebview's
+     default refuses them): evidence bundles, key backups and Markdown, and attachments, which
+     now carry the `download` attribute so that WKWebView saves them instead of showing a PDF
+     or picture in place of the app, with no way back. Files the page makes keep their address
+     for a minute, as the save dialog may still be open. Links that open a new window (DOI,
+     repository, web addresses) open in the browser. A picture opens larger inside the window.
+     A new project is named in a dialog of the app's own instead of the browser's prompt box.
+     The app runs its few scripts in the window (opening the quick note box) with pywebview's
+     `run_js`, not `evaluate_js`: that one wraps them in `eval()`, which the page's own
+     Content-Security-Policy forbids, and WKWebView holds such scripts to it (WebView2 does not),
+     so the policy stays as strict as before.
+     Text can be selected and copied (pywebview's default stops that); on macOS the Edit menu
+     gives ⌘C/⌘V/⌘A, in Chinese or English; on Windows the right-click menu and the usual keys
+     (Ctrl+P, Ctrl+F) are turned back on. The page's own settings (view, tips) are kept between
+     starts: macOS keeps them in the app's WebKit folder, Windows in
+     `%LOCALAPPDATA%\Research History\WebView2`, which the uninstaller removes. Printing (the
+     recovery code, the story) uses the system's print dialog, which can also save a PDF.
+  6. *Tested.* Unit tests drive the window logic through a stand-in for pywebview. The
+     browser tests also run in WebKit (CI job "webkit"), the engine of the macOS window. The
+     packaging smoke tests on macOS and Windows start the installed app with `--check-window`:
+     the page must be drawn in the real window (not only the start-up note), closing the window
+     must hide it while the server keeps running, a second start must show it again, and Quit
+     must end the app with exit code 0.
