@@ -35,6 +35,10 @@ curl -fsS "${H[@]}" -H 'Content-Type: application/json' -d '{"title":"Smoke","de
   -o "$DATA/bundle.zip" "$BASE/api/export"
 mkdir -p "$DATA/bundle" && (cd "$DATA/bundle" && unzip -q ../bundle.zip)
 uv run python "$DATA/bundle/verify.py" "$DATA/bundle" --offline   # needs cryptography + rfc3161-client
+
+# The sample research is in the app (D-059): practice fills with it, in Chinese here.
+curl -fsS "${H[@]}" -H 'Content-Type: application/json' -d '{"sample":true,"lang":"zh"}' "$BASE/api/practice/reset" >/dev/null
+curl -fsS -H 'X-RPROV-Space: practice' "$BASE/api/status" | grep -q '"entry_count":32' || { echo "sample research missing"; exit 1; }
 kill $PID 2>/dev/null || true
 wait $PID 2>/dev/null || true
 

@@ -16,6 +16,7 @@ import { QuickNote } from "./components/QuickNote";
 import { RecordForm } from "./components/RecordForm";
 import { ServiceCheckDialog } from "./components/ServiceCheck";
 import { Setup } from "./components/Setup";
+import { SampleTour, type TourAction } from "./components/SampleTour";
 import { Steps } from "./components/Steps";
 import { Story } from "./components/Story";
 import { help, homeNote } from "./labels";
@@ -159,7 +160,7 @@ export function App() {
     return () => document.removeEventListener("mousedown", close);
   }, [menuOpen]);
 
-  function switchSpace(next: Space) {
+  function switchSpace(next: Space, clearNotice = true) {
     if (next === space) return;
     setSpace(next);
     try {
@@ -176,11 +177,12 @@ export function App() {
     setProjectId("");
     setStatus(null);
     setSpaceState(next);
-    setNotice(
-      next === "real"
-        ? { text: t("You are now in My research. Steps you save here are permanent — they can't be changed or deleted.") }
-        : null,
-    );
+    setMilestonesOnly(false);
+    if (next === "real") {
+      setNotice({ text: t("You are now in My research. Steps you save here are permanent — they can't be changed or deleted.") });
+    } else if (clearNotice) {
+      setNotice(null);
+    }
   }
 
   async function resetPractice(sample: boolean) {
@@ -189,14 +191,54 @@ export function App() {
     setSelected(null);
     setNotice({ text: sample ? t("Filling practice with the sample research…") : t("Starting practice over…") });
     try {
-      await api.practiceReset(sample);
+      await api.practiceReset(sample, lang());
+      setNotice({ text: sample ? t("Practice now holds the fictional sample research. Look around freely.") : t("Practice is empty again.") });
+      if (space !== "practice") {
+        switchSpace("practice", false);  // from the first screen or the real record
+        return;
+      }
       setProjectId("");
       setGraph(null);
-      setNotice({ text: sample ? t("Practice now holds the fictional sample research. Look around freely.") : t("Practice is empty again.") });
+      setMilestonesOnly(false);
       await reload();
     } catch (e) {
       setNotice({ text: (e as Error).message, kind: "error" });
     }
+  }
+
+  // A stop of the sample tour (D-059): open the part of the app it is about.
+  function tourStop(action: TourAction) {
+    setDialog(null);
+    if ("export" in action) {
+      setDialog("export");
+      return;
+    }
+    const main = status?.sample?.projects.main;
+    if ("project" in action) {
+      setSelected(null);
+      setMilestonesOnly(false);
+      setView("steps");
+      setProjectId(action.project);
+      return;
+    }
+    if (main && projectId !== main) setProjectId(main);
+    if ("keyOnly" in action) {
+      setSelected(null);
+      setView("steps");
+      setStepsTable(false);
+      setMilestonesOnly(true);
+      return;
+    }
+    setMilestonesOnly(false);
+    if ("view" in action) {
+      setSelected(null);
+      setView(action.view);
+      if (action.view === "steps") setStepsTable(false);
+      return;
+    }
+    setView("steps");
+    setStepsTable(false);
+    setSelected(action.select);
   }
 
   // The keychain refused access, so the app stopped asking (a refusal is never retried on its own).
@@ -296,7 +338,8 @@ export function App() {
 
   if (!status) return <div className="loading">{t("Loading…")}</div>;
   if (!status.initialized)
-    return <Setup key={uiLang} onDone={reload} onPractice={() => switchSpace("practice")} onLang={changeLang} />;
+    return <Setup key={uiLang} onDone={reload} onPractice={() => switchSpace("practice")}
+      onSample={() => void resetPractice(true)} onLang={changeLang} />;
 
   function projectCreated(id: string) {
     setDialog(null);
@@ -546,6 +589,7 @@ export function App() {
           </button>
         </div>
       )}
+      {space === "practice" && status.sample && <SampleTour key={status.installation ?? ""} sample={status.sample} onAction={tourStop} />}
       <main className={`main ${selected ? "with-detail" : ""}`}>
         <section className="canvas">
           {!empty && !tipsHidden && (

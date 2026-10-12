@@ -1,4 +1,8 @@
-## What's in this version (v0.4.0)
+## What's in this version (v0.4.1)
+
+**New in v0.4.1**
+- **A finished example comes with the app.** The first screen now offers "See a finished example first": a fictional research project, FSF, with 32 steps in two projects that use everything the app does — a hypothesis revised after an experiment, a side idea withdrawn, code recorded from git, pictures, data and drafts shown in place, older material, later corrections, key steps and the story. It opens in the practice space (in Chinese or English, as the app is set), so nothing goes into your real record.
+- **A short tour.** A bar above the sample has twelve stops; each one opens the part of the app it is about and says in one sentence what it shows. Fold it away when you are done.
 
 **New in v0.4.0**
 - **Its own window.** Research History now opens in a window of its own, like any other program, instead of a browser tab. It uses the web engine your system already has (Safari's on a Mac, Edge's on Windows), so the download is only about 1–2 MB larger.

@@ -229,8 +229,8 @@ export const api = {
   },
   exportBundle: (body: { title: string; records: Record<string, string>; default: string; language?: string }) =>
     request<Blob>("POST", "/api/export", body),
-  practiceReset: (sample: boolean) =>
-    request<{ space: string; record_count: number }>("POST", "/api/practice/reset", { sample }),
+  practiceReset: (sample: boolean, lang?: string) =>
+    request<{ space: string; record_count: number }>("POST", "/api/practice/reset", { sample, lang }),
 };
 
 export async function downloadRequest(path: string, body: unknown) {

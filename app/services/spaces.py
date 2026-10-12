@@ -35,6 +35,7 @@ PRACTICE = "practice"
 SPACE_HEADER = "x-rprov-space"
 PRACTICE_DIR_NAME = "practice"
 PRACTICE_PROJECT = "Practice project"
+SAMPLE_FILE = "sample.json"  # in the practice folder when it holds the FSF sample (D-059)
 
 
 class PracticeResetError(RuntimeError):
@@ -101,8 +102,17 @@ class Spaces:
                 label = json.loads(rows[0].payload_bytes).get("author_label")
         return f"{label} (practice)" if label else "Practice"
 
-    def reset_practice(self, *, with_sample: bool = False) -> AppContext:
-        """Throw the practice space away and start a fresh one (optionally with the sample)."""
+    def sample_info(self) -> dict | None:
+        """What the practice space remembers about the FSF sample in it (D-059), or None."""
+        try:
+            data = json.loads((self.practice_dir / SAMPLE_FILE).read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            return None
+        return data if isinstance(data, dict) else None
+
+    def reset_practice(self, *, with_sample: bool = False, lang: str = "en") -> AppContext:
+        """Throw the practice space away and start a fresh one (optionally with the sample, in
+        the interface's language)."""
         with self._lock:
             with WRITE_LOCK:  # no write is half-way through while the folder goes
                 old = self._practice
@@ -118,10 +128,11 @@ class Spaces:
             log.info("practice space started over")
             if not with_sample:
                 return self.practice()
-            from app.demo import load_demo
+            from app.demo import load_sample
 
             ctx = self.practice(auto_init=False)
-            load_demo(ctx)
+            info = load_sample(ctx, lang)
+            (self.practice_dir / SAMPLE_FILE).write_text(json.dumps(info, indent=1), encoding="utf-8")
             return ctx
 
     def anchor_services(self) -> list:

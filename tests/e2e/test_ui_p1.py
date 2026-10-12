@@ -570,9 +570,10 @@ def test_practice_space(tmp_path, browser):
         page.get_by_test_id("empty-state").wait_for()
         wait_for_step_count(page, "0 steps")
 
-        page.get_by_test_id("practice-sample").click()
-        page.get_by_test_id("steps").locator(".step-card").nth(13).wait_for()
-        wait_for_step_count(page, "14 steps")
+        page.get_by_test_id("practice-sample").click()  # the FSF sample research (D-059), main project
+        page.get_by_test_id("steps").locator(".step-card").nth(28).wait_for()
+        wait_for_step_count(page, "29 steps")
+        page.get_by_test_id("sample-tour").wait_for()
         assert srv.ctx.ledger.record_count() == real_count
 
         # Back to the real record: a reminder that saving there is permanent.
@@ -606,10 +607,10 @@ def test_practice_sample_survives_a_late_answer(tmp_path, browser):
         assert old
         page.evaluate("id => { window.__slowProject = id; }", old)
         page.get_by_test_id("practice-sample").click()
-        page.get_by_test_id("steps").locator(".step-card").nth(13).wait_for()
+        page.get_by_test_id("steps").locator(".step-card").nth(28).wait_for()
         page.wait_for_timeout(2500)  # the late answer for the replaced project has arrived by now
-        assert page.get_by_test_id("steps").locator(".step-card").count() == 14
-        wait_for_step_count(page, "14 steps")
+        assert page.get_by_test_id("steps").locator(".step-card").count() == 29
+        wait_for_step_count(page, "29 steps")
         page.close()
 
 

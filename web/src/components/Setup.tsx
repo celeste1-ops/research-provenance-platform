@@ -9,9 +9,10 @@ import { LangSwitch } from "./LangSwitch";
 const bold = { b: (s: string) => <b>{s}</b> };
 
 // First run: (1) your name + first project, (2) automatic backup. Or restore instead.
-export function Setup({ onDone, onPractice, onLang }: {
+export function Setup({ onDone, onPractice, onSample, onLang }: {
   onDone: () => void;
   onPractice: () => void;
+  onSample: () => void;
   onLang: (l: Lang) => void;
 }) {
   const [step, setStep] = useState<"welcome" | "backup" | "restore">("welcome");
@@ -57,6 +58,17 @@ export function Setup({ onDone, onPractice, onLang }: {
               </li>
               <li data-testid="home-note-setup">{homeNote()}</li>
             </ul>
+            <div className="sample-offer" data-testid="sample-offer">
+              <div>
+                <b>{t("See a finished example first")}</b>
+                <p className="small muted">
+                  {t("A fictional research project, FSF: 32 steps in two projects, using everything the app does, with a short tour. It opens in the practice space, so nothing goes into your real record.")}
+                </p>
+              </div>
+              <button type="button" className="secondary" onClick={onSample} data-testid="setup-sample">
+                {t("Open the example")}
+              </button>
+            </div>
             <form onSubmit={start}>
               <label>
                 {t("Your name (or pen name)")}
