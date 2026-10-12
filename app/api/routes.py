@@ -96,6 +96,8 @@ def status(request: Request):
         "keychain_denied": c.keystore.denied or real(request).keystore.denied,
         "data_dir_warning": _data_dir_warning(real(request)),
         "practice_dir": str(request.app.state.spaces.practice_dir),
+        # The practice space holds the FSF sample: its language and the ids of its steps (D-059).
+        "sample": request.app.state.spaces.sample_info() if space_name(request) == PRACTICE else None,
     }
 
 
@@ -123,7 +125,8 @@ def _data_dir_warning(c: AppContext) -> str | None:
 
 
 class PracticeResetIn(BaseModel):
-    sample: bool = False  # fill the fresh practice space with the fictional FSF sample
+    sample: bool = False  # fill the fresh practice space with the fictional FSF sample (D-059)
+    lang: str = "en"  # the sample's language: the interface's
 
 
 @router.post("/practice/reset")
@@ -133,7 +136,7 @@ def practice_reset(body: PracticeResetIn, request: Request):
 
     spaces = request.app.state.spaces
     try:
-        c = spaces.reset_practice(with_sample=body.sample)
+        c = spaces.reset_practice(with_sample=body.sample, lang=body.lang)
     except PracticeResetError as exc:
         raise HTTPException(409, str(exc)) from None
     return {"space": PRACTICE, "record_count": c.ledger.record_count()}

@@ -21,6 +21,7 @@ datas = [
     (str(ROOT / "web" / "dist"), "web/dist"),
     (str(ROOT / "app" / "report" / "templates"), "app/report/templates"),
     (str(ROOT / "fixtures" / "fsf_demo"), "fixtures/fsf_demo"),
+    (str(ROOT / "fixtures" / "fsf_sample"), "fixtures/fsf_sample"),  # the sample research in practice (D-059)
     (str(ROOT / "core" / "provenance_core" / "certs"), "provenance_core/certs"),
     (str(BUILD / "prebuilt" / "verify.py"), "prebuilt"),
     # Export compares each timestamp's issuer with the test TSA to label test bundles; only its

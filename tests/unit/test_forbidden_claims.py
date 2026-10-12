@@ -20,7 +20,10 @@ def _scanned_files() -> list[Path]:
     files += sorted((ROOT / "app" / "report").rglob("*"))
     files += [ROOT / "web" / "index.html", ROOT / "app" / "services" / "views.py",
               ROOT / "core" / "provenance_core" / "verify_cli.py"]
-    return [f for f in files if f.is_file() and f.suffix in {".md", ".ts", ".tsx", ".html", ".j2", ".py", ".css"}]
+    files += sorted((ROOT / "fixtures" / "fsf_sample").rglob("*"))  # the sample research people see (D-059)
+    files += [ROOT / "tools" / "make_fsf_sample.py"]
+    return [f for f in files if f.is_file() and f.suffix in {".md", ".ts", ".tsx", ".html", ".j2", ".py", ".css",
+                                                              ".json", ".txt", ".bib", ".tex", ".log", ".csv"}]
 
 
 def _hits(text: str) -> list[str]:

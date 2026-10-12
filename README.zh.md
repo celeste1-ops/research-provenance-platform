@@ -143,6 +143,8 @@ RPROV_HOME=~/.rprov-restore-test RPROV_KEYSTORE=memory make run PORT=8767
 
 只想单独备份签名钥匙：**Settings → Back up signing key only…**（完整备份里已经包含钥匙）。
 
+**先看一个完整的例子。** 第一次打开时，首页有「先看一个完整的例子」：一项虚构的研究 FSF，两个项目、32 步，用到了软件的所有功能（被修改的假设、被撤回的旁支想法、从 git 自动记录的代码、直接显示的图片和数据、更早的材料、后来的更正、关键步骤）。它在练习区里打开，语言跟着软件当前的语言，上方有一条 12 站的导览，每一站打开它讲的那部分。空的正式记录里也有入口，练习区里可以在 **设置 → 在练习区放入样例研究** 打开。里面全部是编出来的（DECISIONS D-059）。
+
 **先练习，再记正式的。** 记录一旦存下就删不掉，所以页面顶部有一个开关：**My research**（正式记录）/ **Practice**（练习空间）。练习空间是完全分开的另一套数据和签名钥匙（放在 `~/.rprov/practice/`），顶栏变成橙色，并一直显示「Practice: nothing here goes into your real record」；在那里保存直接存，按钮写 **Save practice step**。练习空间不备份，可以在 **Settings → Start practice over…** 清空重来，或者 **Fill practice with sample research** 放进虚构的 FSF 样例随便看。第一次打开时也可以先点「Open the practice space」。
 
 **存进正式记录前会再确认一次。** 在 My research 里点 **Save step**，会弹出「Save this step to your real record?」，列出类型、标题、正文开头、附件、和哪一步有关、你写的原因，提醒「存进去以后不能修改也不能删除，只能补充或撤回」。点 **Save to my record** 才真正存入，点 **Go back** 回去接着改。后来补关系、标关键一步、补说明、撤回，也都会先确认。从练习切回正式记录时会提醒一次。
@@ -288,6 +290,7 @@ GitHub Actions 的 **Package** 工作流在每次推送时自动打两个安装�
 - **P0 已完成**：只追加的记录、签名、重放；第三方签名时间证明（RFC 3161）；导出证据包、`report.html`（含静态演化图）、`verify.py`、篡改测试；记录表单和演化图。
 - **P1 已完成**：比特币时间锚定（OpenTimestamps）和区块浏览器核对；「只看里程碑」视图；时间线视图；详情侧栏的完整分区（Verified record / Author statement / Later additions / Changes，以及在侧栏里追加关系、里程碑、说明、撤回）；备份与恢复；FSF 样例数据。
 - **第 4 轮（安装包）**：macOS（Apple 芯片）和 Windows 10/11 安装包，菜单栏/通知区域图标，只开一份；Windows 的备份位置建议和全套测试（含浏览器测试）在 GitHub Actions 上跑；日期章增加 DigiCert 作为备用；Settings → Check stamp services 检查各个时间证明服务能不能连上（见 DECISIONS D-043 – D-045）。
+- **v0.4.1**：软件里带了一个虚构的 FSF 示例研究（32 步、两个项目、用到所有功能），首页就能打开，在练习区里按界面语言显示，并有 12 站导览（DECISIONS D-059）。
 - **v0.4.0**：程序有了自己的窗口，用系统自带的网页引擎（macOS 是 WKWebView，Windows 是 WebView2）；关掉窗口程序照样在图标里运行，再打开一次程序或点程序坞图标就叫出窗口，「退出」才真正停止；下载会问存到哪里，网上的链接用浏览器打开，图片在窗口里放大；没有网页引擎的电脑照旧用浏览器（DECISIONS D-058）。
 - **v0.3.4**：步骤卡片和关系图的方框直接显示每一步写了什么——正文的前几行、附件、代码提交或 DOI，不用点开（DECISIONS D-056）；图片和文字类文件直接预览，DOI 和代码仓库可以直接在网上打开，作者写的更早日期标为「未核实」，关系图上鼠标指到一步就弹出内容，分享的报告也一样，并且写清楚哪些没公开（D-057）。
 - **v0.3.3**：有些 Windows 电脑把 `.js` 文件登记成纯文本，页面会一直空白，现在修好了；万一页面打不开，会显示该怎么办（DECISIONS D-055）。

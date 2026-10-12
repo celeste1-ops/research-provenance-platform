@@ -1,0 +1,6 @@
+lattice model, 64 x 64 grid, periodic boundary
+step  1000  mean v = 0.412
+step  5000  mean v = 0.733
+step 20000  mean v = 0.861
+fit: alpha = 1.10 (+/- 0.08)
+WARNING: boundary condition set to periodic; channel walls should be no-slip

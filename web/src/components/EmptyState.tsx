@@ -53,7 +53,12 @@ export function EmptyState({
         ) : (
           <>
             <h1>{t("Record the first step of {project}", { project: projectTitle })}</h1>
-            <p className="lead">{t("Build a verifiable history of how this research develops.")}</p>
+            <p className="lead">
+              {t("Build a verifiable history of how this research develops.")}{" "}
+              <button className="link" onClick={onSample} data-testid="real-sample">
+                {t("Not sure how? Look at a finished example (in the practice space)")}
+              </button>
+            </p>
           </>
         )}
         <div className="field-label">{t("What are you adding?")}</div>

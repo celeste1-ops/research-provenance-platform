@@ -198,6 +198,15 @@ export interface Status {
   device: string;
   keychain_name: string;
   keychain_denied?: boolean;
+  sample?: SampleInfo | null;
+}
+
+/** The practice space holds the FSF sample research (DECISIONS D-059). */
+export interface SampleInfo {
+  version: number;
+  lang: string;
+  ids: Record<string, string>;
+  projects: Record<string, string>;
 }
 
 export interface Project {

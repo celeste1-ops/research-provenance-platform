@@ -851,3 +851,40 @@ verification rules or what leaves the machine for time proofs.
      the page must be drawn in the real window (not only the start-up note), closing the window
      must hide it while the server keeps running, a second start must show it again, and Quit
      must end the app with exit code 0.
+
+- **D-059 · A sample research comes with the app.** Asked for: the FSF example, with enough
+  structure that someone who has just installed the app sees how it works and what all of it
+  does, built where needed rather than taken from the author's real material.
+  1. *Fictional, and in practice only.* `fixtures/fsf_sample` is a made-up research project on
+     the FSF theme (flow speed levelling off under forcing): the steps, numbers, code, pictures,
+     DOIs and people are invented, and say so (author "Sample author (fictional)", "(sample)" in
+     the project names, a note in each DOI step). Nothing of the author's real FSF material is
+     in it. It loads into the practice space only — the real record can never remove a step,
+     so a sample there would stay forever — and replaces whatever practice held, as "Fill
+     practice with sample research" always did.
+  2. *What it holds.* Two projects (FSF; the flow channel setup) and 32 steps of all nine
+     kinds, linked with all three relations. A hypothesis is revised after an experiment fails
+     it; a side branch (a lattice model) is withdrawn with its test run; code arrives as git
+     commits with a copy of the code, a history step for earlier commits and a tagged commit as
+     a key step; data, plots and drafts are attached as PNG and SVG pictures, CSV, JSON, LaTeX,
+     BibTeX, Python and Markdown (shown in place) and a PDF and zips (download only); a notebook
+     page, the git history and the preprint carry earlier claimed dates (L1, L1, L2); and later
+     additions cover a relation added later, one withdrawn, a clarification and its correction,
+     a statement, a key step marked afterwards and two retractions. 41 records in all.
+  3. *Both languages.* `records.en.json` and `records.zh.json` are the same steps with the text
+     translated (a test checks the structure is identical); the sample loads in the language
+     the interface shows. The files are written by `tools/make_fsf_sample.py`, byte for byte
+     (a test regenerates them and compares).
+  4. *Where it is offered.* The first screen has "See a finished example first", which opens it
+     without setting anything up; the empty real record links to it; practice still has it in
+     Settings and on its empty page. `make demo` and the tests keep the small 14-step sample
+     (`fixtures/fsf_demo`).
+  5. *A tour.* The practice space remembers it holds the sample (`practice/sample.json`: the
+     language and the record id of each step and project), and the status says so. The page
+     then shows a bar with twelve stops — step cards, a turning point, the map, code from git,
+     pictures and data, later additions, a withdrawn step, older material, key steps only, the
+     story, sharing, the second project — each opening the view or step it is about with one
+     sentence of explanation. It can be folded away, and stays folded.
+  6. *Stamps as usual.* Sample steps get date stamps and public stamps like any practice step,
+     so the stamps appear within minutes when the computer is online; all of them carry the day
+     the sample was loaded, which is the point the "older material" stop makes.

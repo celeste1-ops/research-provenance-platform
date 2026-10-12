@@ -48,6 +48,12 @@ try {
   uv run python (Join-Path $unpacked "verify.py") $unpacked --offline  # needs cryptography + rfc3161-client
   if ($LASTEXITCODE -ne 0) { throw "verify.py rejected the bundle" }
   Write-Host "verify.py accepted the bundle"
+
+  # The sample research is in the app (D-059): practice fills with it, in Chinese here.
+  Invoke-RestMethod -Method Post "$base/api/practice/reset" -Headers $h -ContentType "application/json" -Body '{"sample":true,"lang":"zh"}' | Out-Null
+  $practice = Invoke-RestMethod "$base/api/status" -Headers @{ "X-RPROV-Space" = "practice" }
+  if ($practice.entry_count -ne 32) { throw "sample research missing: $($practice.entry_count) steps in practice" }
+  Write-Host "Sample research: $($practice.entry_count) steps in practice"
 } finally {
   Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue
 }

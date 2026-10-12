@@ -91,8 +91,18 @@ def test_start_practice_over(api, client, ctx):
     r = client.post("/api/practice/reset", json={"sample": True})
     assert r.status_code == 200
     st = client.get("/api/status", headers=P).json()
-    assert st["entry_count"] == 14 and "fictional" in st["author_label"]
+    assert st["entry_count"] == 32 and "fictional" in st["author_label"]
     assert ctx.ledger.record_count() == real_count
+    # The practice space remembers it holds the sample, for the tour (D-059); the real record does not.
+    assert st["sample"]["lang"] == "en" and set(st["sample"]["projects"]) == {"main", "side"}
+    assert client.get("/api/status").json()["sample"] is None
+    r = client.post("/api/practice/reset", json={"sample": True, "lang": "zh"})
+    st = client.get("/api/status", headers=P).json()
+    assert st["sample"]["lang"] == "zh" and st["author_label"] == "示例作者（虚构）"
+    titles = [p["title"] for p in client.get("/api/projects", headers=P).json()]
+    assert sorted(titles) == sorted(["FSF（示例）", "流道装置（示例）"])
+    client.post("/api/practice/reset", json={})
+    assert client.get("/api/status", headers=P).json()["sample"] is None  # empty practice: no tour
 
 
 def test_reset_needs_the_session_token(client):
