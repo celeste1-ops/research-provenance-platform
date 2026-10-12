@@ -4,7 +4,10 @@
 - **One keychain question per upgrade.** Everything the app keeps in the keychain is now in a single item, so a new version asks once — click **Always Allow**. (This first time, 0.3.2 asks once for each item older versions made, usually two or three, while it moves them into the single item.)
 - **Opening the app again shows its page.** If you closed the browser window, double-click Research History in Applications or Launchpad and the page opens again.
 - **Drag files in.** Drag files from the Finder or Explorer anywhere onto the "Add a step" form; dropped onto the main page, they open a new step with them attached.
-- **A clearer layout.** The top is now two rows: where you are (space, project, backup, settings) and what you can do (Map / List / Story as buttons with icons; Quick note, Share, Add a step). A short line at the bottom says how to use the view in front of you, and Settings is grouped.
+- **A clearer layout.** The top is now two rows: where you are (space, project, backup, settings) and what you can do (Steps / Map / Story as buttons with icons; Quick note, Share, Add a step). A short line at the bottom says how to use the view in front of you, and Settings is grouped.
+- **Steps in plain words.** The first view is one card per step, oldest at the top: what kind of step it is, its date and stamps, and which earlier steps it came from ("Grew out of #1", "Builds on #2"). Click a #number to go to that step; "Table" shows every record.
+- **A map that explains itself.** The row names stay in sight, a short legend explains the lines, and pointing at a step shows only its lines. It opens at the newest steps.
+- **AI summary in short sections.** The optional summary by a model on your own computer now comes as a few headed lists of points (in one sentence, how it started, what happened, turning points, where it stands now), each point linked to its steps. The text appears as it is written, with the time taken so far, and **Stop** really stops the model.
 - **The disk image says what to do.** The window that opens with the `.dmg` shows an arrow and a short note: drag Research History onto Applications, then open it from there.
 
 **Fixed in v0.3.1**

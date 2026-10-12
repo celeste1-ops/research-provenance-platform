@@ -30,7 +30,7 @@ In the app and in reports, every piece of information says where it comes from, 
 | --- | --- |
 | **Verified record** | Signed and time-stamped; anyone can check it. It only shows that the record existed then and has not changed since — not that what it says is true. |
 | **Author statement** | What you said: the "why", relations, an earlier date you gave for older material, the local clock time. The app can only show that you said so on that day. |
-| AI inference | Only when you optionally retell the Story with a model on your own computer. Shown apart, never saved as a record, never put into a bundle (see "Retell with an AI model on this computer" below). |
+| AI inference | Only when you optionally retell the Story with a model on your own computer. Shown apart, never saved as a record, never put into a bundle (see "Summarise with an AI model on this computer" below). |
 
 The two time proofs are also always shown apart, never merged into a vague "verified time":
 
@@ -163,7 +163,7 @@ This README uses the English button names.
 3. **+ Connect to an earlier step**: say how it relates to an earlier step — a new version (revises), developed from it (derived from), or uses it (uses). You can add a sentence on "why", shown as an author statement; important steps can be marked "Mark as a key step".
 4. Click **Save step**. Within seconds it shows "Date stamp ✓", a few hours later "Public stamp: done". Every term has a small "?" next to it that opens a one-sentence explanation.
 5. **Adding older material**: tick "This is older material I'm adding now". It can only show that the material existed on the day it was recorded; an earlier date you give is shown as an author statement (L1), and one backed by an outside record such as a DOI, an email or a web archive is marked L2.
-6. **Look at the map** (Map): records from left to right in order, in rows by type, arrows from older to newer records; if the lines and D/P icons are unclear, click the "?" next to Map. **List** is a list by date; **Key steps only** shows just the key steps. Click any step to see its content, both time proofs, the author's statements and what was added later; the record ID, hashes and signature are under "Technical details". The number in the top bar counts research steps only — not the first "genesis" record, nor relations and notes added later.
+6. **Look at your steps.** **Steps** shows one card per step, oldest at the top: what kind of step it is, its date and stamps, and in plain words which earlier steps it came from ("Grew out of #1 …", "Builds on #2 …"); click a #number to go to that step, or "Table" for every record with both stamps. **Map** shows the same steps as boxes, older on the left, in rows by kind, with lines between related steps; the row names stay at the left edge, a short legend explains the lines, and pointing at a step shows only its lines. **Key steps only** shows just the key steps. Click any step to see its content, both time proofs, the author's statements and what was added later; the record ID, hashes and signature are under "Technical details". The number in the top bar counts research steps only — not the first "genesis" record, nor relations and notes added later.
 
 ![Record detail](docs/screenshots/detail.png)
 
@@ -185,7 +185,7 @@ This README uses the English button names.
 
 ### Story: the research told in sentences, without AI
 
-The **Story** tab next to the map tells each step, and what was added later, in order and in fixed sentences, for example: "On 2026-05-03 the author recorded an experiment: “Numerical experiment 1”. The author noted that it builds on “Formula v1”."
+The **Story** tab tells each step, and what was added later, in order and in fixed sentences, for example: "On 2026-05-03 the author recorded an experiment: “Numerical experiment 1”. The author noted that it builds on “Formula v1”."
 
 - **No AI, nothing added.** Every sentence comes from the records themselves; "why" appears only where you wrote a reason, quoted as you wrote it.
 - **Every sentence names its source:** the record number and date (✓ marks a date-stamp time); click to open that step. Your own statements (reasons, notes, claimed dates, and the relations between steps) are highlighted.
@@ -193,14 +193,14 @@ The **Story** tab next to the map tells each step, and what was added later, in 
 - **Take it with you:** save it as Markdown or print it to PDF. The shared report (`report.html`) has this section too, written only from what the bundle discloses: a record shared as "existence only" appears only as "record n is not disclosed".
 - In Chinese and English, following the interface language; the report follows the report language chosen when exporting.
 
-### Retell with an AI model on this computer (optional)
+### Summarise with an AI model on this computer (optional)
 
-At the bottom of the Story tab is "Retell with an AI model on this computer (optional)…". You first need a model running on your own computer, for example [Ollama](https://ollama.com) (for Chinese, a model such as Qwen; 16 GB of memory is best) or LM Studio.
+At the top of the Story tab is "AI summary…" (and at its bottom "Summarise with an AI model on this computer (optional)…"). The model writes a short summary in sections — In one sentence, How it started, What happened, Turning points, Where it stands now — each point ending with the steps it comes from, which you can click. The text appears as it is written, with the time taken so far; **Stop** ends it at any time (the model really stops). A local model usually needs one to three minutes; the first time it also has to load. You first need a model running on your own computer, for example [Ollama](https://ollama.com) (for Chinese, a model such as Qwen; 16 GB of memory is best) or LM Studio.
 
 - **Only this computer.** Only `127.0.0.1`, `localhost` or `::1` are accepted as addresses (Ollama uses `http://127.0.0.1:11434` by default, LM Studio `http://127.0.0.1:1234`); any other address is refused. Proxies are not used and redirects not followed, so nothing leaves the computer: the promise that content stays on your computer holds.
 - **It is given only the Story's sentences** (titles, the reasons and notes you wrote), never the text or attachments of steps.
 - **Every sentence must name the steps it comes from** (for example [#12]). The app checks each sentence: one that names no step, names a step that doesn't exist, or claims what records can't show (originality, authorship, who owns an idea, who had it first) is crossed out, and left out when saving as Markdown.
-- Its text is always labelled **"AI inference"**, in its own colour, apart from verified records and author statements; it is **never saved as a step** and never put into a bundle. It runs only when you click "Write".
+- Its text is always labelled **"AI inference"**, in its own colour, apart from verified records and author statements; it is **never saved as a step** and never put into a bundle. It runs only when you click "Write the summary".
 
 ## Sharing: export an evidence bundle
 
@@ -275,7 +275,7 @@ Code layout: `core/provenance_core/` is the only library with trust logic (JCS, 
 - **P0 done**: append-only records, signing, replay; third-party timestamps (RFC 3161); evidence bundle export, `report.html` (with a static evolution map), `verify.py`, tamper tests; the record form and evolution map.
 - **P1 done**: Bitcoin anchors (OpenTimestamps) and block-explorer checks; the key-steps-only view; the timeline view; the full detail panel (Verified record / Author statement / Later additions / Changes, with adding relations, key steps, notes and retractions from the panel); backup and restore; the FSF sample data.
 - **Round 4 (installers)**: macOS (Apple silicon) and Windows 10/11 installers, a menu bar / notification area icon, a single running copy; Windows backup-location suggestions, and the full test suite (browser tests included) on GitHub Actions; DigiCert as a fallback for date stamps; Settings → Check stamp services checks whether each time-proof service can be reached (DECISIONS D-043 – D-045).
-- **v0.3.2**: one keychain item, so a new version asks once; opening the app again while it runs shows its page; files can be dragged onto the page and the form; a clearer two-row layout with Map / List / Story as buttons (D-053); the disk image window says to drag the app onto Applications (DECISIONS D-052).
+- **v0.3.2**: one keychain item, so a new version asks once; opening the app again while it runs shows its page; files can be dragged onto the page and the form; a clearer two-row layout (D-053); Steps as plain-language cards first, a map with row names and a legend, and an AI summary in short sections that appears as it is written and can be stopped (D-054); the disk image window says to drag the app onto Applications (DECISIONS D-052).
 - **v0.3.1**: after an upgrade the keychain is asked once, not every few seconds; a refusal is not retried until you click Try again (DECISIONS D-051).
 - **Round 5 (v0.3.0)**: the Chinese / English switch — the interface, the app's own texts and error messages, exported reports and VERIFY.md, the menu bar / tray menu and the Windows installer (DECISIONS D-046); quick notes and recording commits from a local git repository (D-047); the Story without AI (D-048); watched folders and the inbox (D-049); optional retelling by a local AI model (D-050).
 - **To be done on a Mac with internet**: `make freetsa-certs`, `make test-network` (AC-09: a real FreeTSA `.tsr` verified with `openssl ts -verify`; a real DigiCert timestamp; real OpenTimestamps calendars and block explorers), and the 4 manual checks in section 16 of the PRD.

@@ -17,7 +17,7 @@ def test_story_tab(tmp_path, browser):
         load_demo(srv.ctx)
         page = browser.new_page(viewport={"width": 1400, "height": 900})
         page.goto(srv.url)
-        page.get_by_test_id("graph").locator(".record-node").first.wait_for()
+        page.get_by_test_id("steps").locator(".step-card").first.wait_for()
         page.get_by_test_id("tab-story").click()
         story = page.get_by_test_id("story")
         expect(story).to_contain_text("no AI")

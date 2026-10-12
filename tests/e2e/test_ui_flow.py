@@ -149,7 +149,15 @@ def test_p0_flow_in_the_browser(tmp_path, browser):
             SNAPSHOT.write_text(json.dumps(snapshot, indent=2) + "\n", encoding="utf-8")
         assert snapshot == json.loads(SNAPSHOT.read_text(encoding="utf-8"))
 
-        # Graph: two nodes, one milestone, both proof icons on each node.
+        # Steps: two cards, one key step, both proof icons on each.
+        steps = page.get_by_test_id("steps")
+        steps.locator(".step-card [data-proof=tsa][data-state=confirmed]").nth(1).wait_for()
+        assert steps.locator(".step-card").count() == 2
+        assert steps.locator(".step-card.milestone").count() == 1
+        assert steps.locator(".step-card [data-proof=btc][data-state=pending]").count() == 2
+
+        # Map: the same, as boxes.
+        page.get_by_test_id("tab-graph").click()
         graph = page.get_by_test_id("graph")
         graph.locator(".record-node").nth(1).wait_for()
         graph.locator(".record-node [data-proof=tsa][data-state=confirmed]").nth(1).wait_for()
@@ -157,6 +165,7 @@ def test_p0_flow_in_the_browser(tmp_path, browser):
         assert graph.locator(".record-node.milestone").count() == 1
         assert graph.locator(".record-node [data-proof=tsa][data-state=confirmed]").count() == 2
         assert graph.locator(".record-node [data-proof=btc][data-state=pending]").count() == 2
+        page.get_by_test_id("tab-steps").click()
 
         # Code reference without archive: the form says the code itself is not saved.
         _new_record(page, "Code", "solver v1")

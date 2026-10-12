@@ -15,8 +15,8 @@ import { QuickNote } from "./components/QuickNote";
 import { RecordForm } from "./components/RecordForm";
 import { ServiceCheckDialog } from "./components/ServiceCheck";
 import { Setup } from "./components/Setup";
+import { Steps } from "./components/Steps";
 import { Story } from "./components/Story";
-import { Timeline } from "./components/Timeline";
 import { help, homeNote } from "./labels";
 import { dev, keychainName, setDevice } from "./device";
 import { chosenHere, lang, setLang, t, tn, tx, type Lang } from "./i18n";
@@ -28,6 +28,18 @@ type Dialog = null | "form" | "export" | "backup" | "key" | "where" | "tech" | "
 const QUICK_NOTE_HASH = "#quick-note"; // the menu bar / tray icon opens the page with it (D-047)
 const SPACE_KEY = "rprov-space";
 const TIPS_KEY = "rprov-tips-hidden"; // the person clicked "Got it" on the how-to line
+const VIEW_KEY = "rprov-view"; // the view chosen last time
+type View = "steps" | "graph" | "story";
+
+function initialView(): View {
+  try {
+    const saved = window.localStorage.getItem(VIEW_KEY);
+    if (saved === "graph" || saved === "story") return saved;
+  } catch {
+    /* storage unavailable */
+  }
+  return "steps";
+}
 const NEW_PROJECT = "__new_project__"; // the last entry of the project list
 
 // Remembered per browser so a reload stays in the same space (a convenience only).
@@ -68,7 +80,8 @@ export function App() {
   });
   const [fileOver, setFileOver] = useState(false);
   const [version, setVersion] = useState(0);
-  const [view, setView] = useState<"graph" | "timeline" | "story">("graph");
+  const [view, setViewState] = useState<View>(initialView);
+  const [stepsTable, setStepsTable] = useState(false);
   const [milestonesOnly, setMilestonesOnly] = useState(false);
   const [notice, setNotice] = useState<Notice | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -309,6 +322,15 @@ export function App() {
     }
   }
 
+  function setView(next: View) {
+    setViewState(next);
+    try {
+      window.localStorage.setItem(VIEW_KEY, next);
+    } catch {
+      /* storage unavailable: remembered for this visit */
+    }
+  }
+
   function hideTips() {
     setTipsHidden(true);
     try {
@@ -427,13 +449,13 @@ export function App() {
         {!empty && (
           <>
             <div className="segmented" role="tablist" aria-label={t("View")}>
+              <button role="tab" aria-selected={view === "steps"} className={view === "steps" ? "on" : ""}
+                onClick={() => setView("steps")} data-testid="tab-steps">
+                <ListIcon /> {t("Steps")}
+              </button>
               <button role="tab" aria-selected={view === "graph"} className={view === "graph" ? "on" : ""}
                 onClick={() => setView("graph")} data-testid="tab-graph">
                 <MapIcon /> {t("Map")}
-              </button>
-              <button role="tab" aria-selected={view === "timeline"} className={view === "timeline" ? "on" : ""}
-                onClick={() => setView("timeline")} data-testid="tab-timeline">
-                <ListIcon /> {t("List")}
               </button>
               <button role="tab" aria-selected={view === "story"} className={view === "story" ? "on" : ""}
                 onClick={() => setView("story")} data-testid="tab-story">
@@ -442,15 +464,15 @@ export function App() {
             </div>
             <Help id="map" label={t("the three views")} wide>
               <span className="views-help">
-                <b>{t("Map")}</b> — {t("the steps and how they connect, left to right in the order they were added.")}
+                <b>{t("Steps")}</b> — {t("every step on a card, oldest at the top: what it is, when it was stamped, and which earlier steps it came from.")}
                 <br />
-                <b>{t("List")}</b> — {help("list")}
+                <b>{t("Map")}</b> — {t("the steps and how they connect, left to right in the order they were added.")}
                 <br />
                 <b>{t("Story")}</b> — {help("story")}
               </span>
               <Legend />
             </Help>
-            {view === "graph" && (
+            {view !== "story" && !(view === "steps" && stepsTable) && (
               <span className="with-help">
                 <label className="toggle small">
                   <input type="checkbox" checked={milestonesOnly} onChange={(e) => setMilestonesOnly(e.target.checked)}
@@ -531,9 +553,9 @@ export function App() {
             <div className="view-tip" data-testid="view-tip">
               <span>
                 {view === "graph"
-                  ? t("Click a step to open it · drag the background to move · scroll to zoom")
-                  : view === "timeline"
-                    ? t("Click a row to open that step")
+                  ? t("Point at a step to see its lines · click it to open it · drag to move · scroll to zoom")
+                  : view === "steps"
+                    ? stepsTable ? t("Click a row to open that step") : t("Click a card to open that step · click a #number to go to that step")
                     : t("Click a #number to open that step")}
               </span>
               <button className="link small" onClick={hideTips} data-testid="view-tip-hide">{t("Got it")}</button>
@@ -548,8 +570,9 @@ export function App() {
               space={space}
               onSample={() => resetPractice(true)}
             />
-          ) : view === "timeline" ? (
-            <Timeline rows={timeline} onSelect={setSelected} />
+          ) : view === "steps" && graph ? (
+            <Steps graph={graph} rows={timeline} selected={selected} onSelect={setSelected} keyOnly={milestonesOnly}
+              table={stepsTable} onTable={setStepsTable} />
           ) : view === "story" ? (
             <Story projectId={projectId} version={version} onSelect={setSelected} />
           ) : graph ? (

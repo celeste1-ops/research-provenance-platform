@@ -329,9 +329,106 @@ ul.plain { list-style: none; padding: 0; margin: 0; }
 .ai-open { margin-top: 28px; }
 .ai-panel { margin-top: 28px; border: 1px solid #c9b8ef; border-left: 4px solid #7c5cc4; border-radius: 8px; padding: 10px 14px; background: #f8f5ff; }
 .ai-panel h3 { margin-top: 0; color: #4b2f91; }
-.ai-label { font-weight: 600; color: #4b2f91; }
+.ai-label { font-weight: 600; color: #4b2f91; font-size: 13.5px; margin: 12px 0 2px; }
 .ai-text { line-height: 1.7; }
 .ai-text .ai-flagged { text-decoration: line-through; color: #8a909c; }
 .ai-text .ai-why { color: var(--bad, #b42318); font-size: 12px; text-decoration: none; display: inline; }
-.ai-text .ref { font-size: 11px; margin-left: 2px; }
+.ai-text .ref { font-size: 11.5px; margin-left: 3px; white-space: nowrap; color: var(--accent); text-decoration: none;
+  border: 1px solid #c9d4f5; border-radius: 99px; padding: 0 6px; background: #f5f8ff; }
+.ai-text .ref:hover { background: var(--accent); border-color: var(--accent); color: #fff; }
 @media print { .ai-open { display: none; } }
+
+/* ---- round 6 (D-054): steps as cards, a map that explains itself, AI summary in sections ---- */
+.segmented.small { padding: 2px; border-radius: 8px; }
+.segmented.small button { padding: 3px 12px; font-size: 13px; }
+/* Steps: one card per step, oldest at the top, joined by a line down the left. */
+.steps-view { position: absolute; inset: 0; display: flex; flex-direction: column; }
+.steps-head { display: flex; align-items: center; gap: 12px; justify-content: space-between; padding: 10px 24px 6px;
+  max-width: 900px; width: 100%; margin: 0 auto; }
+.steps-head p { margin: 0; }
+.steps-body { position: relative; flex: 1; min-height: 0; }
+.steps-scroll { position: absolute; inset: 0; overflow: auto; padding: 4px 24px 70px; }
+.step-list { list-style: none; margin: 0 auto; padding: 0; max-width: 900px; }
+.step-row { display: grid; grid-template-columns: 40px 1fr; gap: 10px; position: relative; scroll-margin: 16px; }
+.step-rail { position: relative; display: flex; justify-content: center; }
+.step-rail::before { content: ""; position: absolute; top: 0; bottom: 0; left: 50%; width: 2px; margin-left: -1px; background: #d5dbe6; }
+.step-row:first-child .step-rail::before { top: 22px; }
+.step-row:last-child .step-rail::before { bottom: calc(100% - 22px); }
+.step-no { position: relative; margin-top: 10px; width: 26px; height: 26px; border-radius: 50%; display: inline-flex;
+  align-items: center; justify-content: center; font-size: 12px; font-weight: 700; color: var(--type); background: var(--type-bg);
+  border: 2px solid #fff; box-shadow: 0 0 0 1.5px var(--type); }
+.step-card { margin: 6px 0; padding: 10px 14px 10px 16px; background: #fff; border: 1px solid var(--line); border-left: 4px solid var(--type);
+  border-radius: 10px; cursor: pointer; transition: box-shadow .12s, border-color .12s; }
+.step-card:hover { border-color: #b7c3dc; border-left-color: var(--type); box-shadow: 0 2px 10px rgba(16, 24, 40, 0.08); }
+.step-card.selected { box-shadow: 0 0 0 3px rgba(47, 91, 211, .28); }
+.step-card.milestone { background: #fffbf0; border-color: #e7c873; border-left-color: #c58b00; }
+.step-card.retracted { background: #f6f7f9; border-style: dashed; }
+.step-card.retracted .step-title { text-decoration: line-through; color: #6b7280; }
+.step-top { display: flex; align-items: center; gap: 8px; font-size: 12.5px; }
+.type-tag { color: var(--type); background: var(--type-bg); border-radius: 99px; padding: 1px 9px; font-weight: 600; white-space: nowrap; }
+.key-tag { color: #8a5d00; background: #fdecc0; border-radius: 99px; padding: 1px 9px; font-weight: 600; white-space: nowrap; }
+.step-top .retracted-tag { margin: 0; font-size: 12px; }
+.step-date { color: var(--muted); white-space: nowrap; }
+.step-date.unverified { color: #8a909c; }
+button.step-title { display: block; width: 100%; margin: 5px 0 0; padding: 0; border: 0; background: none; text-align: left;
+  font-size: 15.5px; font-weight: 600; color: var(--ink); line-height: 1.35; }
+button.step-title:hover { color: var(--accent); }
+.step-links { list-style: none; margin: 6px 0 0; padding: 0; font-size: 13.5px; color: #3b4352; }
+.step-links li { display: flex; gap: 6px; align-items: baseline; margin: 3px 0; }
+.step-links li.withdrawn { color: #8a909c; text-decoration: line-through; }
+.step-link-arrow { color: #9aa3b2; }
+button.step-ref { display: inline; padding: 0 7px; border-radius: 99px; border: 1px solid transparent; background: var(--type-bg);
+  color: var(--type); font-size: 12.5px; font-weight: 600; line-height: 1.6; }
+button.step-ref:hover { border-color: var(--type); }
+.step-ref-title { font-weight: 500; color: var(--ink); }
+.step-next { margin-top: 6px; display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
+.step-gap { list-style: none; margin: 0 0 0 50px; padding: 4px 0; font-style: italic; }
+/* The map: row names that stay at the left edge, faint bands, and a legend in plain words. */
+.lane-rail { position: absolute; inset: 0 auto 0 0; width: 0; z-index: 5; pointer-events: none; }
+.lane-rail::before { content: ""; position: absolute; inset: 0 auto 0 0; width: 104px;
+  background: linear-gradient(to right, var(--bg) 62%, rgba(245, 246, 248, 0)); }
+.space-practice .lane-rail::before { background: linear-gradient(to right, #fffdf8 62%, rgba(255, 253, 248, 0)); }
+.lane-chip { position: absolute; left: 8px; transform: translateY(-50%); padding: 2px 10px; border-radius: 99px; font-size: 12px;
+  font-weight: 600; white-space: nowrap; color: var(--type); background: var(--type-bg); box-shadow: 0 0 0 3px var(--bg); }
+.lane-band { border-radius: 0; }
+.react-flow__node-band { pointer-events: none !important; cursor: default; }
+.band-odd .lane-band { background: rgba(214, 221, 233, 0.32); }
+.record-node { border-left: 4px solid var(--type, #8c95a6); min-height: 56px; }
+.record-node.milestone { border-left-width: 4px; }
+.node-seq { color: var(--ink); font-weight: 700; }
+.map-legend { width: 270px; padding: 10px 12px; background: rgba(255, 255, 255, 0.96); border: 1px solid var(--line); border-radius: 10px;
+  box-shadow: 0 4px 16px rgba(16, 24, 40, 0.1); font-size: 12.5px; line-height: 1.45; }
+.map-legend-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
+.map-legend ul { margin: 0; padding-left: 16px; }
+.map-legend li { margin: 2px 0; }
+.map-legend-lines { display: grid; gap: 3px; margin: 4px 0 4px 16px; }
+.map-legend-lines span { display: inline-flex; align-items: center; gap: 8px; }
+.map-legend p { margin: 4px 0 0; }
+button.map-legend-open { box-shadow: 0 2px 8px rgba(16, 24, 40, 0.1); }
+/* AI summary: sections of short points, each point naming its steps. */
+.ai-badge { display: inline-block; margin-left: 6px; padding: 1px 8px; border-radius: 99px; background: #ece4ff; color: #4b2f91;
+  font-size: 11.5px; font-weight: 600; vertical-align: middle; }
+.ai-steps .row { flex-wrap: nowrap; }
+.ai-step-no { flex: 0 0 auto; width: 22px; height: 22px; border-radius: 50%; display: inline-flex; align-items: center;
+  justify-content: center; background: #7c5cc4; color: #fff; font-size: 12px; font-weight: 700; }
+.ai-section { margin: 10px 0; padding: 10px 14px; background: #fff; border: 1px solid #e3d9f8; border-radius: 10px; }
+.ai-section h4 { margin: 0 0 6px; font-size: 13px; letter-spacing: .02em; color: #4b2f91; }
+.ai-section ul { margin: 0; padding-left: 18px; }
+.ai-section li { margin: 4px 0; }
+.ai-section p { margin: 4px 0; }
+.ai-section:first-child { border-left: 4px solid #7c5cc4; font-size: 16px; }
+.ai-progress { margin: 10px 0; }
+.ai-draft { padding: 10px 14px; background: #fff; border: 1px dashed #c9b8ef; border-radius: 10px; color: #4a4f5c; line-height: 1.6; }
+.ai-draft h4 { margin: 8px 0 2px; font-size: 13px; color: #4b2f91; }
+.ai-draft h4:first-child { margin-top: 0; }
+.ai-draft-item { padding-left: 4px; }
+.ai-cursor { display: inline-block; width: 7px; height: 1em; margin-left: 2px; vertical-align: text-bottom; background: #7c5cc4;
+  animation: ai-blink 1s steps(2) infinite; }
+@keyframes ai-blink { 50% { opacity: 0; } }
+.spinner { display: inline-block; width: 12px; height: 12px; border: 2px solid #d8ccf4; border-top-color: #7c5cc4; border-radius: 50%;
+  vertical-align: -1px; animation: spin .8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+button.ai-jump { color: #4b2f91; border-color: #d3c4f3; background: #f8f5ff; }
+button.ai-jump:hover { border-color: #7c5cc4; }
+@media print { .ai-jump { display: none !important; } }
+.space-practice .lane-chip { box-shadow: 0 0 0 3px #fffdf8; }

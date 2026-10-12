@@ -36,20 +36,21 @@ def test_switching_language_and_back(tmp_path, browser):
         context = browser.new_context(locale="en-US", viewport={"width": 1500, "height": 950})
         page = context.new_page()
         page.goto(srv.url)
-        node = page.get_by_test_id(f"node-{ids['formula1']}")
+        node = page.get_by_test_id(f"step-{ids['formula1']}")
         node.wait_for()
         expect(page.get_by_test_id("new-record")).to_have_text("Add a step")
-        title = node.locator(".node-title").text_content()
+        title = node.locator(".step-title").text_content()
 
         page.get_by_test_id("lang-switch").click()
         expect(page.get_by_test_id("new-record")).to_have_text(ZH["Add a step"])
         expect(page.locator("html")).to_have_attribute("lang", "zh-CN")
         expect(page.get_by_test_id("lang-switch")).to_have_text("English")
-        node = page.get_by_test_id(f"node-{ids['formula1']}")
+        node = page.get_by_test_id(f"step-{ids['formula1']}")
         node.click()
         verified = page.get_by_test_id("section-verified")
         expect(verified).to_contain_text(ZH["Verified record"])  # the server's words, in Chinese
-        expect(node.locator(".node-title")).to_have_text(title)  # the author's title, as written
+        expect(node.locator(".step-title")).to_have_text(title)  # the author's title, as written
+        expect(node.locator(".type-tag")).to_have_text(ZH["Document"])
         assert remembered(srv, page, "zh")
 
         page.reload()

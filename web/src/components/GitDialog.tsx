@@ -225,7 +225,7 @@ export function GitDialog({ projects, projectId, onClose, onChanged }: {
           <button className="link" onClick={onClose} aria-label={t("Close")}>✕</button>
         </div>
         <p>
-          {t("Every new commit on the branch you choose becomes a code step in your map, with its date stamps — you don't have to add it by hand. The app looks once a minute while it is running, and catches up when it starts again.")}
+          {t("Every new commit on the branch you choose becomes a code step, with its date stamps — you don't have to add it by hand. The app looks once a minute while it is running, and catches up when it starts again.")}
         </p>
         <p className="note">
           {tx("Only the repository on this {device} is read; nothing is fetched, pushed or sent anywhere (only the fingerprints for the stamps, as for every step). <b>Dates that git shows are your own statement</b>: they can be changed, so they are never shown as verified times.", { b: (s) => <b>{s}</b> }, { device: dev() })}

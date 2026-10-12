@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import re
+
 import pytest
 
 from app.demo import load_demo
@@ -18,13 +20,78 @@ def demo_page(tmp_path, browser):
         ids = load_demo(srv.ctx)
         page = browser.new_page(viewport={"width": 1500, "height": 950})
         page.goto(srv.url)
-        page.get_by_test_id("graph").locator(".record-node").nth(13).wait_for()
+        page.get_by_test_id("steps").locator(".step-card").nth(13).wait_for()
         yield page, ids, srv
         page.close()
 
 
+def open_map(page):
+    page.get_by_test_id("tab-graph").click()
+    page.get_by_test_id("graph").locator(".record-node").nth(13).wait_for()
+
+
+def test_steps_view_reads_in_plain_words(demo_page):
+    """D-054: the first view is a card per step, oldest first, saying which earlier steps each one
+    came from; a #number goes to that step."""
+    page, ids, _srv = demo_page
+    steps = page.get_by_test_id("steps")
+    seqs = [int(n) for n in steps.locator(".step-no").all_inner_texts()]
+    assert seqs == sorted(seqs) and len(seqs) == 14  # oldest at the top
+    card = steps.get_by_test_id(f"step-{ids['formula2']}")
+    text = card.inner_text()
+    assert "Document" in text and "Formula v2" in text
+    assert "A new version of" in text and "Formula v1" in text  # revises, in plain words
+    assert "Later steps that build on it:" not in steps.get_by_test_id(f"step-{ids['preprint']}").inner_text()
+    card.get_by_role("button", name="#4 Formula v1").click()  # goes to the earlier step and opens it
+    expect(page.get_by_test_id("detail")).to_contain_text("Formula v1")
+    expect(steps.get_by_test_id(f"step-{ids['formula1']}")).to_have_class(re.compile("selected"))
+    expect(steps.get_by_test_id(f"step-{ids['formula1']}")).to_be_in_viewport()
+
+    page.get_by_test_id("milestones-only").check()  # key steps only, with how many lie between
+    expect(steps.locator(".step-card")).to_have_count(3)
+    assert "Key steps only — 3 of 14." in steps.inner_text()
+    assert steps.locator(".step-gap").count() >= 2
+    page.get_by_test_id("milestones-only").uncheck()
+    expect(steps.locator(".step-card")).to_have_count(14)
+
+    # The view chosen is remembered.
+    page.get_by_test_id("tab-story").click()
+    page.reload()
+    page.get_by_test_id("story").wait_for()
+    page.get_by_test_id("tab-steps").click()
+    expect(steps.locator(".step-card")).to_have_count(14)
+
+
+def test_the_map_explains_itself(demo_page):
+    page, ids, _srv = demo_page
+    open_map(page)
+    graph = page.get_by_test_id("graph")
+    legend = graph.get_by_test_id("map-legend")
+    assert "older on the left, newer on the right" in legend.inner_text()
+    # The names of the rows stay in sight however the map is moved.
+    rows = graph.locator(".lane-chip")
+    assert "Idea" in rows.all_inner_texts() and "Paper" in rows.all_inner_texts()
+    # The newest step is in sight at the start.
+    expect(graph.get_by_test_id(f"node-{ids['preprint']}")).to_be_in_viewport()
+    # Pointing at a step fades the steps it has no line to, and names its lines.
+    graph.get_by_test_id(f"node-{ids['formula2']}").hover()
+    expect(graph.locator(".react-flow__edge-text").filter(has_text="new version")).to_have_count(1)
+    faded = page.evaluate("""id => [...document.querySelectorAll('.react-flow__node-record')]
+        .filter(n => getComputedStyle(n).opacity < 0.5).map(n => n.dataset.id)""", ids["formula2"])
+    assert ids["intuition"] in faded and ids["formula1"] not in faded and ids["formula2"] not in faded
+    page.mouse.move(5, 300)
+    # The legend can be put away, and stays away.
+    legend.get_by_test_id("map-legend-hide").click()
+    page.reload()
+    open_map(page)
+    expect(graph.get_by_test_id("map-legend")).to_have_count(0)
+    graph.get_by_test_id("map-legend-open").click()
+    expect(graph.get_by_test_id("map-legend")).to_be_visible()
+
+
 def test_milestones_only_view(demo_page):  # AC-13
     page, ids, srv = demo_page
+    open_map(page)
     graph = page.get_by_test_id("graph")
     assert graph.locator(".record-node").count() == 14
     page.get_by_test_id("milestones-only").check()
@@ -51,6 +118,7 @@ def test_redrawing_the_map_never_hides_steps_again(demo_page):
     the wrong moment left one hidden for good (seen on CI after a restore). Unchanged steps now
     stay the same objects; changed ones keep their size."""
     page, ids, _srv = demo_page
+    open_map(page)
     page.wait_for_timeout(500)
     page.evaluate("""() => { window.__hidden = 0;
         new MutationObserver(ms => { for (const m of ms) if (m.target.classList?.contains('react-flow__node')
@@ -58,6 +126,7 @@ def test_redrawing_the_map_never_hides_steps_again(demo_page):
           .observe(document.querySelector('.react-flow'), {subtree: true, attributes: true, attributeFilter: ['style']}); }""")
     page.get_by_test_id("settings-menu").click()
     page.get_by_role("menuitem", name="Check stamps now").click()  # the same data again
+    page.locator(".react-flow__controls-fitview").click()  # the whole map in sight (it starts at the newest)
     page.get_by_test_id(f"node-{ids['exp1']}").click()  # a redraw where two steps change
     page.get_by_test_id("detail").wait_for()
     page.get_by_test_id(f"node-{ids['exp2']}").click()
@@ -67,7 +136,7 @@ def test_redrawing_the_map_never_hides_steps_again(demo_page):
 
 def test_timeline_view(demo_page):
     page, ids, srv = demo_page
-    page.get_by_test_id("tab-timeline").click()
+    page.get_by_test_id("steps-table").click()  # every record, as a table, one click from the cards
     table = page.get_by_test_id("timeline")
     table.wait_for()
     # The list's data is asked for after the map's, so its rows can arrive just after the click.
@@ -82,7 +151,7 @@ def test_timeline_view(demo_page):
 
 def test_changes_and_later_actions(demo_page):
     page, ids, srv = demo_page
-    page.get_by_test_id(f"node-{ids['formula2']}").click()
+    page.get_by_test_id(f"step-{ids['formula2']}").click()
     changes = page.get_by_test_id("section-changes")
     changes.locator("pre.diff").wait_for()
     diff = changes.inner_text()
@@ -126,6 +195,7 @@ def test_200_nodes_render_within_a_second(tmp_path, browser):
             rels = [{"to": prev, "rel": "revises"}] if prev and i % 3 else []
             prev = L.create_entry(EntryInput(pid, types[i % 9], f"Record {i}", relations=rels, milestone=i % 25 == 0))
         page = browser.new_page(viewport={"width": 1400, "height": 900})
+        page.add_init_script("localStorage.setItem('rprov-view', 'graph')")  # the map is the heavy view
         page.goto(srv.url + "/api/graph")  # warm the server-side read path
         page.goto("about:blank")
         start = time.monotonic()
@@ -200,7 +270,7 @@ def test_backup_and_restore_in_the_browser(tmp_path, browser):
         result = page.get_by_test_id("restore-result")
         assert fingerprint in result.get_by_test_id("restored-fingerprint").inner_text()
         result.get_by_role("button", name="Open the app").click()
-        page.get_by_test_id("graph").locator(".record-node").nth(13).wait_for()
+        page.get_by_test_id("steps").locator(".step-card").nth(13).wait_for()
         wait_for_step_count(page, "14 steps")
         assert b.ctx.ledger.record_count() == count
         # Paused until confirmed; the old password is unknown, so resuming asks for a new one.
@@ -287,7 +357,7 @@ def test_empty_state_and_help_panels(tmp_path, browser):
         legend = page.get_by_test_id("legend")
         assert "Date stamp" in legend.inner_text() and "Public stamp" in legend.inner_text()
         views = page.get_by_test_id("help-map-text").inner_text()
-        assert "List" in views and "Story" in views and "no AI" in views
+        assert "Steps" in views and "Map" in views and "Story" in views and "no AI" in views
         page.locator(".brand").click()  # a click anywhere else closes it
         assert page.get_by_test_id("legend").count() == 0
         for hid in ("key-steps",):
@@ -453,7 +523,7 @@ def test_practice_space(tmp_path, browser):
         wait_for_step_count(page, "0 steps")
 
         page.get_by_test_id("practice-sample").click()
-        page.get_by_test_id("graph").locator(".record-node").nth(13).wait_for()
+        page.get_by_test_id("steps").locator(".step-card").nth(13).wait_for()
         wait_for_step_count(page, "14 steps")
         assert srv.ctx.ledger.record_count() == real_count
 
@@ -488,9 +558,9 @@ def test_practice_sample_survives_a_late_answer(tmp_path, browser):
         assert old
         page.evaluate("id => { window.__slowProject = id; }", old)
         page.get_by_test_id("practice-sample").click()
-        page.get_by_test_id("graph").locator(".record-node").nth(13).wait_for()
+        page.get_by_test_id("steps").locator(".step-card").nth(13).wait_for()
         page.wait_for_timeout(2500)  # the late answer for the replaced project has arrived by now
-        assert page.get_by_test_id("graph").locator(".record-node").count() == 14
+        assert page.get_by_test_id("steps").locator(".step-card").count() == 14
         wait_for_step_count(page, "14 steps")
         page.close()
 

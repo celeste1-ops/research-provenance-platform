@@ -315,6 +315,7 @@ export type FolderInspect = {
 export type AiBlock =
   | { kind: "heading"; text: string }
   | { kind: "break" }
+  | { kind: "item" } // a bullet point begins; its sentences follow
   | { kind: "sentence"; text: string; status: "ok" | "no_source" | "unknown_source" | "claim";
       refs: { seq: number; id: string | null }[] };
 export type AiResult = {

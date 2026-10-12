@@ -16,7 +16,7 @@ import type {
   Status,
   TimelineRow,
 } from "./types";
-import { lang, type Lang } from "./i18n";
+import { lang, t, type Lang } from "./i18n";
 
 // The per-launch session token is embedded in the page by the local server — never in a URL.
 function sessionToken(): string {
@@ -87,6 +87,44 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
   return (type.includes("application/json") ? res.json() : res.blob()) as Promise<T>;
 }
 
+// The local model's answer arrives as it is written, one JSON object per line: {"text"} pieces,
+// then {"result"} (checked) or {"error"}. Aborting the signal stops the model (D-050).
+async function aiStoryStream(
+  body: { url: string; model: string; project?: string },
+  onText: (piece: string) => void,
+  signal?: AbortSignal,
+): Promise<AiResult> {
+  const res = await fetch("/api/ai/story", {
+    method: "POST",
+    headers: { ...spaceHeaders(), "X-RPROV-Token": sessionToken(), "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+    credentials: "same-origin",
+    signal,
+  });
+  if (!res.ok || !res.body) {
+    const data = await res.json().catch(() => ({ detail: res.statusText }));
+    throw new ApiError(res.status, typeof data.detail === "string" ? data.detail : JSON.stringify(data.detail));
+  }
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buffered = "";
+  for (;;) {
+    const { done, value } = await reader.read();
+    buffered += decoder.decode(value, { stream: !done });
+    let end: number;
+    while ((end = buffered.indexOf("\n")) >= 0) {
+      const line = buffered.slice(0, end).trim();
+      buffered = buffered.slice(end + 1);
+      if (!line) continue;
+      const event = JSON.parse(line) as { text?: string; result?: AiResult; error?: string };
+      if (event.text) onText(event.text);
+      else if (event.result) return event.result;
+      else if (event.error) throw new ApiError(502, event.error);
+    }
+    if (done) throw new ApiError(502, t("The local model stopped before it finished."));
+  }
+}
+
 export const api = {
   status: () => request<Status>("GET", "/api/status"),
   createIdentity: (author_label: string) =>
@@ -102,7 +140,7 @@ export const api = {
   record: (id: string) => request<RecordDetail>("GET", `/api/records/${id}`),
   aiSettings: () => request<{ url: string; model: string }>("GET", "/api/ai"),
   aiModels: (url: string) => request<{ url: string; models: string[] }>("POST", "/api/ai/models", { url }),
-  aiStory: (body: { url: string; model: string; project?: string }) => request<AiResult>("POST", "/api/ai/story", body),
+  aiStory: aiStoryStream,
   narrative: (project?: string) =>
     request<Narrative>("GET", `/api/narrative${project ? `?project=${encodeURIComponent(project)}` : ""}`),
   body: async (id: string) => {

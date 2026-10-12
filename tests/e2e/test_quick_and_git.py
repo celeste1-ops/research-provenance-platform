@@ -67,5 +67,5 @@ def test_record_a_repository_from_settings(tmp_path, browser):
         dialog.get_by_test_id("git-check").click()
         expect(dialog.get_by_test_id("git-recorded")).to_have_text("2 steps recorded")
         page.get_by_role("button", name="Close").click()
-        expect(page.get_by_test_id("graph")).to_contain_text("Fix the boundary term")
+        expect(page.get_by_test_id("steps")).to_contain_text("Fix the boundary term")
         page.close()

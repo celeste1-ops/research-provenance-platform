@@ -1,5 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { api } from "../api";
+import { dev } from "../device";
 import { t } from "../i18n";
 import type { Narrative, NarrativeSentence } from "../types";
 import { AiStory } from "./AiStory";
@@ -44,6 +45,14 @@ export function Story({ projectId, version, onSelect }: {
 }) {
   const [story, setStory] = useState<Narrative | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [aiOpen, setAiOpen] = useState(false);
+  const aiRef = useRef<HTMLDivElement>(null);
+
+  // The AI summary sits below the story; the button at the top opens it and goes there.
+  function openAi() {
+    setAiOpen(true);
+    window.requestAnimationFrame(() => aiRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }));
+  }
 
   useEffect(() => {
     api.narrative(projectId || undefined).then(setStory).catch((e) => setError((e as Error).message));
@@ -55,6 +64,10 @@ export function Story({ projectId, version, onSelect }: {
     <div className="story-scroll">
     <article className="story-view" data-testid="story">
       <div className="story-tools">
+        <button className="secondary small ai-jump" onClick={openAi} data-testid="ai-jump"
+          title={t("Summarise with an AI model on this {device} (optional)…", { device: dev() })}>
+          {t("AI summary…")}
+        </button>
         <button className="secondary small" data-testid="story-markdown"
           onClick={() => download(`${story.title.replace(/[\\/:*?"<>|]+/g, "_")}.md`, markdown(story))}>
           {t("Save as Markdown")}
@@ -88,7 +101,9 @@ export function Story({ projectId, version, onSelect }: {
           ))}
         </section>
       ))}
-      <AiStory projectId={projectId} onSelect={onSelect} />
+      <div ref={aiRef}>
+        <AiStory projectId={projectId} onSelect={onSelect} open={aiOpen} onOpen={() => setAiOpen(true)} />
+      </div>
     </article>
     </div>
   );
