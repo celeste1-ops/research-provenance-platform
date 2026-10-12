@@ -647,7 +647,7 @@ def ai_retell(body: AiIn, request: Request):
             # the fallback. Then the answer is closed. Nothing is left for the garbage collector.
             with anyio.CancelScope(shield=True):
                 if step is not None and not step.done():
-                    if model.hang_up():
+                    if await model.hang_up():
                         await asyncio.wait({step}, timeout=5)
                     if not step.done():
                         step.cancel()
