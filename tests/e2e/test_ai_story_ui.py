@@ -62,7 +62,7 @@ class FakeModel(BaseHTTPRequestHandler):
                 self.wfile.flush()
                 time.sleep(FakeModel.delay)
             self.wfile.write(b"data: [DONE]\n\n")
-        except (BrokenPipeError, ConnectionResetError):
+        except ConnectionError:  # broken pipe or reset (Linux, macOS), aborted (Windows)
             FakeModel.aborted.set()
 
     def log_message(self, *args):

@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import re
 from collections.abc import AsyncIterator
+from contextlib import aclosing
 from datetime import UTC, datetime
 
 from app.i18n import tr
@@ -194,7 +195,9 @@ async def retell_stream(narrative: dict, model: LocalModel, lang: str,
     lang = "zh" if lang == "zh" else "en"
     system, user, known, count = prompt(narrative, lang)
     reply: list[str] = []
-    async for piece in model.chat_stream(system, user):
-        reply.append(piece)
-        yield {"text": piece}
+    # Closed as soon as this is: that ends the connection to the model there and then.
+    async with aclosing(model.chat_stream(system, user)) as pieces:
+        async for piece in pieces:
+            reply.append(piece)
+            yield {"text": piece}
     yield {"result": result(narrative, model, "".join(reply), known, count, label)}
