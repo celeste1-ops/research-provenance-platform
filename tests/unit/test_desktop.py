@@ -96,7 +96,8 @@ def test_menu_follows_the_language_chosen_in_the_app(tmp_path, monkeypatch):
 
     monkeypatch.setattr(desktop, "system_language", lambda: "en")
     assert desktop.menu_language(tmp_path) == "en"
-    assert desktop.MENU["en"] == {"open": "Open Research History", "note": "Quick note…", "quit": "Quit"}
+    assert desktop.MENU["en"] == {"open": "Open Research History", "note": "Quick note…",
+                                  "browser": "Open in browser", "quit": "Quit"}
     seen = []
     preferences.on_change(seen.append)
     try:
@@ -105,7 +106,8 @@ def test_menu_follows_the_language_chosen_in_the_app(tmp_path, monkeypatch):
         preferences._listeners.remove(seen.append)
     assert seen == [{"language": "zh"}]
     assert desktop.menu_language(tmp_path) == "zh"
-    assert desktop.MENU["zh"] == {"open": "打开 Research History", "note": "快速记一笔…", "quit": "退出"}
+    assert desktop.MENU["zh"] == {"open": "打开 Research History", "note": "快速记一笔…",
+                                  "browser": "在浏览器中打开", "quit": "退出"}
 
 
 def test_system_language_is_read_from_the_environment(monkeypatch):
@@ -129,3 +131,83 @@ def test_opening_the_app_again_shows_its_page(monkeypatch):
     if sys.platform != "darwin":
         desktop.watch_reopen("http://127.0.0.1:8765/")  # nothing to do elsewhere, and no error
         assert desktop._reopen_delegate == []
+
+
+class FakePystray:
+    """Just enough of pystray to read the menu the app builds."""
+
+    class MenuItem:
+        def __init__(self, text, action, default=False):
+            self.text, self.action, self.default = text, action, default
+
+    class Menu:
+        SEPARATOR = object()
+
+        def __init__(self, *items):
+            self.items = items
+
+    class Icon:
+        def __init__(self, name, image, title, menu):
+            self.title, self.menu, self.stopped, self.notes = title, menu, False, []
+
+        def stop(self):
+            self.stopped = True
+
+        def notify(self, text, title):
+            self.notes.append((title, text))
+
+
+class FakeShell:
+    def __init__(self, has_window):
+        self.has_window, self.url, self.calls, self.notify = has_window, "http://127.0.0.1:8765/", [], None
+
+    def show(self, hash=""):
+        self.calls.append(("show", hash))
+
+    def open_in_browser(self):
+        self.calls.append(("browser",))
+
+    def quit(self):
+        self.calls.append(("quit",))
+
+
+def _menu(icon):
+    return [i for i in icon.menu.items if i is not FakePystray.Menu.SEPARATOR]
+
+
+def test_the_icon_opens_the_window_and_quit_quits(tmp_path, monkeypatch):
+    from app import desktop, preferences
+
+    monkeypatch.setitem(sys.modules, "pystray", FakePystray)
+    monkeypatch.setattr(desktop, "system_language", lambda: "en")
+    shell = FakeShell(has_window=True)
+    icon = desktop.make_tray(shell, tmp_path)
+    preferences._listeners.pop()  # the relabel hook this test added
+    items = _menu(icon)
+    assert [i.text(None) for i in items] == ["Open Research History", "Quick note…", "Open in browser", "Quit"]
+    assert items[0].default
+    for item in items:
+        item.action(icon, item)
+    assert shell.calls == [("show", ""), ("show", "#quick-note"), ("browser",), ("quit",)]
+    assert not icon.stopped  # with a window, the window's event loop ends the app
+    shell.notify("still running")
+    assert icon.notes == [("Research History", "still running")]
+
+
+def test_without_a_window_the_icon_works_as_before(tmp_path, monkeypatch):
+    from app import desktop, preferences
+
+    monkeypatch.setitem(sys.modules, "pystray", FakePystray)
+    monkeypatch.setattr(desktop, "system_language", lambda: "zh")
+    opened = []
+    monkeypatch.setattr(desktop, "open_browser", opened.append)
+    quits = []
+    shell = desktop.BrowserShell("http://127.0.0.1:8765/", lambda: quits.append(1))
+    icon = desktop.make_tray(shell, tmp_path)
+    preferences._listeners.pop()
+    items = _menu(icon)
+    assert [i.text(None) for i in items] == ["打开 Research History", "快速记一笔…", "退出"]
+    for item in items:
+        item.action(icon, item)
+    assert opened == ["http://127.0.0.1:8765/", "http://127.0.0.1:8765/#quick-note"]
+    assert quits == [1] and icon.stopped

@@ -75,6 +75,38 @@ def test_steps_view_reads_in_plain_words(demo_page):
     expect(steps.locator(".step-card")).to_have_count(14)
 
 
+def test_files_save_and_pictures_open_inside_the_app(demo_page):
+    """D-058: in the app's own window a link that leaves the page would open the browser, so an
+    attachment is a download (the window asks where to save it), a picture is shown larger in
+    place, and a new project is named in a dialog of the app's own (not the browser's prompt)."""
+    page, ids, _srv = demo_page
+    steps = page.get_by_test_id("steps")
+    chip = steps.get_by_test_id(f"step-{ids['exp1']}").locator("a.file-chip").first
+    assert chip.get_attribute("download") == "run1_results.csv"
+    with page.expect_download() as saved:
+        chip.click()
+    assert saved.value.suggested_filename == "run1_results.csv"
+
+    steps.get_by_test_id(f"step-{ids['fig1']}").click()
+    detail = page.get_by_test_id("detail")
+    assert detail.locator("ul.files a").first.get_attribute("download") == "figure1.svg"
+    detail.get_by_test_id("file-image").click()
+    expect(page.get_by_test_id("lightbox")).to_be_visible()
+    page.keyboard.press("Escape")
+    expect(page.get_by_test_id("lightbox")).to_have_count(0)
+    detail.get_by_role("button", name="Close", exact=True).click()
+
+    page.on("dialog", lambda d: pytest.fail(f"a browser dialog appeared: {d.message}"))
+    page.get_by_test_id("project-select").select_option("__new_project__")
+    dialog = page.get_by_test_id("new-project")
+    expect(dialog.get_by_test_id("new-project-create")).to_be_disabled()
+    dialog.get_by_test_id("new-project-title").fill("Second study")
+    dialog.get_by_test_id("new-project-title").press("Enter")
+    expect(dialog).to_have_count(0)
+    expect(page.get_by_test_id("project-select").locator("option:checked")).to_have_text("Second study")
+    expect(page.get_by_test_id("step-count")).to_contain_text("0 steps")
+
+
 def test_the_map_explains_itself(demo_page):
     page, ids, _srv = demo_page
     open_map(page)

@@ -248,6 +248,9 @@ export async function downloadRequest(path: string, body: unknown) {
   return { blob: await res.blob(), filename };
 }
 
+/** Save a file the page made (an evidence bundle, a key backup, a Markdown text). The browser saves
+ * it to Downloads; the app's window (D-058) asks where. The address is kept for a minute, as the
+ * window may still be asking when a shorter wait would already have thrown it away. */
 export function download(blob: Blob, filename: string) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
@@ -256,5 +259,5 @@ export function download(blob: Blob, filename: string) {
   document.body.appendChild(a);
   a.click();
   a.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  setTimeout(() => URL.revokeObjectURL(url), 60_000);
 }

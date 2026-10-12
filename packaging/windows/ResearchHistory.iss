@@ -54,6 +54,12 @@ Source: "..\..\dist\{#MyAppName}\*"; DestDir: "{app}"; Flags: ignoreversion recu
 ; An upgrade replaces the program files completely (never the data in %USERPROFILE%\.rprov).
 Type: filesandordirs; Name: "{app}\_internal"
 
+[UninstallDelete]
+; The window's own settings (view, tips) and WebView2's cache (D-058). Never the data in
+; %USERPROFILE%\.rprov.
+Type: filesandordirs; Name: "{localappdata}\{#MyAppName}\WebView2"
+Type: dirifempty; Name: "{localappdata}\{#MyAppName}"
+
 [Icons]
 Name: "{autoprograms}\{#MyAppName}"; Filename: "{app}\{#MyAppExe}"
 Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExe}"; Tasks: desktopicon

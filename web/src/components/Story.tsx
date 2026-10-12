@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { api } from "../api";
+import { api, download } from "../api";
 import { dev } from "../device";
 import { t } from "../i18n";
 import type { Narrative, NarrativeSentence } from "../types";
@@ -29,13 +29,8 @@ function markdown(n: Narrative): string {
   return out.join("\n");
 }
 
-function download(name: string, text: string) {
-  const url = URL.createObjectURL(new Blob([text], { type: "text/markdown;charset=utf-8" }));
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = name;
-  a.click();
-  URL.revokeObjectURL(url);
+function saveMarkdown(name: string, text: string) {
+  download(new Blob([text], { type: "text/markdown;charset=utf-8" }), name);
 }
 
 export function Story({ projectId, version, onSelect }: {
@@ -69,7 +64,7 @@ export function Story({ projectId, version, onSelect }: {
           {t("AI summary…")}
         </button>
         <button className="secondary small" data-testid="story-markdown"
-          onClick={() => download(`${story.title.replace(/[\\/:*?"<>|]+/g, "_")}.md`, markdown(story))}>
+          onClick={() => saveMarkdown(`${story.title.replace(/[\\/:*?"<>|]+/g, "_")}.md`, markdown(story))}>
           {t("Save as Markdown")}
         </button>
         <button className="secondary small" onClick={() => window.print()}>{t("Print or save as PDF")}</button>

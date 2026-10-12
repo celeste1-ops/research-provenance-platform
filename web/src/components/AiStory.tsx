@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { api } from "../api";
+import { api, download } from "../api";
 import { dev } from "../device";
 import { t, tx } from "../i18n";
 import type { AiBlock, AiResult } from "../types";
@@ -303,11 +303,7 @@ export function AiStory({ projectId, onSelect, open, onOpen }: {
           </div>
           <button className="secondary small" data-testid="ai-markdown" onClick={() => {
             const blob = new Blob([markdown(result)], { type: "text/markdown;charset=utf-8" });
-            const a = document.createElement("a");
-            a.href = URL.createObjectURL(blob);
-            a.download = `${result.title.replace(/[\\/:*?"<>|]+/g, "_")} - AI.md`;
-            a.click();
-            URL.revokeObjectURL(a.href);
+            download(blob, `${result.title.replace(/[\\/:*?"<>|]+/g, "_")} - AI.md`);
           }}>
             {t("Save as Markdown (labelled AI inference)")}
           </button>

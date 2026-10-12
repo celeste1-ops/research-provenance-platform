@@ -35,4 +35,24 @@ curl -fsS "${H[@]}" -H 'Content-Type: application/json' -d '{"title":"Smoke","de
   -o "$DATA/bundle.zip" "$BASE/api/export"
 mkdir -p "$DATA/bundle" && (cd "$DATA/bundle" && unzip -q ../bundle.zip)
 uv run python "$DATA/bundle/verify.py" "$DATA/bundle" --offline   # needs cryptography + rfc3161-client
-echo "Smoke test passed: started, saved a step, exported, verified."
+kill $PID 2>/dev/null || true
+wait $PID 2>/dev/null || true
+
+# The app's own window (D-058), as you would use it: the page is drawn in the window, closing the
+# window hides it while the app keeps running, a second start shows it again, Quit ends the app.
+WDATA="$(mktemp -d)/rprov-window"
+RPROV_HOME="$WDATA" RPROV_KEYSTORE=memory RPROV_TSA=off RPROV_BTC=off \
+  "$BIN" --check-window --port 8798 &
+WPID=$!
+trap 'kill $PID $WPID 2>/dev/null || true' EXIT
+for _ in $(seq 1 180); do
+  kill -0 "$WPID" 2>/dev/null || break
+  sleep 1
+done
+if kill -0 "$WPID" 2>/dev/null; then
+  cat "$WDATA/logs/app.log" || true; echo "window check did not finish"; exit 1
+fi
+wait "$WPID" || { cat "$WDATA/logs/app.log" || true; echo "window check failed"; exit 1; }
+grep -q "window check passed" "$WDATA/logs/app.log" || { cat "$WDATA/logs/app.log"; echo "window check incomplete"; exit 1; }
+grep "window check" "$WDATA/logs/app.log"
+echo "Smoke test passed: started, saved a step, exported, verified; the window works."

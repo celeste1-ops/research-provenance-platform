@@ -4,15 +4,24 @@ Both ways of starting the app take the same lock: the double-click app (app.desk
 ``make run`` / ``python -m app``. Otherwise two servers could read and write the same
 database and backups at once, e.g. ``make run`` still open when the installed app starts.
 The operating system releases the lock when the process ends, even after a crash.
+
+A second start of the desktop app asks the running copy to show its window (D-058) by leaving
+a file in the data folder, which the running copy looks for and removes. A file, not a socket:
+no network code outside the providers, and nothing another program could connect to.
 """
 
 from __future__ import annotations
 
 import json
+import logging
 import os
 import sys
+import threading
 import time
+from collections.abc import Callable
 from pathlib import Path
+
+log = logging.getLogger("rprov.desktop")
 
 
 class InstanceLock:
@@ -21,6 +30,7 @@ class InstanceLock:
     def __init__(self, data_dir: Path):
         self.path = data_dir / "app.lock"
         self.port_file = data_dir / "app.port"
+        self.show_file = data_dir / "app.show"
         self._fh = None
 
     def acquire(self) -> bool:
@@ -56,6 +66,45 @@ class InstanceLock:
                 if time.monotonic() > deadline:
                     return None
                 time.sleep(0.2)
+
+    def ask_to_show(self, wait: float = 3.0) -> bool:
+        """Ask the running copy to show its window. True when it took the request; False when it
+        does not answer (``make run``, or a version without a window): open the browser then."""
+        try:
+            self.show_file.write_text(str(os.getpid()), encoding="utf-8")
+        except OSError:
+            return False
+        deadline = time.monotonic() + wait
+        while time.monotonic() < deadline:
+            if not self.show_file.exists():
+                return True
+            time.sleep(0.05)
+        try:
+            self.show_file.unlink()
+        except FileNotFoundError:
+            return True  # taken just now
+        except OSError:
+            pass
+        return False
+
+    def watch_show_requests(self, on_request: Callable[[], None], stop: threading.Event,
+                            interval: float = 0.25) -> None:
+        """Run by the copy that holds the lock, in a thread of its own, until ``stop`` is set."""
+        try:
+            self.show_file.unlink()  # left over from a start that gave up
+        except OSError:
+            pass
+        while not stop.wait(interval):
+            if not self.show_file.exists():
+                continue
+            try:
+                self.show_file.unlink()
+            except OSError:
+                continue
+            try:
+                on_request()
+            except Exception:  # noqa: BLE001 - keep answering later requests
+                log.exception("could not show the window")
 
     def release(self) -> None:
         if self._fh is not None:

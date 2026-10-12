@@ -28,11 +28,14 @@ function FilePreview({ id, name, kind }: { id: string; name: string; kind: Previ
   const [text, setText] = useState<{ text: string; truncated: boolean } | null>(null);
   const [open, setOpen] = useState(false);
   if (kind === "image") {
+    // Shown larger in place, not in a new window: in the app's own window that would be the browser.
     return (
-      <a className="file-image" href={previewUrl(id, name)} target="_blank" rel="noopener noreferrer"
-        title={t("Open the picture on its own")}>
-        <img src={previewUrl(id, name)} alt={name} loading="lazy" data-testid="file-image" />
-      </a>
+      <>
+        <button type="button" className="file-image" onClick={() => setOpen(true)} title={t("Show the picture larger")}>
+          <img src={previewUrl(id, name)} alt={name} loading="lazy" data-testid="file-image" />
+        </button>
+        {open && <Lightbox src={previewUrl(id, name)} name={name} onClose={() => setOpen(false)} />}
+      </>
     );
   }
   if (kind === "text") {
@@ -55,6 +58,23 @@ function FilePreview({ id, name, kind }: { id: string; name: string; kind: Previ
     );
   }
   return <span className="muted"> · {t("open it with the program it belongs to")}</span>;
+}
+
+function Lightbox({ src, name, onClose }: { src: string; name: string; onClose: () => void }) {
+  useEffect(() => {
+    const key = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    window.addEventListener("keydown", key);
+    return () => window.removeEventListener("keydown", key);
+  }, [onClose]);
+  return (
+    <div className="lightbox" role="dialog" aria-modal="true" aria-label={name} onClick={onClose} data-testid="lightbox">
+      <img src={src} alt={name} />
+      <div className="lightbox-bar">
+        <span>{name}</span>
+        <button className="link" onClick={onClose} aria-label={t("Close")}>✕</button>
+      </div>
+    </div>
+  );
 }
 
 export function Detail({ id, version, onClose, onSelect, entries, relationTypes, onChanged, activeRelations, space }: Props) {
@@ -136,7 +156,7 @@ export function Detail({ id, version, onClose, onSelect, entries, relationTypes,
               .filter((h) => h.name !== "body.md")
               .map((h) => (
                 <li key={h.name}>
-                  📎 <a href={contentUrl(detail.id, h.name)}>{h.name}</a>{" "}
+                  📎 <a href={contentUrl(detail.id, h.name)} download={h.name}>{h.name}</a>{" "}
                   <span className="muted">{t("({n} bytes)", { n: h.size })}</span>
                   <FilePreview id={detail.id} name={h.name}
                     kind={detail.files.find((f) => f.role === "file" && f.name === h.name)?.preview ?? null} />

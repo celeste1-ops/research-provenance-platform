@@ -66,7 +66,7 @@ function StepContent({ node }: { node: GraphNode }) {
       {(files.length > 0 || ref) && (
         <div className="step-attach small">
           {files.map((f) => (
-            <a key={f.name} className="file-chip" href={contentUrl(node.id, f.name)} onClick={stop}
+            <a key={f.name} className="file-chip" href={contentUrl(node.id, f.name)} download={f.name} onClick={stop}
               title={t("Download {name}", { name: f.name })}>
               📎 {f.name}
             </a>

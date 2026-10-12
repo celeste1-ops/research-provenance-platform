@@ -1,4 +1,10 @@
-## What's in this version (v0.3.4)
+## What's in this version (v0.4.0)
+
+**New in v0.4.0**
+- **Its own window.** Research History now opens in a window of its own, like any other program, instead of a browser tab. It uses the web engine your system already has (Safari's on a Mac, Edge's on Windows), so the download is only about 1–2 MB larger.
+- **Closing the window does not stop the app.** Date stamps, backups, watched folders and git recording keep running in the menu bar (Mac) or the notification area by the clock (Windows); the first time, the icon says so. Open the window again from that icon, by opening Research History again, or (Mac) from the Dock. To stop everything, choose **Quit** in the icon's menu (Mac: also ⌘Q).
+- **Everything works as in the browser.** Drag files in; print the recovery code (or save it as a PDF); save an evidence bundle or an attachment, now with a dialog that asks where; DOI and GitHub links open in your browser. A picture opens larger inside the window, and a new project is named in a proper dialog. Copy and paste work as usual.
+- **The browser is still there.** "Open in browser" in the icon's menu opens the same page in your browser. On a Windows computer without Edge's web engine (Microsoft Edge WebView2 Runtime), the app uses the browser as before.
 
 **New in v0.3.4**
 - **See what each step says without opening it.** Every step card now shows the first lines of the step's text, its attached files (click one to download it) and its code commit or DOI; a step with only a title says so. The boxes on the map show one line of it too. Click a card to see all of it.
@@ -41,11 +47,11 @@
 
 ## How to install
 
-**Mac:** click the `.dmg` file below; it goes to your Downloads folder. Double-click it: a window opens with **Research History**, an arrow and **Applications**. Drag Research History onto Applications (choose Replace when upgrading; quit the running app first with the menu bar icon → Quit). Then open Applications and double-click Research History. Your browser opens the app's page, and a blue round icon appears in the menu bar.
+**Mac:** click the `.dmg` file below; it goes to your Downloads folder. Double-click it: a window opens with **Research History**, an arrow and **Applications**. Drag Research History onto Applications (choose Replace when upgrading; quit the running app first with the menu bar icon → Quit). Then open Applications and double-click Research History. Its window opens, and a blue round icon appears in the menu bar.
 
-**Windows:** click the `.exe` file below; it goes to your Downloads folder. Double-click it and click through the installer (Next → Install → Finish). Your browser opens the app's page; next time, open it from the Start menu.
+**Windows:** click the `.exe` file below; it goes to your Downloads folder. Double-click it and click through the installer (Next → Install → Finish). The app's window opens; next time, open it from the Start menu.
 
-The **中文 / English** button at the top right of the page switches the app between Chinese and English.
+The **中文 / English** button at the top right of the window switches the app between Chinese and English.
 
 ## Downloads
 
