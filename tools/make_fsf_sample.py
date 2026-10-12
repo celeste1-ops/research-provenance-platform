@@ -152,7 +152,7 @@ def figure_saturation_svg() -> None:
 <text x="{x1 - 170}" y="{y0 + 40}" font-family="sans-serif" font-size="12" fill="#2f5bd3">fitted alpha = 1.3 (H1 said 1.5)</text>
 </svg>
 """
-    (OUT / "figure1-saturation.svg").write_text(svg, encoding="utf-8")
+    (OUT / "figure1-saturation.svg").write_text(svg, encoding="utf-8", newline="\n")
 
 
 # ---------------------------------------------------------------- data, code, documents
@@ -160,26 +160,26 @@ def figure_saturation_svg() -> None:
 
 def data_files(ks: list[float], fs: list[float]) -> list[list[float]]:
     rows = ["t,v"] + [f"{t},{saturation(t):.4f}" for t in range(0, 81, 5)]
-    (OUT / "run1_results.csv").write_text("\n".join(rows) + "\n", encoding="utf-8")
+    (OUT / "run1_results.csv").write_text("\n".join(rows) + "\n", encoding="utf-8", newline="\n")
     (OUT / "run2_summary.csv").write_text(
         "forcing_F,alpha_fit,residual_formula_v2,residual_formula_v1\n"
-        "0.5,1.40,0.012,0.038\n1.0,1.30,0.011,0.041\n1.5,1.21,0.013,0.047\n", encoding="utf-8")
+        "0.5,1.40,0.012,0.038\n1.0,1.30,0.011,0.041\n1.5,1.21,0.013,0.047\n", encoding="utf-8", newline="\n")
     alpha = [[round(1.5 - 0.2 * f + 0.02 * (k - 0.8) - 0.004 * ((i + j) % 3), 3) for j, f in enumerate(fs)]
              for i, k in enumerate(ks)]
     sweep = {"description": "Sensitivity sweep (sample data): fitted alpha for each k and F.",
              "solver": "v0.2 (c05b9e2)", "k": ks, "F": fs, "alpha": alpha}
-    (OUT / "run3_sweep.json").write_text(json.dumps(sweep, indent=1) + "\n", encoding="utf-8")
+    (OUT / "run3_sweep.json").write_text(json.dumps(sweep, indent=1) + "\n", encoding="utf-8", newline="\n")
     (OUT / "run4_robustness.csv").write_text(
         "step_size,forcing_F,alpha_fit\n"
         "0.005,1.0,1.301\n0.010,1.0,1.300\n0.020,1.0,1.298\n"
-        "0.005,2.0,1.102\n0.010,2.0,1.099\n0.020,2.0,unstable\n", encoding="utf-8")
+        "0.005,2.0,1.102\n0.010,2.0,1.099\n0.020,2.0,unstable\n", encoding="utf-8", newline="\n")
     (OUT / "calibration.csv").write_text(
-        "controller_hz,flow_l_per_min\n10,1.9\n20,4.1\n30,6.0\n40,8.2\n50,9.9\n", encoding="utf-8")
+        "controller_hz,flow_l_per_min\n10,1.9\n20,4.1\n30,6.0\n40,8.2\n50,9.9\n", encoding="utf-8", newline="\n")
     (OUT / "lattice_run.log").write_text(
         "lattice model, 64 x 64 grid, periodic boundary\n"
         "step  1000  mean v = 0.412\nstep  5000  mean v = 0.733\nstep 20000  mean v = 0.861\n"
         "fit: alpha = 1.10 (+/- 0.08)\n"
-        "WARNING: boundary condition set to periodic; channel walls should be no-slip\n", encoding="utf-8")
+        "WARNING: boundary condition set to periodic; channel walls should be no-slip\n", encoding="utf-8", newline="\n")
     return alpha
 
 
@@ -235,8 +235,8 @@ def solve(forcing, k=0.8, t_end=80.0, tol=1e-4):
 
 
 def code_files() -> None:
-    (OUT / "solver-v1.py").write_text(SOLVER_V1, encoding="utf-8")
-    (OUT / "solver-v2.py").write_text(SOLVER_V2, encoding="utf-8")
+    (OUT / "solver-v1.py").write_text(SOLVER_V1, encoding="utf-8", newline="\n")
+    (OUT / "solver-v2.py").write_text(SOLVER_V2, encoding="utf-8", newline="\n")
     for name, commit, code in (("fsf-solver-3f9c2ab.zip", "3f9c2ab", SOLVER_V1),
                                ("fsf-solver-c05b9e2.zip", "c05b9e2", SOLVER_V21)):
         buf = io.BytesIO()
@@ -257,14 +257,14 @@ def document_files() -> None:
         "@article{modelB, author = {Sample, B. and Demo, C.}, title = {Logistic saturation with a fixed exponent},"
         " journal = {Sample Journal}, year = {2018}}\n"
         "@article{modelC, author = {Placeholder, D.}, title = {An empirical fit for saturating flows},"
-        " journal = {Sample Letters}, year = {2021}}\n", encoding="utf-8")
+        " journal = {Sample Letters}, year = {2021}}\n", encoding="utf-8", newline="\n")
     (OUT / "formula-v1.tex").write_text(
         "% Formula v1 (sample)\n\\begin{equation}\n  \\frac{dv}{dt} = k\\,(1 - v)^{\\alpha},"
-        " \\qquad k = 0.8,\\ \\alpha = 1.5\n\\end{equation}\n", encoding="utf-8")
+        " \\qquad k = 0.8,\\ \\alpha = 1.5\n\\end{equation}\n", encoding="utf-8", newline="\n")
     (OUT / "formula-v2.tex").write_text(
         "% Formula v2 (sample): the exponent depends on the forcing F\n\\begin{equation}\n"
         "  \\frac{dv}{dt} = k\\,(1 - v)^{\\alpha(F)}, \\qquad \\alpha(F) = 1.5 - 0.2\\,F\n\\end{equation}\n",
-        encoding="utf-8")
+        encoding="utf-8", newline="\n")
 
 
 def pdf_file() -> None:
@@ -333,7 +333,7 @@ def drafts() -> None:
     for lang, files in DRAFTS.items():
         (OUT / lang).mkdir(exist_ok=True)
         for name, text in files.items():
-            (OUT / lang / name).write_text(text, encoding="utf-8")
+            (OUT / lang / name).write_text(text, encoding="utf-8", newline="\n")
 
 
 def main() -> None:
