@@ -555,7 +555,7 @@ export function App() {
                 {view === "graph"
                   ? t("Point at a step to see its lines · click it to open it · drag to move · scroll to zoom")
                   : view === "steps"
-                    ? stepsTable ? t("Click a row to open that step") : t("Click a card to open that step · click a #number to go to that step")
+                    ? stepsTable ? t("Click a row to open that step") : t("Click a card to see all of that step · click a #number to go to that step")
                     : t("Click a #number to open that step")}
               </span>
               <button className="link small" onClick={hideTips} data-testid="view-tip-hide">{t("Got it")}</button>

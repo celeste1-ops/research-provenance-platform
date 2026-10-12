@@ -432,3 +432,12 @@ button.ai-jump { color: #4b2f91; border-color: #d3c4f3; background: #f8f5ff; }
 button.ai-jump:hover { border-color: #7c5cc4; }
 @media print { .ai-jump { display: none !important; } }
 .space-practice .lane-chip { box-shadow: 0 0 0 3px #fffdf8; }
+/* What a step holds, readable without opening it (D-056). */
+.step-preview { margin: 4px 0 2px; font-size: 14px; color: #3b4352; line-height: 1.5; white-space: pre-line;
+  display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; }
+.step-attach { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0 2px; }
+a.file-chip, .file-chip { display: inline-flex; align-items: center; gap: 4px; max-width: 100%; padding: 1px 9px; border: 1px solid var(--line);
+  border-radius: 99px; background: #f7f8fa; color: #3b4352; text-decoration: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+a.file-chip:hover { border-color: var(--accent); color: var(--accent); }
+.step-empty { margin: 4px 0 0; font-style: italic; }
+.node-preview { margin-top: 3px; font-size: 11.5px; color: #4a5263; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

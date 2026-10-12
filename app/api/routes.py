@@ -415,7 +415,7 @@ def get_diff(record_id: str, against: str, request: Request):
 @router.get("/graph")
 def get_graph(request: Request, project: str | None = None, milestones_only: bool = False):
     c = ctx(request)
-    return graph_view(Snapshot.load(c.ledger, c.anchors), project, milestones_only)
+    return graph_view(Snapshot.load(c.ledger, c.anchors), project, milestones_only, blobs=c.ledger.blobs)
 
 
 @router.get("/timeline")

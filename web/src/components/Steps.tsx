@@ -2,6 +2,7 @@ import { useEffect, useMemo, type ReactNode } from "react";
 import type { Graph, GraphEdge, GraphNode, TimelineRow } from "../types";
 import { help, typeLabel, typeStyle } from "../labels";
 import { t, tn, tx } from "../i18n";
+import { contentUrl } from "../api";
 import { ProofIcon } from "./ProofBadge";
 import { Timeline } from "./Timeline";
 
@@ -21,6 +22,43 @@ function relation(rel: string, step: ReactNode): ReactNode {
     default:
       return <>{rel.replace("_", " ")} {step}</>;
   }
+}
+
+/** A step's reference outside the app, in a few words: a code commit, a DOI or a link. */
+export function referenceText(ext: GraphNode["external"]): string | null {
+  if (!ext) return null;
+  if (ext.commit) {
+    const repo = ext.repo_url ? ` · ${ext.repo_url.replace(/^https?:\/\//, "")}` : "";
+    return t("Code commit {commit}", { commit: ext.commit.slice(0, 7) }) + repo;
+  }
+  if (ext.doi) return `DOI ${ext.doi}`;
+  return ext.url ?? null;
+}
+
+/** What the step holds — the first lines of its text, its files, its reference — so it can be read
+ * without opening it. The whole of it is in the step's detail. */
+function StepContent({ node }: { node: GraphNode }) {
+  const files = node.files ?? [];
+  const ref = referenceText(node.external);
+  if (!node.preview && files.length === 0 && !ref) {
+    return <p className="step-empty muted small">{t("No text — just the title.")}</p>;
+  }
+  return (
+    <div className="step-content">
+      {node.preview && <p className="step-preview" data-testid="step-preview">{node.preview}</p>}
+      {(files.length > 0 || ref) && (
+        <div className="step-attach small">
+          {files.map((f) => (
+            <a key={f} className="file-chip" href={contentUrl(node.id, f)} onClick={(e) => e.stopPropagation()}
+              title={t("Download {name}", { name: f })}>
+              📎 {f}
+            </a>
+          ))}
+          {ref && <span className="file-chip ref-chip">🔗 {ref}</span>}
+        </div>
+      )}
+    </div>
+  );
 }
 
 function cardId(id: string): string {
@@ -91,6 +129,7 @@ function Card({ node, links, next, byId, selected, onSelect }: {
         <button className="step-title" onClick={(e) => { e.stopPropagation(); onSelect(node.id); }}>
           {node.title}
         </button>
+        <StepContent node={node} />
         {links.length > 0 && (
           <ul className="step-links">
             {links.map((e) => {

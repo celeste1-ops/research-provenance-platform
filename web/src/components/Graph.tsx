@@ -19,13 +19,14 @@ import type { Graph as GraphData, GraphNode } from "../types";
 import { typeLabel, typeStyle } from "../labels";
 import { t } from "../i18n";
 import { ProofIcon } from "./ProofBadge";
+import { referenceText } from "./Steps";
 
 const COL_W = 210;
 const ROW_H = 96;
 const LEFT = 150;
 const TOP = 24;
 const NODE_W = 184;
-const NODE_H = 60; // about the height of a step's box, for the row names beside it
+const NODE_H = 74; // about the height of a step's box, for the row names beside it
 const LEGEND_KEY = "rprov-map-legend-hidden";
 
 const DASH: Record<string, string | undefined> = { revises: undefined, derived_from: "7 4", uses: "2 4" };
@@ -49,6 +50,8 @@ function relWords(rel: string): string {
 
 function RecordNode({ data }: NodeProps<Node<RecordNodeData>>) {
   const n = data.node;
+  // One line of what the step holds: its text, else its files, else its reference.
+  const glance = n.preview?.split("\n")[0] || (n.files?.length ? `📎 ${n.files.join(", ")}` : referenceText(n.external));
   const cls = ["record-node", n.milestone ? "milestone" : "", n.retracted ? "retracted" : "", data.selected ? "selected" : ""]
     .filter(Boolean)
     .join(" ");
@@ -59,6 +62,7 @@ function RecordNode({ data }: NodeProps<Node<RecordNodeData>>) {
         {n.milestone && <span className="star">★ </span>}
         {n.title}
       </div>
+      {glance && <div className="node-preview" title={n.preview ?? glance}>{glance}</div>}
       <div className="node-meta">
         <span className={n.date.verified ? "" : "unverified"} title={n.date.from}>
           <b className="node-seq">#{n.seq}</b> · {n.date.time.slice(0, 10)}

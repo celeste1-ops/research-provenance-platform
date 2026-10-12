@@ -544,7 +544,7 @@ export const ZH: Record<string, string> = {
   "Steps": "步骤",
   "every step on a card, oldest at the top: what it is, when it was stamped, and which earlier steps it came from.": "每一步一张卡片，最早的在最上面：这一步是什么、什么时候盖的章、它是从前面哪几步来的。",
   "Point at a step to see its lines · click it to open it · drag to move · scroll to zoom": "鼠标指着一步就只显示它的连线 · 点一下查看详情 · 拖动移动 · 滚轮缩放",
-  "Click a card to open that step · click a #number to go to that step": "点卡片查看那一步 · 点 #编号 跳到那一步",
+  "Click a card to see all of that step · click a #number to go to that step": "点卡片看这一步的全部内容 · 点 #编号 跳到那一步",
   "The local model stopped before it finished.": "本机模型没写完就停了。",
   "Open step #{n}": "查看第 {n} 步",
   "Summarise with an AI model on this {device} (optional)…": "用这台{device}上的 AI 模型总结要点（可选）…",
@@ -583,4 +583,7 @@ export const ZH: Record<string, string> = {
   "{n} more step in between": "中间还有 {n} 步",
   "{n} more steps in between": "中间还有 {n} 步",
   "AI summary…": "AI 总结要点…",
+  "Code commit {commit}": "代码提交 {commit}",
+  "No text — just the title.": "没有写内容，只有标题。",
+  "Download {name}": "下载 {name}",
 };

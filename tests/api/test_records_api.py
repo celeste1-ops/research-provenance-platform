@@ -184,3 +184,22 @@ def test_key_backup_export_is_password_protected(api):
     with _pytest.raises(KeyBackupError):
         load_private_key_encrypted(r.content, "wrong password!")
     assert api.client.get("/api/status").json()["key_backup_done"] is True
+
+
+def test_the_steps_show_what_they_hold(api):
+    """D-056: the map and the step cards show the first lines of each step's text, its files and its
+    reference, so a step can be read without opening it."""
+    api.init()
+    note = api.entry("Notes", "note", body="# Heading\n\n- **first** point with a [link](https://example.org)\n\n"
+                     "```\ncode line\n```\n" + "more words " * 100)
+    data = api.entry("Data", "dataset", files=[("run1.csv", b"t,x\n0,1\n")])
+    code = api.entry("Solver", "code", repo_url="https://github.com/example/fsf", commit="0123abcdef")
+    bare = api.entry("Only a title", "idea")
+    nodes = {n["id"]: n for n in api.client.get("/api/graph").json()["nodes"]}
+    preview = nodes[note["id"]]["preview"]
+    assert preview.startswith("Heading\nfirst point with a link\ncode line\nmore words")  # plain text, no marks
+    assert preview.endswith("…") and len(preview) <= 281  # a few lines, not the whole text
+    assert nodes[data["id"]]["files"] == ["run1.csv"] and nodes[data["id"]]["preview"] is None
+    assert nodes[code["id"]]["external"] == {"repo_url": "https://github.com/example/fsf", "commit": "0123abcdef"}
+    assert nodes[bare["id"]]["preview"] is None and nodes[bare["id"]]["files"] == []
+    assert nodes[bare["id"]]["external"] is None

@@ -757,3 +757,13 @@ verification rules or what leaves the machine for time proofs.
   Chinese and English, that appears after a few seconds if the app has not replaced it ("quit
   the app from its tray / menu bar icon and open it again; if it stays, send a screenshot").
   Tested by making the type table answer `text/plain`, in the API tests and in a browser.
+
+- **D-056 · A step shows what it says without being opened.** The step cards and the map showed
+  each step's kind, title, date and relations, and its text only in the detail panel, so the
+  research read as a list of relations ("I can't see what is actually in it"). The map's data
+  now carries, per step, the first lines of its text as plain text (at most four lines and 280
+  characters, read from the first 4 KB of the stored text; Markdown marks dropped), the names of
+  its files and its external reference. A card shows them under the title — files as chips that
+  download, a commit or DOI as a chip — and says "No text — just the title" when there is none; a
+  map box shows one line. This is for reading only: the full text, checked against its
+  fingerprint, stays in the detail; nothing changes in records, exports or what the AI is given.

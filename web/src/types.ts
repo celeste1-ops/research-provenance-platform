@@ -29,6 +29,9 @@ export interface GraphNode {
   date: WhenInfo;
   tsa: ProofStatus;
   btc: ProofStatus;
+  preview?: string | null; // the first lines of the step's text
+  files?: string[]; // names of attached files
+  external?: { commit?: string; repo_url?: string; doi?: string; url?: string } | null;
 }
 
 export interface GraphEdge {

@@ -40,6 +40,11 @@ def test_steps_view_reads_in_plain_words(demo_page):
     card = steps.get_by_test_id(f"step-{ids['formula2']}")
     text = card.inner_text()
     assert "Document" in text and "Formula v2" in text
+    assert "alpha(F) = 1.5 - 0.2 F" in card.get_by_test_id("step-preview").inner_text()  # what it says, at a glance
+    exp1 = steps.get_by_test_id(f"step-{ids['exp1']}")
+    assert "fitted exponent is closer to 1.3" in exp1.inner_text() and "run1_results.csv" in exp1.inner_text()
+    assert "Code commit 3f9c2ab" in steps.get_by_test_id(f"step-{ids['solver']}").inner_text()
+    assert "DOI 10.5281/zenodo.0000000" in steps.get_by_test_id(f"step-{ids['preprint']}").inner_text()
     assert "A new version of" in text and "Formula v1" in text  # revises, in plain words
     assert "Later steps that build on it:" not in steps.get_by_test_id(f"step-{ids['preprint']}").inner_text()
     card.get_by_role("button", name="#4 Formula v1").click()  # goes to the earlier step and opens it

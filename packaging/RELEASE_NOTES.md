@@ -1,4 +1,7 @@
-## What's in this version (v0.3.3)
+## What's in this version (v0.3.4)
+
+**New in v0.3.4**
+- **See what each step says without opening it.** Every step card now shows the first lines of the step's text, its attached files (click one to download it) and its code commit or DOI; a step with only a title says so. The boxes on the map show one line of it too. Click a card to see all of it.
 
 **Fixed in v0.3.3**
 - **The page no longer stays empty on some Windows computers.** Where other software had told Windows that `.js` files are plain text, the app sent its own script as plain text, the browser would not run it, and the page at `127.0.0.1:8765` stayed blank. The app now always names the type of its own files. If the page ever cannot start, it says what to do instead of staying empty.
