@@ -40,6 +40,16 @@ class LanguageMiddleware:
         await self.app(scope, receive, send)
 
 
+# The types of the page's own files, not left to the mimetypes module: on Windows it takes them from
+# the registry, where other software often maps .js to text/plain, and a browser does not run a
+# script sent as plain text — the page stayed empty on such a computer.
+WEB_TYPES = {
+    ".js": "text/javascript", ".mjs": "text/javascript", ".css": "text/css", ".html": "text/html",
+    ".json": "application/json", ".map": "application/json", ".svg": "image/svg+xml", ".png": "image/png",
+    ".ico": "image/x-icon", ".woff2": "font/woff2", ".woff": "font/woff",
+}
+
+
 def create_app(ctx: AppContext, *, start_jobs: bool = False) -> FastAPI:
     spaces = Spaces(ctx)
 
@@ -108,7 +118,7 @@ def create_app(ctx: AppContext, *, start_jobs: bool = False) -> FastAPI:
             raise HTTPException(404)
         target = (dist / path).resolve()
         if dist.resolve() in target.parents and target.is_file():
-            return FileResponse(target)
+            return FileResponse(target, media_type=WEB_TYPES.get(target.suffix.lower()))
         return index()
 
     return app

@@ -747,3 +747,13 @@ verification rules or what leaves the machine for time proofs.
      still loading. Opening the panel looks for models at the saved
      address at once, and a button at the top of the story goes to it, so one click on Write is
      enough.
+
+- **D-055 · The page's own files have fixed types.** v0.3.2 showed an empty page on a friend's
+  Windows computer. The server let Python's mimetypes module name the type of each file it
+  sends, and on Windows that module reads the registry, where other software often maps `.js`
+  to `text/plain`; the page's script then arrived as plain text (with `nosniff`), the browser
+  refused to run it, and only the background showed. The server now names the types of the
+  page's own files itself (`WEB_TYPES` in `app/main.py`), and the page holds a short note, in
+  Chinese and English, that appears after a few seconds if the app has not replaced it ("quit
+  the app from its tray / menu bar icon and open it again; if it stays, send a screenshot").
+  Tested by making the type table answer `text/plain`, in the API tests and in a browser.

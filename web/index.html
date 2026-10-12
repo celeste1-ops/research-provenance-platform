@@ -4,10 +4,21 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="rprov-session-token" content="__RPROV_SESSION_TOKEN__" />
-    <title>Research Provenance</title>
+    <title>Research History</title>
+    <!-- Shown only if the app has not started after a few seconds (the app replaces it at once). -->
+    <style>
+      .boot { max-width: 560px; margin: 80px auto; padding: 0 20px; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei", sans-serif; color: #1d2330; line-height: 1.6; opacity: 0; animation: boot-show 0s 4s forwards; }
+      .boot p { margin: 0 0 12px; }
+      @keyframes boot-show { to { opacity: 1; } }
+    </style>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <div class="boot" data-testid="boot-fallback">
+        <p><b>研究历程没能打开这个页面。</b>请从托盘（Windows 右下角）或菜单栏（Mac 右上角）的图标退出程序，再重新打开。还是这样的话，请把这个页面截图发给开发者。</p>
+        <p><b>Research History could not start this page.</b> Quit the app from its tray (Windows, bottom right) or menu bar (Mac, top right) icon and open it again. If it stays like this, send a screenshot of this page to the developer.</p>
+      </div>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

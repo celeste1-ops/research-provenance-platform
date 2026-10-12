@@ -1,4 +1,7 @@
-## What's in this version (v0.3.2)
+## What's in this version (v0.3.3)
+
+**Fixed in v0.3.3**
+- **The page no longer stays empty on some Windows computers.** Where other software had told Windows that `.js` files are plain text, the app sent its own script as plain text, the browser would not run it, and the page at `127.0.0.1:8765` stayed blank. The app now always names the type of its own files. If the page ever cannot start, it says what to do instead of staying empty.
 
 **Fixed in v0.3.2**
 - **One keychain question per upgrade.** Everything the app keeps in the keychain is now in a single item, so a new version asks once — click **Always Allow**. (This first time, 0.3.2 asks once for each item older versions made, usually two or three, while it moves them into the single item.)
