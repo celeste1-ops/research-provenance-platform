@@ -64,8 +64,11 @@ class FakeWindow:
             self.closed.set()
 
     def evaluate_js(self, script):
+        raise AssertionError("evaluate_js wraps scripts in eval(), which the page's CSP refuses (WKWebView)")
+
+    def run_js(self, script):
         self.scripts.append(script)
-        return True
+        return "drawn" if "drawn" in script else None
 
     def user_closes(self):
         """The red button / the × of the window."""

@@ -306,16 +306,18 @@ def check_window(shell, lock: InstanceLock, server_thread: threading.Thread) -> 
     seen = {}
 
     def drawn() -> bool:
+        # run_js: the page's Content-Security-Policy forbids the eval() that evaluate_js uses.
         try:
-            seen["answer"] = shell.window.evaluate_js(
-                "!document.querySelector('#root .boot') && !!document.querySelector('#root [data-testid]')")
+            seen["answer"] = shell.window.run_js(
+                "!document.querySelector('#root .boot') && !!document.querySelector('#root [data-testid]')"
+                " ? 'drawn' : 'not yet'")
         except Exception as exc:  # noqa: BLE001 - not yet
             seen["answer"] = exc
-        return seen["answer"] is True
+        return seen["answer"] == "drawn"
 
     if not wait_for(drawn, 30):
         try:
-            page = shell.window.evaluate_js("document.getElementById('root').innerHTML.slice(0, 300)")
+            page = shell.window.run_js("document.getElementById('root').innerHTML.slice(0, 300)")
         except Exception as exc:  # noqa: BLE001
             page = exc
         fail(f"the page was not drawn (only the start-up note, or nothing): the window answered "

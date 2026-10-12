@@ -835,6 +835,10 @@ verification rules or what leaves the machine for time proofs.
      for a minute, as the save dialog may still be open. Links that open a new window (DOI,
      repository, web addresses) open in the browser. A picture opens larger inside the window.
      A new project is named in a dialog of the app's own instead of the browser's prompt box.
+     The app runs its few scripts in the window (opening the quick note box) with pywebview's
+     `run_js`, not `evaluate_js`: that one wraps them in `eval()`, which the page's own
+     Content-Security-Policy forbids, and WKWebView holds such scripts to it (WebView2 does not),
+     so the policy stays as strict as before.
      Text can be selected and copied (pywebview's default stops that); on macOS the Edit menu
      gives ⌘C/⌘V/⌘A, in Chinese or English; on Windows the right-click menu and the usual keys
      (Ctrl+P, Ctrl+F) are turned back on. The page's own settings (view, tips) are kept between

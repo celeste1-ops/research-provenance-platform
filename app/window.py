@@ -219,7 +219,9 @@ class AppWindow:
 
     def _go(self, hash: str) -> None:
         try:
-            self.window.evaluate_js(f"window.location.hash = {json.dumps(hash)}")
+            # run_js, not evaluate_js: that one wraps the script in eval(), which the page's own
+            # Content-Security-Policy forbids, and WKWebView holds such scripts to it.
+            self.window.run_js(f"window.location.hash = {json.dumps(hash)}")
         except Exception:  # noqa: BLE001
             log.exception("could not open %s in the window", hash)
 
