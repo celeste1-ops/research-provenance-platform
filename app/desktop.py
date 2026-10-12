@@ -303,15 +303,23 @@ def check_window(shell, lock: InstanceLock, server_thread: threading.Thread) -> 
 
     if not shell.loaded.wait(90):
         fail("the page did not load")
+    seen = {}
+
     def drawn() -> bool:
         try:
-            return shell.window.evaluate_js(
-                "!document.querySelector('#root .boot') && !!document.querySelector('#root [data-testid]')") is True
-        except Exception:  # noqa: BLE001 - not yet
-            return False
+            seen["answer"] = shell.window.evaluate_js(
+                "!document.querySelector('#root .boot') && !!document.querySelector('#root [data-testid]')")
+        except Exception as exc:  # noqa: BLE001 - not yet
+            seen["answer"] = exc
+        return seen["answer"] is True
 
     if not wait_for(drawn, 30):
-        fail("the page was not drawn (only the start-up note, or nothing)")
+        try:
+            page = shell.window.evaluate_js("document.getElementById('root').innerHTML.slice(0, 300)")
+        except Exception as exc:  # noqa: BLE001
+            page = exc
+        fail(f"the page was not drawn (only the start-up note, or nothing): the window answered "
+             f"{seen.get('answer')!r}; the page holds {page!r}")
     log.info("window check: the page is drawn")
 
     if sys.platform == "darwin":

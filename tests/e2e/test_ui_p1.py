@@ -175,7 +175,9 @@ def test_redrawing_the_map_never_hides_steps_again(demo_page):
     page.locator(".react-flow__controls-fitview").click()  # the whole map in sight (it starts at the newest)
     page.get_by_test_id(f"node-{ids['exp1']}").click()  # a redraw where two steps change
     page.get_by_test_id("detail").wait_for()
-    page.get_by_test_id(f"node-{ids['exp2']}").click()
+    # A step on the left: the detail panel now covers the right edge of the map (where WebKit's
+    # layout puts the next experiment).
+    page.get_by_test_id(f"node-{ids['formula1']}").click()
     page.wait_for_timeout(1000)
     assert page.evaluate("window.__hidden") == 0
 
