@@ -1,10 +1,10 @@
 import { useEffect, useState } from "react";
-import { api, contentUrl, type Space } from "../api";
-import type { GraphNode, RecordDetail } from "../types";
+import { api, contentUrl, previewText, previewUrl, type Space } from "../api";
+import type { GraphNode, PreviewKind, RecordDetail } from "../types";
 import { Changes } from "./Changes";
 import { LaterActions, WithdrawRelation } from "./LaterActions";
 import { Markdown } from "./Markdown";
-import { stampName } from "../labels";
+import { referenceHref, stampName } from "../labels";
 import { t, tx } from "../i18n";
 import { ProofLine } from "./ProofBadge";
 
@@ -22,6 +22,41 @@ interface Props {
 
 // Record detail, split by source with fixed labels:
 // Verified record / Author statement / Later additions / Changes.
+/** An attached file shown in place when the app can show it safely (D-057): a picture, or the
+ * start of a text file; anything else opens with the program it belongs to. */
+function FilePreview({ id, name, kind }: { id: string; name: string; kind: PreviewKind }) {
+  const [text, setText] = useState<{ text: string; truncated: boolean } | null>(null);
+  const [open, setOpen] = useState(false);
+  if (kind === "image") {
+    return (
+      <a className="file-image" href={previewUrl(id, name)} target="_blank" rel="noopener noreferrer"
+        title={t("Open the picture on its own")}>
+        <img src={previewUrl(id, name)} alt={name} loading="lazy" data-testid="file-image" />
+      </a>
+    );
+  }
+  if (kind === "text") {
+    return (
+      <>
+        {" "}
+        <button className="link small" data-testid="file-preview-toggle" onClick={() => {
+          setOpen(!open);
+          if (!text) previewText(id, name).then(setText).catch(() => setText({ text: t("Could not show this file."), truncated: false }));
+        }}>
+          {open ? t("Hide") : t("Show what it says")}
+        </button>
+        {open && (
+          <pre className="file-text" data-testid="file-text">
+            {text ? text.text : t("Loading…")}
+            {text?.truncated && <span className="muted">{"\n"}{t("… only the start is shown; download the file for all of it.")}</span>}
+          </pre>
+        )}
+      </>
+    );
+  }
+  return <span className="muted"> · {t("open it with the program it belongs to")}</span>;
+}
+
 export function Detail({ id, version, onClose, onSelect, entries, relationTypes, onChanged, activeRelations, space }: Props) {
   const [detail, setDetail] = useState<RecordDetail | null>(null);
   const [body, setBody] = useState<string | null>(null);
@@ -78,7 +113,13 @@ export function Detail({ id, version, onClose, onSelect, entries, relationTypes,
               .map(([k, val]) => (
                 <div key={k}>
                   {k === "repo_url" ? t("Repository") : k === "commit" ? t("Commit") : k.toUpperCase()}:{" "}
-                  <span className="mono">{val}</span>
+                  {(k === "repo_url" || k === "doi" || k === "url") && referenceHref({ [k]: String(val) }) ? (
+                    <a className="mono" href={referenceHref({ [k]: String(val) }) ?? undefined} target="_blank"
+                      rel="noopener noreferrer"
+                      title={t("Opens in your browser. A private page may ask you to sign in, or not open at all.")}>
+                      {String(val)}
+                    </a>
+                  ) : <span className="mono">{val}</span>}
                 </div>
               ))}
             {v.external.evidence_level && <div className="muted">{v.external.evidence_level}</div>}
@@ -97,6 +138,8 @@ export function Detail({ id, version, onClose, onSelect, entries, relationTypes,
                 <li key={h.name}>
                   📎 <a href={contentUrl(detail.id, h.name)}>{h.name}</a>{" "}
                   <span className="muted">{t("({n} bytes)", { n: h.size })}</span>
+                  <FilePreview id={detail.id} name={h.name}
+                    kind={detail.files.find((f) => f.role === "file" && f.name === h.name)?.preview ?? null} />
                 </li>
               ))}
           </ul>

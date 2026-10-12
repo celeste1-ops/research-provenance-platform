@@ -757,3 +757,42 @@ verification rules or what leaves the machine for time proofs.
   Chinese and English, that appears after a few seconds if the app has not replaced it ("quit
   the app from its tray / menu bar icon and open it again; if it stays, send a screenshot").
   Tested by making the type table answer `text/plain`, in the API tests and in a browser.
+
+- **D-056 · A step shows what it says without being opened.** The step cards and the map showed
+  each step's kind, title, date and relations, and its text only in the detail panel, so the
+  research read as a list of relations ("I can't see what is actually in it"). The map's data
+  now carries, per step, the first lines of its text as plain text (at most four lines and 280
+  characters, read from the first 4 KB of the stored text; Markdown marks dropped), the names of
+  its files and its external reference. A card shows them under the title — files as chips that
+  download, a commit or DOI as a chip — and says "No text — just the title" when there is none; a
+  map box shows one line. This is for reading only: the full text, checked against its
+  fingerprint, stays in the detail; nothing changes in records, exports or what the AI is given.
+
+- **D-057 · Showing what a step holds, in the app and in the shared report.** Asked for: someone
+  curious should be able to see what a step actually contains — in full where possible, with
+  links where it lives elsewhere, a clear note where it cannot be seen — and readers of a shared
+  report should get the same "point at it and see" as the author.
+  1. *Pictures and text files in place.* A step's files are stored as they are, any format. The
+     app now shows two kinds itself: pictures (PNG, JPEG, GIF, WebP, BMP, SVG) through an `<img>`
+     element, which runs no script even in an SVG, and the first 64 KB of text files (notes, CSV,
+     JSON, code, LaTeX…) as text. Both come from `/api/records/{id}/preview`, sandboxed like any
+     attachment (`Content-Security-Policy: sandbox`), so a file opened on its own can run nothing.
+     Everything else — Word, PDF, archives, HTML — stays download-only (PRD S3). Cards show up
+     to three picture thumbnails; the detail shows the picture, or "Show what it says" for text.
+  2. *Links.* A DOI opens at doi.org, a repository or web address as given (http/https only),
+     in a new tab, with a note that a private page may ask to sign in or not open.
+  3. *Earlier dates.* A step's claimed date (older material, git history recorded later) is
+     shown on its card and on the map as "the author says it is from … — not verified". The
+     verified date stays the date stamp: when the step entered the app (README explains why).
+  4. *The map* shows a panel with the content of the step under the mouse.
+  5. *The shared report* (still no scripts: its policy is `default-src 'none'`) shows a card on
+     hover, made with CSS `:hover`/`:focus-within`, on the story's #numbers and the timeline's
+     titles; the graph's boxes carry the same text as an SVG `<title>`. What a card holds follows
+     the disclosure chosen for the step: its first lines when shared in full, else the plain
+     note that the author did not share it (structure only). Files shared in full are linked
+     into `content/` and pictures up to 2 MB are embedded as `data:` images; a file not in the
+     package says "a file on the author's computer, not put into this package". DOIs and web
+     addresses are links.
+  6. *No excerpt level for sharing.* A piece of a text cannot be checked against the step's
+     fingerprint, so a reader would have to take it on trust; a step is shared whole (checkable)
+     or not at all. In the app, where the whole is one click away, excerpts are fine.

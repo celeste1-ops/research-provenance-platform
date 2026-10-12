@@ -3,7 +3,9 @@ CSS, a static SVG graph, no scripts, fonts or external requests (PRD §12)."""
 
 from __future__ import annotations
 
+import base64
 from pathlib import Path
+from urllib.parse import quote
 
 from jinja2 import Environment, FileSystemLoader
 from markdown_it import MarkdownIt
@@ -11,6 +13,7 @@ from markupsafe import Markup, escape
 
 from app.i18n import current, tr
 from app.report.svg import render_graph_svg
+from app.services.previews import image_type, plain_preview, preview_kind, web_link
 from provenance_core.jcs import parse_json_strict
 from provenance_core.replay import replay
 from provenance_core.verify import STATUS_LABELS
@@ -84,6 +87,21 @@ def rel_label(rel: str) -> str:
     return tr(REL_LABELS.get(rel, "other relation"))
 
 
+# What a reader can see of a step, in plain words (D-057): everything, or why not.
+NOT_SHARED = {  # an "existence only" step is not described at all, so it needs no note
+    "structure": "The author did not share what this step says, only its fingerprint (to check a copy "
+                 "the author gives you later).",
+}
+FILE_NOT_SHARED = "a file on the author's computer, not put into this package, so it cannot be seen here"
+INLINE_IMAGE_BYTES = 2 * 1024 * 1024  # larger pictures are only linked, so the report stays small
+
+
+def _image_data_uri(name: str, data: bytes) -> str | None:
+    if preview_kind(name) != "image" or len(data) > INLINE_IMAGE_BYTES:
+        return None
+    return f"data:{image_type(name)};base64,{base64.b64encode(data).decode('ascii')}"
+
+
 def build_model(plan, meta, mats, contents, report, trust) -> dict:
     results = report.by_id()
     payloads: dict[str, dict] = {}
@@ -109,10 +127,28 @@ def build_model(plan, meta, mats, contents, report, trust) -> dict:
         return tr("hidden {kind} record #{seq}", kind=kind, seq=state.seqs.get(rid, "?")) \
             if rid in state.hidden else kind
 
+    # What each disclosed step says at a glance, for the hover cards (D-057).
+    peeks: dict[str, dict] = {}
+    for e in state.entries.values():
+        p = payloads.get(e.id) or {}
+        level = plan.levels[e.id]
+        body = (contents.get(e.id) or {}).get("body")
+        w = when(e.id)
+        peeks[e.id] = {
+            "seq": e.seq, "title": e.title, "type": tr(TYPE_LABELS.get(e.node_type, "Other")),
+            "date": _date(w["time"]) + ("" if w["verified"] else " " + tr("(unverified)")),
+            "preview": plain_preview(body.decode("utf-8", "replace")) if body is not None else None,
+            "files": [f["name"] for f in (p.get("content") or {}).get("files") or []],
+            "note": tr(NOT_SHARED[level]) if level in NOT_SHARED else None,
+        }
+
     nodes = []
     for e in sorted(state.entries.values(), key=lambda e: e.seq):
         res = results[e.id]
+        pk = peeks[e.id]
         nodes.append({
+            "tip": "\n".join(x for x in (pk["title"], f'{pk["type"]} · {pk["date"]}', pk["preview"] or pk["note"] or "",
+                                         ("📎 " + ", ".join(pk["files"])) if pk["files"] else "") if x),
             "id": e.id, "seq": e.seq, "title": e.title, "node_type": e.node_type, "milestone": e.milestone,
             "retracted": bool(e.retracted_by), "date": _date(when(e.id)["time"] if when(e.id)["verified"] else None),
             "tsa_state": "confirmed" if res.tsa.verified else ("none" if res.tsa.state == "none" else res.tsa.state),
@@ -170,7 +206,8 @@ def build_model(plan, meta, mats, contents, report, trust) -> dict:
         res = results[r.id]
         d = {"id": r.id, "seq": r.seq, "kind": r.kind, "title": titles[r.id],
              "disclosure": plan.levels[r.id], "res": res, "ev": res.earliest_verified(),
-             "author": [], "later": [], "body_html": None, "content_hashes": [], "external": None}
+             "author": [], "later": [], "body_html": None, "content_hashes": [], "external": None,
+             "files": [], "not_shared": None, "link": None}
         declared = when(r.id)
         declared_note = tr("Author declared on {date}" if declared["verified"]
                            else "Author declared on {date} (unverified date)", date=_date(declared["time"]))
@@ -192,6 +229,16 @@ def build_model(plan, meta, mats, contents, report, trust) -> dict:
             cont = contents.get(r.id) or {}
             if "body" in cont:
                 d["body_html"] = _markdown(cont["body"].decode("utf-8", "replace"))
+            d["not_shared"] = tr(NOT_SHARED[d["disclosure"]]) if d["disclosure"] in NOT_SHARED else None
+            d["link"] = web_link(p.get("external"))
+            d["files"] = []
+            for f in content.get("files") or []:
+                data = cont.get(f"files/{f['name']}")
+                d["files"].append({
+                    "name": f["name"],
+                    "href": f"content/{r.id}/files/{quote(f['name'])}" if data is not None else None,
+                    "image": _image_data_uri(f["name"], data) if data is not None else None,
+                })
             if p.get("author_statement"):
                 d["author"].append({"text": p["author_statement"], "note": declared_note})
             if p.get("import"):
@@ -235,7 +282,7 @@ def build_model(plan, meta, mats, contents, report, trust) -> dict:
                                 title=meta["title"], file_stamps=stamps)
     anchors = {d["id"] for d in details}  # records with their own section below
     return {
-        "narrative": narrative, "anchors": anchors,
+        "narrative": narrative, "anchors": anchors, "peeks": peeks, "file_not_shared": tr(FILE_NOT_SHARED),
         "meta": meta, "plan": plan, "report": report, "counts": report.counts, "trust": trust,
         "graph_svg": Markup(render_graph_svg(nodes, edges)), "timeline": timeline, "details": details,
         "proves": [tr(x) for x in PROVES], "does_not_prove": [tr(x) for x in DOES_NOT_PROVE],

@@ -50,6 +50,18 @@ export function contentUrl(id: string, file: string): string {
   return `/api/records/${id}/content?file=${encodeURIComponent(file)}${space}`;
 }
 
+/** An attached image, or the start of a text file, as the app may show it (D-057). */
+export function previewUrl(id: string, file: string): string {
+  const space = currentSpace === "practice" ? "&space=practice" : "";
+  return `/api/records/${id}/preview?file=${encodeURIComponent(file)}${space}`;
+}
+
+export async function previewText(id: string, file: string): Promise<{ text: string; truncated: boolean }> {
+  const res = await fetch(previewUrl(id, file), { headers: spaceHeaders(), credentials: "same-origin" });
+  if (!res.ok) throw new ApiError(res.status, res.statusText);
+  return { text: await res.text(), truncated: res.headers.get("X-Preview-Truncated") === "1" };
+}
+
 export class ApiError extends Error {
   status: number;
   constructor(status: number, message: string) {

@@ -122,3 +122,31 @@ def test_export_api_preview_and_download(api, client):
     assert r.status_code == 200 and r.headers["content-type"] == "application/zip"
     assert "provenance-t-" in r.headers["content-disposition"]
     assert client.post("/api/export", json={"records": {a: "everything"}}).status_code == 400
+
+
+def test_the_report_shows_what_was_shared_on_hover_and_says_why_not(tmp_path):
+    """D-057: pointing at a step in report.html shows what it says (no script needed); a step whose
+    content was not shared says so in plain words, and so does a file left out of the package."""
+    s = make_sample(tmp_path)
+    html = s.files["report.html"].decode()
+    assert "<script" not in html.lower()  # still none
+    ids = s.ids
+    # A shared step: its text in the hover card, its file linked inside the package.
+    assert 'class="peek-card"' in html and "run1.csv" in html
+    assert f'href="content/{ids["exp"]}/files/run1.csv"' in html
+    # A step shared as structure only: why its text is not there; its fingerprint-only note.
+    assert "did not share what this step says" in html
+    assert "secret draft wording" not in html
+    # The DOI opens on the web; the graph's boxes carry the hover text too.
+    assert 'href="https://doi.org/10.5281/zenodo.1"' in html
+    assert "<title>Preprint\n" in html
+
+
+def test_a_shared_picture_is_shown_in_the_report(tmp_path):
+    from app.report.render import INLINE_IMAGE_BYTES, _image_data_uri
+
+    png = b"\x89PNG\r\n\x1a\n" + b"0" * 32
+    assert _image_data_uri("figure.png", png).startswith("data:image/png;base64,")
+    assert _image_data_uri("figure.svg", b"<svg/>").startswith("data:image/svg+xml;base64,")
+    assert _image_data_uri("notes.docx", b"PK") is None  # not a picture
+    assert _image_data_uri("huge.png", b"0" * (INLINE_IMAGE_BYTES + 1)) is None  # linked, not inlined

@@ -125,7 +125,8 @@ def render_graph_svg(nodes: list[dict], edges: list[dict]) -> str:
             cls += " milestone"
         if n.get("retracted"):
             cls += " retracted"
-        out.append(f'<g class="{cls}"><title>{escape(n["title"])}</title>')
+        # Pointing at a box shows what the step says, or why it is not shown (D-057).
+        out.append(f'<g class="{cls}"><title>{escape(n.get("tip") or n["title"])}</title>')
         out.append(f'<rect x="{x}" y="{y}" width="{NODE_W}" height="{NODE_H}" rx="7"/>')
         title = ("★ " if n.get("milestone") else "") + n["title"]
         out.append(f'<text x="{x + 9}" y="{y + 20}" class="node-title">{escape(_short(title, 22))}</text>')

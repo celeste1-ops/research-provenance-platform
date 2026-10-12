@@ -16,16 +16,18 @@ import {
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import type { Graph as GraphData, GraphNode } from "../types";
-import { typeLabel, typeStyle } from "../labels";
+import { claimedText, typeLabel, typeStyle } from "../labels";
+import { previewUrl } from "../api";
 import { t } from "../i18n";
 import { ProofIcon } from "./ProofBadge";
+import { referenceText } from "./Steps";
 
 const COL_W = 210;
 const ROW_H = 96;
 const LEFT = 150;
 const TOP = 24;
 const NODE_W = 184;
-const NODE_H = 60; // about the height of a step's box, for the row names beside it
+const NODE_H = 74; // about the height of a step's box, for the row names beside it
 const LEGEND_KEY = "rprov-map-legend-hidden";
 
 const DASH: Record<string, string | undefined> = { revises: undefined, derived_from: "7 4", uses: "2 4" };
@@ -49,6 +51,9 @@ function relWords(rel: string): string {
 
 function RecordNode({ data }: NodeProps<Node<RecordNodeData>>) {
   const n = data.node;
+  // One line of what the step holds: its text, else its files, else its reference.
+  const glance = n.preview?.split("\n")[0]
+    || (n.files?.length ? `📎 ${n.files.map((f) => f.name).join(", ")}` : referenceText(n.external));
   const cls = ["record-node", n.milestone ? "milestone" : "", n.retracted ? "retracted" : "", data.selected ? "selected" : ""]
     .filter(Boolean)
     .join(" ");
@@ -59,6 +64,7 @@ function RecordNode({ data }: NodeProps<Node<RecordNodeData>>) {
         {n.milestone && <span className="star">★ </span>}
         {n.title}
       </div>
+      {glance && <div className="node-preview" title={n.preview ?? glance}>{glance}</div>}
       <div className="node-meta">
         <span className={n.date.verified ? "" : "unverified"} title={n.date.from}>
           <b className="node-seq">#{n.seq}</b> · {n.date.time.slice(0, 10)}
@@ -92,6 +98,35 @@ function RowNames({ rows }: { rows: string[] }) {
           {typeLabel(row)}
         </div>
       ))}
+    </div>
+  );
+}
+
+/** What the step under the mouse holds, without opening it: its text, its pictures and files. */
+function MapPeek({ node }: { node: GraphNode }) {
+  const images = (node.files ?? []).filter((f) => f.kind === "image").slice(0, 2);
+  const others = (node.files ?? []).filter((f) => f.kind !== "image");
+  const ref = referenceText(node.external);
+  const claimed = claimedText(node.claimed);
+  return (
+    <div className="map-peek" style={typeStyle(node.node_type)} data-testid="map-peek">
+      <div className="map-peek-top">
+        <span className="type-tag">{typeLabel(node.node_type)}</span>
+        <span className="muted small">#{node.seq} · {node.date.time.slice(0, 10)}{node.date.verified ? " ✓" : ""}</span>
+      </div>
+      <b className="map-peek-title">{node.title}</b>
+      {claimed && <div className="step-claimed small">{claimed}</div>}
+      {node.preview ? <p className="map-peek-text">{node.preview}</p>
+        : !images.length && !others.length && !ref && <p className="muted small">{t("No text — just the title.")}</p>}
+      {images.length > 0 && (
+        <div className="step-thumbs">{images.map((f) => <img key={f.name} src={previewUrl(node.id, f.name)} alt={f.name} />)}</div>
+      )}
+      {(others.length > 0 || ref) && (
+        <div className="small muted">
+          {others.map((f) => `📎 ${f.name}`).join("  ")}{others.length && ref ? "  " : ""}{ref ? `🔗 ${ref}` : ""}
+        </div>
+      )}
+      <div className="small muted map-peek-hint">{t("Click to see all of it")}</div>
     </div>
   );
 }
@@ -191,6 +226,7 @@ export function Graph({ data, selected, onSelect, milestonesOnly = false }: Prop
   );
   const { nodes, onNodesChange } = useStableNodes(drawn.nodes);
   const wrap = useRef<HTMLDivElement>(null);
+  const peek = hovered ? data.nodes.find((n) => n.id === hovered) ?? null : null;
 
   // Pointing at a step shows its own lines, named, and fades the rest. The steps themselves are
   // faded with a style rule, so they are never handed to the map again (see useStableNodes).
@@ -268,6 +304,11 @@ export function Graph({ data, selected, onSelect, milestonesOnly = false }: Prop
         <Panel position="top-right">
           <MapLegend />
         </Panel>
+        {peek && (
+          <Panel position="bottom-left">
+            <MapPeek node={peek} />
+          </Panel>
+        )}
       </ReactFlow>
     </div>
   );

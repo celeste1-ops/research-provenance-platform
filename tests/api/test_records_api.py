@@ -184,3 +184,52 @@ def test_key_backup_export_is_password_protected(api):
     with _pytest.raises(KeyBackupError):
         load_private_key_encrypted(r.content, "wrong password!")
     assert api.client.get("/api/status").json()["key_backup_done"] is True
+
+
+def test_the_steps_show_what_they_hold(api):
+    """D-056: the map and the step cards show the first lines of each step's text, its files and its
+    reference, so a step can be read without opening it."""
+    api.init()
+    note = api.entry("Notes", "note", body="# Heading\n\n- **first** point with a [link](https://example.org)\n\n"
+                     "```\ncode line\n```\n" + "more words " * 100)
+    data = api.entry("Data", "dataset", files=[("run1.csv", b"t,x\n0,1\n")])
+    code = api.entry("Solver", "code", repo_url="https://github.com/example/fsf", commit="0123abcdef")
+    bare = api.entry("Only a title", "idea")
+    nodes = {n["id"]: n for n in api.client.get("/api/graph").json()["nodes"]}
+    preview = nodes[note["id"]]["preview"]
+    assert preview.startswith("Heading\nfirst point with a link\ncode line\nmore words")  # plain text, no marks
+    assert preview.endswith("…") and len(preview) <= 281  # a few lines, not the whole text
+    assert nodes[data["id"]]["files"] == [{"name": "run1.csv", "kind": "text"}] and nodes[data["id"]]["preview"] is None
+    assert nodes[code["id"]]["external"] == {"repo_url": "https://github.com/example/fsf", "commit": "0123abcdef"}
+    assert nodes[bare["id"]]["preview"] is None and nodes[bare["id"]]["files"] == []
+    assert nodes[bare["id"]]["external"] is None
+
+
+def test_pictures_and_text_files_can_be_shown_in_the_app(api):
+    """D-057: an attached picture or text file can be shown in place; it is sandboxed like any
+    attachment, and other kinds stay download-only."""
+    api.init()
+    png = b"\x89PNG\r\n\x1a\n" + b"\0" * 24
+    big = "row\n" * 30000  # more than the 64 KB that are shown
+    out = api.entry("Figure", "figure", files=[("plot.png", png), ("data.csv", big.encode()), ("paper.docx", b"PK")])
+    rid = out["id"]
+    kinds = {f["name"]: f["preview"] for f in out["detail"]["files"] if f["role"] == "file"}
+    assert kinds == {"plot.png": "image", "data.csv": "text", "paper.docx": None}
+    img = api.client.get(f"/api/records/{rid}/preview", params={"file": "plot.png"})
+    assert img.status_code == 200 and img.headers["content-type"] == "image/png" and img.content == png
+    assert img.headers["content-security-policy"].startswith("sandbox")
+    text = api.client.get(f"/api/records/{rid}/preview", params={"file": "data.csv"})
+    assert text.headers["content-type"].startswith("text/plain") and text.headers["x-preview-truncated"] == "1"
+    assert len(text.content) == 64 * 1024 and text.text.startswith("row\nrow\n")
+    assert api.client.get(f"/api/records/{rid}/preview", params={"file": "paper.docx"}).status_code == 415
+    assert api.client.get(f"/api/records/{rid}/preview", params={"file": "missing.png"}).status_code == 404
+    node = next(n for n in api.client.get("/api/graph").json()["nodes"] if n["id"] == rid)
+    assert node["files"] == [{"name": "plot.png", "kind": "image"}, {"name": "data.csv", "kind": "text"},
+                             {"name": "paper.docx", "kind": None}]
+
+
+def test_an_earlier_claimed_date_comes_with_the_step(api):
+    api.init()
+    old = api.entry("Old notes", "note", body="x", import_claimed_date="2025-09", import_precision="month")
+    node = next(n for n in api.client.get("/api/graph").json()["nodes"] if n["id"] == old["id"])
+    assert node["claimed"] == {"date": "2025-09", "precision": "month"}

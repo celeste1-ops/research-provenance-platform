@@ -1,4 +1,11 @@
-## What's in this version (v0.3.3)
+## What's in this version (v0.3.4)
+
+**New in v0.3.4**
+- **See what each step says without opening it.** Every step card now shows the first lines of the step's text, its attached files (click one to download it) and its code commit or DOI; a step with only a title says so. The boxes on the map show one line of it too. Click a card to see all of it.
+- **Pictures and text files in place.** Attached pictures show on the step's card and in its detail; text files (notes, CSV, code) show what they say; other kinds (Word, PDF, archives) open with the program they belong to. DOIs and repository addresses open on the web.
+- **Point at a step on the map** to see what it says.
+- **Earlier dates are shown as such.** Material added later shows the day it was added (that is what the date stamp proves); an earlier date the author gave appears next to it as "not verified".
+- **The shared report shows content on hover.** In `report.html`, pointing at a step shows what it says, as far as it was shared; a step or file that was not shared says so in plain words. Shared pictures are shown, shared files linked, links open on the web. Still no scripts in the report.
 
 **Fixed in v0.3.3**
 - **The page no longer stays empty on some Windows computers.** Where other software had told Windows that `.js` files are plain text, the app sent its own script as plain text, the browser would not run it, and the page at `127.0.0.1:8765` stayed blank. The app now always names the type of its own files. If the page ever cannot start, it says what to do instead of staying empty.

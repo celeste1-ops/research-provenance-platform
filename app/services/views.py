@@ -12,6 +12,7 @@ from dataclasses import dataclass
 
 from app.db.models import AnchorRow, RecordRow
 from app.i18n import tr
+from app.services.previews import plain_preview, preview_kind
 from provenance_core.jcs import parse_json_strict
 from provenance_core.replay import ReplayState, milestone_view, replay
 
@@ -119,7 +120,25 @@ class Snapshot:
         return next((r for r in self.rows if r.id == rid), None)
 
 
-def graph_view(snap: Snapshot, project_id: str | None = None, milestones_only: bool = False) -> dict:
+PREVIEW_BYTES = 4096  # read from the start of a step's text, however long it is
+
+
+def text_preview(blobs, files: list) -> str | None:
+    """The first few lines of a step's text, as plain text, so they can be read without opening it.
+    Only for showing: the full text, checked against its fingerprint, is in the step's detail."""
+    body = next((f for f in files if f.role == "body"), None)
+    if body is None or blobs is None:
+        return None
+    try:
+        with open(blobs.path_for(body.sha256), "rb") as fh:
+            raw = fh.read(PREVIEW_BYTES)
+    except (OSError, ValueError):
+        return None
+    return plain_preview(raw.decode("utf-8", errors="ignore"), more=len(raw) == PREVIEW_BYTES)
+
+
+def graph_view(snap: Snapshot, project_id: str | None = None, milestones_only: bool = False,
+               blobs=None) -> dict:
     st = snap.state
     entries = [e for e in sorted(st.entries.values(), key=lambda e: e.seq)
                if project_id is None or e.project_id == project_id]
@@ -140,6 +159,14 @@ def graph_view(snap: Snapshot, project_id: str | None = None, milestones_only: b
                 "date": snap.when(e.id),
                 "tsa": tsa,
                 "btc": btc,
+                # What the step holds, to read at a glance: its text, its files, its reference.
+                "preview": text_preview(blobs, snap.files.get(e.id, [])),
+                "files": [{"name": f.name, "kind": preview_kind(f.name)}
+                          for f in snap.files.get(e.id, []) if f.role == "file"],
+                "external": snap.payloads[e.id].get("external"),
+                # An earlier date the author gave for older material: their word, never verified.
+                "claimed": ({"date": imp["claimed_date"], "precision": imp["precision"]}
+                            if (imp := snap.payloads[e.id].get("import")) else None),
             }
         )
     edges = []
@@ -350,7 +377,8 @@ def record_detail(snap: Snapshot, rid: str, verification: dict | None = None) ->
         "author": {"label": tr("Author statement"), "source": "author", "items": author_items},
         "later": {"label": tr("Later additions"), "items": later},
         "retracted": bool(entry and entry.retracted_by),
-        "files": [{"role": f.role, "name": f.name, "size": f.size, "media_type": f.media_type, "sha256": f.sha256}
+        "files": [{"role": f.role, "name": f.name, "size": f.size, "media_type": f.media_type, "sha256": f.sha256,
+                   "preview": preview_kind(f.name) if f.role == "file" else None}
                   for f in files],
     }
     if entry:
