@@ -212,6 +212,8 @@ Click **Share** and choose, record by record, how much to disclose:
 | Structure only | Type, title, relations, author statements, times; not the text (but the hashes of the text and attachments) |
 | Existence only | "Record n existed no later than such-and-such a time" |
 
+In `report.html`, pointing at a step (its #number in the story, its title in the timeline, its box in the graph) shows what it says, as far as you shared it; a step you did not share says so in plain words, and so does a file you left out ("a file on the author's computer, not put into this package"). Shared pictures are shown in the report, shared files are linked (in the `content/` folder once the zip is unpacked), and DOIs and repository addresses open on the web. There is no "excerpt" level on purpose: a piece of a text cannot be checked against its fingerprint, so a step is either shared whole (checkable) or not.
+
 Before exporting you get a preview of what each record discloses. Two things to keep in mind: "Structure only" discloses the hashes of the text and attachments, so content someone already has or can easily guess could be confirmed against them; and the bundle's `chain.json` shows how many records there are up to the last exported one.
 
 The evidence bundle is a zip:
@@ -224,6 +226,10 @@ manifests/ payloads/ content/ signatures/ proofs/ certs/ identity/ chain.json bu
 ```
 
 ![Report](docs/screenshots/report.png)
+
+### Why do the dates show the day a step was recorded?
+
+The dates the app verifies are the date stamps: when a step **entered the app** (a time-stamping service signs it within seconds). They cannot be earlier than that — that is what makes them proof. So material you add later (old notes, a git history recorded now, the sample research) shows the day you added it. An earlier date you give, or the date git wrote into a commit, is shown next to it as "the author says it is from … — not verified": anyone can type a date into a note, and anyone can change a commit's date. Steps recorded as you go (and commits recorded while the app runs) get their stamp within a minute, so for them the two are the same. The public (Bitcoin) stamp comes a few hours later and confirms the same moment.
 
 ## How to verify (for readers)
 
@@ -275,7 +281,7 @@ Code layout: `core/provenance_core/` is the only library with trust logic (JCS, 
 - **P0 done**: append-only records, signing, replay; third-party timestamps (RFC 3161); evidence bundle export, `report.html` (with a static evolution map), `verify.py`, tamper tests; the record form and evolution map.
 - **P1 done**: Bitcoin anchors (OpenTimestamps) and block-explorer checks; the key-steps-only view; the timeline view; the full detail panel (Verified record / Author statement / Later additions / Changes, with adding relations, key steps, notes and retractions from the panel); backup and restore; the FSF sample data.
 - **Round 4 (installers)**: macOS (Apple silicon) and Windows 10/11 installers, a menu bar / notification area icon, a single running copy; Windows backup-location suggestions, and the full test suite (browser tests included) on GitHub Actions; DigiCert as a fallback for date stamps; Settings → Check stamp services checks whether each time-proof service can be reached (DECISIONS D-043 – D-045).
-- **v0.3.4**: step cards and map boxes show what each step says — the first lines of its text, its files, its code commit or DOI — without opening it (DECISIONS D-056).
+- **v0.3.4**: step cards and map boxes show what each step says — the first lines of its text, its files, its code commit or DOI — without opening it (DECISIONS D-056); pictures and text files are shown in place, DOIs and repositories open on the web, earlier dates the author gave appear as "not verified", pointing at a step on the map shows its content, and the shared report does the same on hover and says plainly what was not shared (D-057).
 - **v0.3.3**: the page no longer stays empty on Windows computers whose registry calls `.js` files plain text; a page that cannot start says what to do (DECISIONS D-055).
 - **v0.3.2**: one keychain item, so a new version asks once; opening the app again while it runs shows its page; files can be dragged onto the page and the form; a clearer two-row layout (D-053); Steps as plain-language cards first, a map with row names and a legend, and an AI summary in short sections that appears as it is written and can be stopped (D-054); the disk image window says to drag the app onto Applications (DECISIONS D-052).
 - **v0.3.1**: after an upgrade the keychain is asked once, not every few seconds; a refusal is not retried until you click Try again (DECISIONS D-051).

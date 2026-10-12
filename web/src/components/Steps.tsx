@@ -1,8 +1,8 @@
 import { useEffect, useMemo, type ReactNode } from "react";
 import type { Graph, GraphEdge, GraphNode, TimelineRow } from "../types";
-import { help, typeLabel, typeStyle } from "../labels";
+import { claimedText, help, referenceHref, typeLabel, typeStyle } from "../labels";
 import { t, tn, tx } from "../i18n";
-import { contentUrl } from "../api";
+import { contentUrl, previewUrl } from "../api";
 import { ProofIcon } from "./ProofBadge";
 import { Timeline } from "./Timeline";
 
@@ -35,26 +35,48 @@ export function referenceText(ext: GraphNode["external"]): string | null {
   return ext.url ?? null;
 }
 
-/** What the step holds — the first lines of its text, its files, its reference — so it can be read
- * without opening it. The whole of it is in the step's detail. */
+/** What the step holds — the first lines of its text, its pictures and files, its reference — so it
+ * can be read without opening it. The whole of it is in the step's detail. */
 function StepContent({ node }: { node: GraphNode }) {
   const files = node.files ?? [];
+  const images = files.filter((f) => f.kind === "image").slice(0, 3);
   const ref = referenceText(node.external);
+  const href = referenceHref(node.external);
+  const claimed = claimedText(node.claimed);
+  const stop = (e: React.MouseEvent) => e.stopPropagation();
   if (!node.preview && files.length === 0 && !ref) {
-    return <p className="step-empty muted small">{t("No text — just the title.")}</p>;
+    return (
+      <>
+        {claimed && <p className="step-claimed small">{claimed}</p>}
+        <p className="step-empty muted small">{t("No text — just the title.")}</p>
+      </>
+    );
   }
   return (
     <div className="step-content">
+      {claimed && <p className="step-claimed small">{claimed}</p>}
       {node.preview && <p className="step-preview" data-testid="step-preview">{node.preview}</p>}
+      {images.length > 0 && (
+        <div className="step-thumbs">
+          {images.map((f) => (
+            <img key={f.name} src={previewUrl(node.id, f.name)} alt={f.name} title={f.name} loading="lazy" />
+          ))}
+        </div>
+      )}
       {(files.length > 0 || ref) && (
         <div className="step-attach small">
           {files.map((f) => (
-            <a key={f} className="file-chip" href={contentUrl(node.id, f)} onClick={(e) => e.stopPropagation()}
-              title={t("Download {name}", { name: f })}>
-              📎 {f}
+            <a key={f.name} className="file-chip" href={contentUrl(node.id, f.name)} onClick={stop}
+              title={t("Download {name}", { name: f.name })}>
+              📎 {f.name}
             </a>
           ))}
-          {ref && <span className="file-chip ref-chip">🔗 {ref}</span>}
+          {ref && (href ? (
+            <a className="file-chip ref-chip" href={href} target="_blank" rel="noopener noreferrer" onClick={stop}
+              title={t("Opens in your browser. A private page may ask you to sign in, or not open at all.")}>
+              🔗 {ref}
+            </a>
+          ) : <span className="file-chip ref-chip">🔗 {ref}</span>)}
         </div>
       )}
     </div>

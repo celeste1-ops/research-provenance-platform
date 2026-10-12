@@ -17,6 +17,8 @@ export interface WhenInfo {
   from: string;
 }
 
+export type PreviewKind = "image" | "text" | null; // how the app can show an attached file (D-057)
+
 export interface GraphNode {
   id: string;
   seq: number;
@@ -30,8 +32,9 @@ export interface GraphNode {
   tsa: ProofStatus;
   btc: ProofStatus;
   preview?: string | null; // the first lines of the step's text
-  files?: string[]; // names of attached files
+  files?: { name: string; kind: PreviewKind }[]; // attached files, and whether the app can show them
   external?: { commit?: string; repo_url?: string; doi?: string; url?: string } | null;
+  claimed?: { date: string; precision: string } | null; // an earlier date the author gave (unverified)
 }
 
 export interface GraphEdge {
@@ -111,7 +114,7 @@ export interface RecordDetail {
   };
   author: { label: string; source: "author"; items: AuthorItem[] };
   later: { label: string; items: LaterItem[] };
-  files: { role: string; name: string; size: number; media_type: string; sha256: string }[];
+  files: { role: string; name: string; size: number; media_type: string; sha256: string; preview?: PreviewKind }[];
   // Date stamps of attached files, taken when they arrived in the inbox (D-049).
   file_stamps?: { file: string; state: string; time: string | null; source: string | null; code: string | null }[];
 }

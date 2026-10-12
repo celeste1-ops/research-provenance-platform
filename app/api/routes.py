@@ -398,6 +398,30 @@ def get_content(record_id: str, request: Request, file: str | None = None):
     )
 
 
+@router.get("/records/{record_id}/preview")
+def get_preview(record_id: str, request: Request, file: str):
+    """An attached image or the start of a text file, to show in the app (D-057). Sandboxed like any
+    attachment: if it is opened on its own, no script in it can run."""
+    from app.services.previews import IMAGE_PREVIEW_BYTES, TEXT_PREVIEW_BYTES, image_type, preview_kind
+
+    c = ctx(request)
+    match = next((f for f in c.ledger.record_files(record_id) if f.role == "file" and f.name == file), None)
+    if match is None:
+        raise HTTPException(404, "no such content")
+    kind = preview_kind(match.name)
+    headers = {"Content-Security-Policy": "sandbox; default-src 'none'; style-src 'unsafe-inline'",
+               "Content-Disposition": f"inline; filename*=UTF-8''{_rfc5987(match.name)}"}
+    if kind == "image" and match.size <= IMAGE_PREVIEW_BYTES:
+        return Response(c.ledger.blobs.get(match.sha256), media_type=image_type(match.name), headers=headers)
+    if kind == "text":
+        # Only the start is read: the whole file, checked against its fingerprint, is the download.
+        with open(c.ledger.blobs.path_for(match.sha256), "rb") as fh:
+            start = fh.read(TEXT_PREVIEW_BYTES)
+        headers["X-Preview-Truncated"] = "1" if match.size > TEXT_PREVIEW_BYTES else "0"
+        return Response(start.decode("utf-8", "replace"), media_type="text/plain; charset=utf-8", headers=headers)
+    raise HTTPException(415, "this kind of file can only be downloaded")
+
+
 def _rfc5987(name: str) -> str:
     from urllib.parse import quote
 

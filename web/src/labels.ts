@@ -106,3 +106,17 @@ export function help(key: "addStep" | "list" | "story" | "keySteps" | "share" | 
 export function homeNote(): string {
   return t("Your notes stay on this {device}. Only a fingerprint is sent out to get a date stamp. Backups let you get everything back if this {device} is lost.", { device: dev() });
 }
+
+/** Where a step's outside reference can be opened: a DOI, a repository, a web address. */
+export function referenceHref(ext: { commit?: string; repo_url?: string; doi?: string; url?: string } | null | undefined):
+  string | null {
+  if (!ext) return null;
+  const web = (u?: string) => (u && /^https?:\/\//i.test(u) ? u : null);
+  if (ext.doi) return `https://doi.org/${ext.doi.replace(/^https?:\/\/(dx\.)?doi\.org\//i, "")}`;
+  return web(ext.repo_url) ?? web(ext.url);
+}
+
+/** "The author says it is from 2025-09 (not verified)" — an earlier date for older material. */
+export function claimedText(claimed: { date: string } | null | undefined): string | null {
+  return claimed ? t("The author says it is from {date} — not verified", { date: claimed.date }) : null;
+}

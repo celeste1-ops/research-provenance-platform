@@ -45,6 +45,14 @@ def test_steps_view_reads_in_plain_words(demo_page):
     assert "fitted exponent is closer to 1.3" in exp1.inner_text() and "run1_results.csv" in exp1.inner_text()
     assert "Code commit 3f9c2ab" in steps.get_by_test_id(f"step-{ids['solver']}").inner_text()
     assert "DOI 10.5281/zenodo.0000000" in steps.get_by_test_id(f"step-{ids['preprint']}").inner_text()
+    doi = steps.get_by_test_id(f"step-{ids['preprint']}").get_by_role("link", name="DOI 10.5281/zenodo.0000000")
+    assert doi.get_attribute("href") == "https://doi.org/10.5281/zenodo.0000000"  # opens on the web
+    # A picture attached to a step shows on its card; a text file shows what it says in the detail.
+    expect(steps.get_by_test_id(f"step-{ids['fig1']}").locator(".step-thumbs img")).to_have_count(1)
+    steps.get_by_test_id(f"step-{ids['exp1']}").click()
+    page.get_by_test_id("detail").get_by_test_id("file-preview-toggle").click()
+    expect(page.get_by_test_id("detail").get_by_test_id("file-text")).to_contain_text("t,v")
+    page.get_by_test_id("detail").get_by_role("button", name="Close", exact=True).click()
     assert "A new version of" in text and "Formula v1" in text  # revises, in plain words
     assert "Later steps that build on it:" not in steps.get_by_test_id(f"step-{ids['preprint']}").inner_text()
     card.get_by_role("button", name="#4 Formula v1").click()  # goes to the earlier step and opens it
@@ -81,6 +89,7 @@ def test_the_map_explains_itself(demo_page):
     # Pointing at a step fades the steps it has no line to, and names its lines.
     graph.get_by_test_id(f"node-{ids['formula2']}").hover()
     expect(graph.locator(".react-flow__edge-text").filter(has_text="new version")).to_have_count(1)
+    expect(graph.get_by_test_id("map-peek")).to_contain_text("alpha(F) = 1.5 - 0.2 F")  # what it says, on hover
     faded = page.evaluate("""id => [...document.querySelectorAll('.react-flow__node-record')]
         .filter(n => getComputedStyle(n).opacity < 0.5).map(n => n.dataset.id)""", ids["formula2"])
     assert ids["intuition"] in faded and ids["formula1"] not in faded and ids["formula2"] not in faded

@@ -51,9 +51,20 @@ dt { color: var(--muted); } dd { margin: 0; }
 .legend { font-size: 12.5px; color: var(--muted); margin: 6px 0 0; }
 .story { margin: 8px 0; } .story .s-author { background: var(--author); border-bottom: 1px dashed #d9a441; }
 .story .ref { font-size: 11px; color: var(--muted); white-space: nowrap; } .story .ref a { color: inherit; }
+/* Hover cards (D-057): pointing at a step shows what it says, with no script. */
+.peek { position: relative; display: inline; }
+.peek-card { display: none; position: absolute; z-index: 20; left: 0; top: 1.5em; width: 340px; max-width: 80vw; padding: 10px 12px;
+  background: #fff; color: var(--ink); border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 6px 20px rgba(16,24,40,.16);
+  font-size: 13px; line-height: 1.5; white-space: normal; text-align: left; font-weight: 400; }
+.peek:hover .peek-card, .peek:focus-within .peek-card { display: block; }
+.peek-card b { display: block; font-size: 14px; } .peek-card .pv { white-space: pre-line; margin: 4px 0; }
+.peek-card .why, .not-shared, .file-missing { color: var(--warn); }
+.files-list { list-style: none; padding: 0; margin: 8px 0 0; } .files-list li { margin: 4px 0; }
+.files-list img { display: block; max-width: 100%; max-height: 280px; margin: 4px 0; border: 1px solid var(--line); border-radius: 6px; background: #fff; }
 .print-footer { display: none; }
 @page { margin: 16mm 14mm 18mm; @bottom-center { content: "{{ t('This record does not prove authorship or originality.') }}"; font-size: 9pt; color: #555; } }
 @media print {
+  .peek-card { display: none !important; }
   main { max-width: none; padding: 0; } .graph { overflow: visible; } .graph svg { max-width: 100%; height: auto; }
   .print-footer { display: block; position: fixed; bottom: 0; left: 0; right: 0; text-align: center; font-size: 9pt; color: #555; }
   a { color: inherit; text-decoration: none; }
@@ -62,6 +73,7 @@ dt { color: var(--muted); } dd { margin: 0; }
 </style>
 </head>
 <body>
+{% macro peek_card(rid) %}{% set pk = peeks.get(rid) %}{% if pk %}<span class="peek-card"><b>#{{ pk.seq }} {{ pk.title }}</b><span class="muted">{{ pk.type }} · {{ pk.date }}</span>{% if pk.preview %}<span class="pv" style="display:block">{{ pk.preview }}</span>{% elif pk.note %}<span class="why" style="display:block">{{ pk.note }}</span>{% endif %}{% if pk.files %}<span class="muted" style="display:block">📎 {{ pk.files|join(', ') }}</span>{% endif %}</span>{% endif %}{% endmacro %}
 <div class="print-footer">{{ t("This record does not prove authorship or originality.") }}</div>
 <main>
 
@@ -107,7 +119,7 @@ dt { color: var(--muted); } dd { margin: 0; }
   {% for ch in narrative.chapters %}
   <h3>{{ ch.heading }}</h3>
   {% for para in ch.paragraphs %}
-  <p class="story">{% for s in para %}<span class="{{ 's-author' if s.source == 'author' else 's-record' }}">{{ s.text }}</span>{% if loop.first and s.refs %} <span class="ref">[{% for r in s.refs[:1] %}{% if r.id in anchors %}<a href="#r-{{ r.id }}">#{{ r.seq }}</a>{% else %}#{{ r.seq }}{% endif %}{% endfor %} · {{ (s.date.time or '')[:10] }}{% if s.date.verified %} ✓{% endif %}]</span>{% endif %} {% endfor %}</p>
+  <p class="story">{% for s in para %}<span class="{{ 's-author' if s.source == 'author' else 's-record' }}">{{ s.text }}</span>{% if loop.first and s.refs %} <span class="ref">[{% for r in s.refs[:1] %}{% if r.id in anchors %}<span class="peek"><a href="#r-{{ r.id }}">#{{ r.seq }}</a>{{ peek_card(r.id) }}</span>{% else %}#{{ r.seq }}{% endif %}{% endfor %} · {{ (s.date.time or '')[:10] }}{% if s.date.verified %} ✓{% endif %}]</span>{% endif %} {% endfor %}</p>
   {% endfor %}
   {% endfor %}
 </section>
@@ -120,7 +132,7 @@ dt { color: var(--muted); } dd { margin: 0; }
     {% for row in timeline %}
       <tr>
         <td>{{ row.seq }}</td>
-        <td>{{ row.title }}<br><span class="muted small">{{ row.kind|word }}{% if row.node_type %} · {{ row.node_type|word }}{% endif %} · {{ row.disclosure|word }}</span><br><span class="mono muted">{{ row.id|short }}</span></td>
+        <td>{% if row.id in peeks %}<span class="peek"><a href="#r-{{ row.id }}">{{ row.title }}</a>{{ peek_card(row.id) }}</span>{% else %}{{ row.title }}{% endif %}<br><span class="muted small">{{ row.kind|word }}{% if row.node_type %} · {{ row.node_type|word }}{% endif %} · {{ row.disclosure|word }}</span><br><span class="mono muted">{{ row.id|short }}</span></td>
         <td>{% if row.tsa.verified %}{{ t("verified") }}<br>{{ row.tsa.time }}{% elif row.tsa.state == 'none' %}<span class="muted">{{ t("no timestamp yet") }}</span>{% else %}{{ row.tsa.state|word }}{% endif %}</td>
         <td>{% if row.btc.verified %}{{ t("confirmed") }}<br>{{ row.btc.time }}{% elif row.btc.state == 'pending' %}{{ t("pending") }}{% elif row.btc.state == 'none' %}<span class="muted">{{ t("none") }}</span>{% else %}{{ row.btc.state|word }}{% endif %}</td>
         <td class="unverified">{{ row.local_time or '—' }}</td>
@@ -150,7 +162,10 @@ dt { color: var(--muted); } dd { margin: 0; }
         {% for h in d.content_hashes %}<dt>{{ h.name }}</dt><dd><span class="mono">sha256 {{ h.sha256 }}</span> · {{ t("{n} bytes", n=h.size) }} · {{ h.media_type }}</dd>{% endfor %}
         {% if d.external %}<dt>{{ t("External reference") }}</dt><dd>{% for k, v in d.external.items() if k != 'note' %}{{ k }}: <span class="mono">{{ v }}</span>{% if not loop.last %}, {% endif %}{% endfor %}<br><span class="muted small">{{ d.external.note }}</span></dd>{% endif %}
       </dl>
-      {% if d.body_html %}<div class="body">{{ d.body_html }}</div>{% elif d.disclosure == 'structure' and d.content_hashes %}<p class="small muted">{{ t("Content not disclosed (structure only); its hashes are listed above.") }}</p>{% endif %}
+      {% if d.body_html %}<div class="body">{{ d.body_html }}</div>{% endif %}
+      {% if d.not_shared %}<p class="small not-shared">{{ d.not_shared }}</p>{% endif %}
+      {% if d.link %}<p class="small">🔗 <a href="{{ d.link }}" target="_blank" rel="noopener noreferrer">{{ d.link }}</a> <span class="muted">{{ t("(opens on the web; a private page may ask you to sign in, or not open)") }}</span></p>{% endif %}
+      {% if d.files %}<ul class="files-list small">{% for f in d.files %}<li>📎 {% if f.href %}<a href="{{ f.href }}">{{ f.name }}</a> <span class="muted">{{ t("(in this package, folder content/ — unzip it first)") }}</span>{% if f.image %}<img src="{{ f.image }}" alt="{{ f.name }}">{% endif %}{% else %}{{ f.name }} — <span class="file-missing">{{ file_not_shared }}</span>{% endif %}</li>{% endfor %}</ul>{% endif %}
     </div>
     <div class="section sec-author">
       <span class="tag">{{ t("Author statement") }}</span>

@@ -586,4 +586,12 @@ export const ZH: Record<string, string> = {
   "Code commit {commit}": "代码提交 {commit}",
   "No text — just the title.": "没有写内容，只有标题。",
   "Download {name}": "下载 {name}",
+  "Open the picture on its own": "单独打开这张图",
+  "Could not show this file.": "没法显示这个文件。",
+  "Show what it says": "看看里面写了什么",
+  "… only the start is shown; download the file for all of it.": "……这里只显示开头，下载文件可以看全部。",
+  "open it with the program it belongs to": "用电脑上对应的软件打开",
+  "Opens in your browser. A private page may ask you to sign in, or not open at all.": "在浏览器里打开。私密的网页可能要先登录，也可能打不开。",
+  "The author says it is from {date} — not verified": "作者说这是 {date} 的——未核实",
+  "Click to see all of it": "点一下看全部",
 };

@@ -8,11 +8,11 @@ time proof are always reported separately (rule 4).
 from __future__ import annotations
 
 import difflib
-import re
 from dataclasses import dataclass
 
 from app.db.models import AnchorRow, RecordRow
 from app.i18n import tr
+from app.services.previews import plain_preview, preview_kind
 from provenance_core.jcs import parse_json_strict
 from provenance_core.replay import ReplayState, milestone_view, replay
 
@@ -121,16 +121,6 @@ class Snapshot:
 
 
 PREVIEW_BYTES = 4096  # read from the start of a step's text, however long it is
-PREVIEW_CHARS = 280
-PREVIEW_LINES = 4
-# Markdown marks that would only get in the way in a few lines of plain text.
-_MARKS = [
-    (re.compile(r"!\[[^\]]*\]\([^)]*\)"), ""),  # images
-    (re.compile(r"\[([^\]]*)\]\([^)]*\)"), r"\1"),  # links: keep their text
-    (re.compile(r"^\s{0,3}(?:#{1,6}|[-*+]|\d+[.)]|>)\s+", re.M), ""),  # headings, list marks, quotes
-    (re.compile(r"^\s*(?:```|~~~).*$", re.M), ""),  # code fences (the code itself stays)
-    (re.compile(r"\*\*|__|`"), ""),
-]
 
 
 def text_preview(blobs, files: list) -> str | None:
@@ -144,17 +134,7 @@ def text_preview(blobs, files: list) -> str | None:
             raw = fh.read(PREVIEW_BYTES)
     except (OSError, ValueError):
         return None
-    text = raw.decode("utf-8", errors="ignore")
-    for pattern, replacement in _MARKS:
-        text = pattern.sub(replacement, text)
-    lines = [" ".join(line.split()) for line in text.splitlines()]
-    lines = [line for line in lines if line]
-    short = "\n".join(lines[:PREVIEW_LINES])
-    if len(short) > PREVIEW_CHARS:
-        short = short[:PREVIEW_CHARS].rstrip()
-    if short != "\n".join(lines) or len(raw) == PREVIEW_BYTES:
-        short += "…"
-    return short or None
+    return plain_preview(raw.decode("utf-8", errors="ignore"), more=len(raw) == PREVIEW_BYTES)
 
 
 def graph_view(snap: Snapshot, project_id: str | None = None, milestones_only: bool = False,
@@ -181,8 +161,12 @@ def graph_view(snap: Snapshot, project_id: str | None = None, milestones_only: b
                 "btc": btc,
                 # What the step holds, to read at a glance: its text, its files, its reference.
                 "preview": text_preview(blobs, snap.files.get(e.id, [])),
-                "files": [f.name for f in snap.files.get(e.id, []) if f.role == "file"],
+                "files": [{"name": f.name, "kind": preview_kind(f.name)}
+                          for f in snap.files.get(e.id, []) if f.role == "file"],
                 "external": snap.payloads[e.id].get("external"),
+                # An earlier date the author gave for older material: their word, never verified.
+                "claimed": ({"date": imp["claimed_date"], "precision": imp["precision"]}
+                            if (imp := snap.payloads[e.id].get("import")) else None),
             }
         )
     edges = []
@@ -393,7 +377,8 @@ def record_detail(snap: Snapshot, rid: str, verification: dict | None = None) ->
         "author": {"label": tr("Author statement"), "source": "author", "items": author_items},
         "later": {"label": tr("Later additions"), "items": later},
         "retracted": bool(entry and entry.retracted_by),
-        "files": [{"role": f.role, "name": f.name, "size": f.size, "media_type": f.media_type, "sha256": f.sha256}
+        "files": [{"role": f.role, "name": f.name, "size": f.size, "media_type": f.media_type, "sha256": f.sha256,
+                   "preview": preview_kind(f.name) if f.role == "file" else None}
                   for f in files],
     }
     if entry:
