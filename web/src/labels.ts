@@ -45,6 +45,25 @@ export function typeLabel(kind: string): string {
 
 export const TYPE_KINDS = Object.keys(TYPE_EN);
 
+// One colour per kind of step, the same in every view, so a kind is recognised before it is read.
+const TYPE_COLORS: Record<string, [string, string]> = {
+  idea: ["#9a5b00", "#fdf0d0"],
+  note: ["#475569", "#edf1f6"],
+  claim: ["#6d28d9", "#efe8fe"],
+  document: ["#1d4ed8", "#e2ebff"],
+  code: ["#0f766e", "#d6f4ee"],
+  experiment: ["#c2410c", "#ffeadb"],
+  dataset: ["#15803d", "#dcf4e3"],
+  figure: ["#be185d", "#fde6f0"],
+  publication: ["#4338ca", "#e6e7ff"],
+};
+
+/** The colours of a kind of step, as CSS variables: --type (text, lines) and --type-bg. */
+export function typeStyle(kind: string): Record<string, string> {
+  const [fg, bg] = TYPE_COLORS[kind] ?? TYPE_COLORS.note;
+  return { "--type": fg, "--type-bg": bg };
+}
+
 export function stampName(kind: "tsa" | "btc"): string {
   return kind === "tsa" ? t("Date stamp") : t("Public stamp");
 }

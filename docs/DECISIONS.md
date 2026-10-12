@@ -698,3 +698,52 @@ verification rules or what leaves the machine for time proofs.
      onto Applications, then open it from Applications or Launchpad; the first time: Open
      Anyway" (`packaging/macos/`, drawn by `tools/dmg_background.py`, laid out with dmgbuild).
      Windows uses an ordinary installer, which needs no such step.
+
+- **D-053 · Two rows at the top: where am I, and what can I do.** The first row had grown to a
+  dozen controls with five "?" buttons, and Map / List / Story looked like plain words, so people
+  did not see they could be clicked. Now:
+  1. *Row 1, where am I:* the app's mark and name, the My research / Practice switch, the project
+     (the list ends with "+ New project…") and its number of steps; on the right the backup and
+     inbox status, Settings and the language.
+  2. *Row 2, what can I do:* the three views as one segmented control with icons (the chosen one
+     raised), one "?" that explains all three and holds the map's legend, "Key steps only" as a
+     toggle; on the right the actions — Quick note, Share and the primary Add a step — with
+     icons. Their explanations moved into tooltips.
+  3. *How to use the view in front of you* is a small line at the bottom of the canvas ("click a
+     step to open it · drag to move · scroll to zoom"; for the list and the story what clicking
+     does), until the person clicks "Got it".
+  4. *Settings is grouped:* Record automatically, Stamps, Your data, Practice, About.
+  5. Everything clickable shows it: a pointer, and a change under the mouse (steps on the map,
+     rows of the list, the story's step numbers as small chips, buttons, the backup pill).
+
+- **D-054 · Steps as cards first; a map that explains itself; the AI summary in sections, shown as
+  it is written.** People found the map hard to read ("can someone with no background follow
+  it?"), and the local-AI retelling took minutes with nothing on screen, then came back as long
+  prose. Now:
+  1. *Steps is the first view.* One card per step, oldest at the top, joined by a line: its kind
+     (one colour per kind, the same in every view), title, date (✓ when it comes from a date
+     stamp) and stamps, then in plain words where it came from — "Grew out of #1 …", "Builds on
+     #2 …", "A new version of #4 …" (later links and withdrawals say so) — and which later steps
+     build on it. A #number goes to that step and opens it. "Key steps only" works here too,
+     with "n more steps in between". The table of every record (PRD §11's timeline: both stamps
+     in their own columns, local time marked unverified) is one click away ("Cards / Table").
+     The tabs are Steps / Map / Story; the last one chosen is remembered in the browser.
+  2. *The map explains itself.* The names of the rows stay at the left edge however far the map
+     is moved, with faint bands to follow a row; a short legend in plain words sits in a corner
+     until hidden ("each box is one step: older on the left, newer on the right; each row is one
+     kind; a line joins two related steps"); each box shows its #number and its kind's colour;
+     pointing at a step fades everything it has no line to and names its lines. The map opens
+     where the newest steps are, with every row in sight. In Chinese it is called 关系图.
+  3. *The AI summary comes in sections of short points* — In one sentence / How it started /
+     What happened / Turning points / Where it stands now — each point ending with its steps,
+     in everyday words with technical terms explained. The checks of D-050 are unchanged (every
+     sentence is checked; flagged ones are crossed out and left out when saving). An answer is
+     limited to 1,500 tokens, which bounds the wait.
+  4. *It shows up as it is written, and can be stopped.* The server asks the model for a
+     streamed answer and passes it on line by line; the page shows the text growing, how long it
+     has taken, and "starting the model…" while a model is loaded the first time. Stop (or
+     leaving the story) makes the server shut its connection to the model at once (cancelling the
+     wait alone could leave it open on Windows), so the model stops writing — also while it is
+     still loading. Opening the panel looks for models at the saved
+     address at once, and a button at the top of the story goes to it, so one click on Write is
+     enough.

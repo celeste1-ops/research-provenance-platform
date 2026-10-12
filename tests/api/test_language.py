@@ -118,7 +118,10 @@ def test_ai_retelling_over_the_api(api, client, monkeypatch, ctx):
     def handle(request):
         if request.url.path == "/v1/models":
             return httpx.Response(200, json={"data": [{"id": "qwen2.5:7b"}]})
-        return httpx.Response(200, json={"choices": [{"message": {"content": "研究从一个想法开始 [#1]。"}}]})
+        assert json.loads(request.content)["stream"] is True
+        pieces = ["## 起点\n", "- 研究从一个", "想法开始 [#1]。"]
+        sse = "".join(f"data: {json.dumps({'choices': [{'delta': {'content': p}}]})}\n\n" for p in pieces)
+        return httpx.Response(200, text=sse + "data: [DONE]\n\n", headers={"Content-Type": "text/event-stream"})
 
     monkeypatch.setattr(ai_story, "model_factory",
                         lambda url, model="": LocalModel(url, model, transport=httpx.MockTransport(handle)))
@@ -128,11 +131,38 @@ def test_ai_retelling_over_the_api(api, client, monkeypatch, ctx):
     assert client.post("/api/ai/models", json={"url": "localhost:11434"}).json() == {
         "url": "http://localhost:11434", "models": ["qwen2.5:7b"]}
     zh = {"X-RPROV-Lang": "zh"}
-    out = client.post("/api/ai/story", json={"url": "http://127.0.0.1:11434", "model": "qwen2.5:7b",
-                                             "project": api.project_id}, headers=zh).json()
+    r = client.post("/api/ai/story", json={"url": "http://127.0.0.1:11434", "model": "qwen2.5:7b",
+                                           "project": api.project_id}, headers=zh)
+    assert r.headers["content-type"].startswith("application/x-ndjson")
+    events = [json.loads(line) for line in r.text.splitlines()]
+    # The page gets the text as it is written, then the checked result.
+    assert "".join(e["text"] for e in events[:-1]) == "## 起点\n- 研究从一个想法开始 [#1]。"
+    out = events[-1]["result"]
     assert out["label"] == "AI 推断" and out["counts"] == {"ok": 1, "flagged": 0}
+    assert [b["kind"] for b in out["blocks"]] == ["heading", "item", "sentence"]
     prefs = preferences.load(ctx.settings.data_dir)
     assert prefs["ai_url"] == "http://127.0.0.1:11434" and prefs["ai_model"] == "qwen2.5:7b"
     assert ctx.ledger.record_count() == 2  # nothing the model wrote became a record
     r = client.post("/api/ai/models", json={"url": "https://api.example.com"}, headers=zh)
     assert r.status_code == 400 and r.json()["detail"].startswith("只能用这台电脑上的模型")
+    r = client.post("/api/ai/story", json={"url": "http://127.0.0.1:11434", "model": ""}, headers=zh)
+    assert r.status_code == 400 and r.json()["detail"] == "请先选择一个模型"
+
+
+def test_an_ai_error_while_writing_arrives_in_the_language(api, client, monkeypatch):
+    import httpx
+
+    from app.services import ai_story
+    from provenance_core.providers.local_ai import LocalModel
+
+    def refuse(request):
+        raise httpx.ConnectError("refused")
+
+    monkeypatch.setattr(ai_story, "model_factory",
+                        lambda url, model="": LocalModel(url, model, transport=httpx.MockTransport(refuse)))
+    api.init()
+    api.entry("Idea", "idea", body="hello")
+    r = client.post("/api/ai/story", json={"url": "http://127.0.0.1:11434", "model": "m"},
+                    headers={"X-RPROV-Lang": "zh"})
+    assert r.status_code == 200  # the answer had begun; the error is its last line
+    assert json.loads(r.text.splitlines()[-1]) == {"error": "这个地址上没有本机模型回答（它在运行吗？）"}

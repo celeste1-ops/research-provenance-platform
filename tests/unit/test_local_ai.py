@@ -3,7 +3,9 @@ sentence by sentence; nothing it writes becomes a record."""
 
 from __future__ import annotations
 
+import asyncio
 import json
+from concurrent.futures import ThreadPoolExecutor
 
 import httpx
 import pytest
@@ -41,8 +43,13 @@ def fake_server(reply: str = "Fine [#1].", seen: list | None = None) -> httpx.Mo
         if request.url.path == "/v1/models":
             return httpx.Response(200, json={"data": [{"id": "qwen2.5:7b"}, {"id": "llama3.1:8b"}]})
         if request.url.path == "/v1/chat/completions":
+            body = json.loads(request.content)
             if seen is not None:
-                seen.append(json.loads(request.content))
+                seen.append(body)
+            if body["stream"]:  # server-sent events, a few characters at a time, as Ollama sends them
+                pieces = [reply[i:i + 7] for i in range(0, len(reply), 7)]
+                sse = "".join(f"data: {json.dumps({'choices': [{'delta': {'content': p}}]})}\n\n" for p in pieces)
+                return httpx.Response(200, text=sse + "data: [DONE]\n\n")
             return httpx.Response(200, json={"choices": [{"message": {"content": reply}}]})
         return httpx.Response(404)
     return httpx.MockTransport(handle)
@@ -55,6 +62,29 @@ def test_the_client_lists_models_and_chats():
     assert model.chat("system", "user") == "Hello [#1]."
     assert seen[0]["model"] == "qwen2.5:7b" and seen[0]["stream"] is False
     assert [m["role"] for m in seen[0]["messages"]] == ["system", "user"]
+    assert seen[0]["max_tokens"]  # an answer cannot run on for ever
+
+
+def collect(pieces) -> list:
+    """Every piece of an async answer. In a thread of its own: the browser tests leave an event
+    loop running in this one."""
+    async def run():
+        return [p async for p in pieces]
+    with ThreadPoolExecutor(1) as pool:
+        return pool.submit(asyncio.run, run()).result()
+
+
+def test_the_answer_can_come_piece_by_piece():
+    seen: list = []
+    model = LocalModel("http://127.0.0.1:11434", "qwen2.5:7b", transport=fake_server("A longer answer [#1].", seen))
+    pieces = collect(model.chat_stream("system", "user"))
+    assert len(pieces) > 1 and "".join(pieces) == "A longer answer [#1]." and seen[0]["stream"] is True
+    garbled = httpx.MockTransport(lambda r: httpx.Response(200, text="data: {not json\n\n"))
+    with pytest.raises(LocalAIError, match="not readable"):
+        collect(LocalModel("http://127.0.0.1:11434", "m", transport=garbled).chat_stream("s", "u"))
+    missing = httpx.MockTransport(lambda r: httpx.Response(404, text="model not found"))
+    with pytest.raises(LocalAIError, match="HTTP 404"):
+        collect(LocalModel("http://127.0.0.1:11434", "m", transport=missing).chat_stream("s", "u"))
 
 
 def test_redirects_are_not_followed_and_errors_are_plain():
@@ -96,11 +126,39 @@ def test_every_sentence_is_checked(story):
     assert statuses == ["ok", "ok", "claim", "no_source", "unknown_source"]
     assert out["counts"] == {"ok": 2, "flagged": 3} and out["label"] == "AI inference"
     assert out["blocks"][1]["refs"][0]["id"]  # each cited step links to its record
-    assert "Retell this research history." in seen[0]["messages"][1]["content"]
+    assert "Summarise this research history" in seen[0]["messages"][1]["content"]
+    assert "## Turning points" in seen[0]["messages"][0]["content"]  # the sections it is asked for
     with language("zh"):
         out = retell(story, LocalModel("http://127.0.0.1:11434", "m", transport=fake_server("一句 [#1]。", seen)), "zh")
-    assert out["label"] == "AI 推断" and "请讲述这段研究经过" in seen[1]["messages"][1]["content"]
+    assert out["label"] == "AI 推断" and "请按上面的几个部分总结" in seen[1]["messages"][1]["content"]
+    assert "## 关键转折" in seen[1]["messages"][0]["content"]
     assert [b["status"] for b in parse("没有来源。有来源【#1】。", {1: "x"})] == ["no_source", "ok"]
+
+
+def test_the_summary_comes_in_sections_of_points(story):
+    """Models write headings and bullet points in several ways; each becomes a heading, or an item
+    whose sentences are checked one by one."""
+    reply = ("## In one sentence\n- The work tested an idea [#1].\n\n**How it started**\n"
+             "* It began with an idea [#1]. Then came an experiment [#2].\n"
+             "Where it stands now:\n1. **A result** was written down [#3].\n2. Something without a source.")
+    blocks = parse(reply, {1: "a", 2: "b", 3: "c"})
+    assert [b["kind"] if b["kind"] != "sentence" else b["status"] for b in blocks] == [
+        "heading", "item", "ok", "break", "heading", "item", "ok", "ok", "heading", "item", "ok", "item", "no_source"]
+    assert [b["text"] for b in blocks if b["kind"] == "heading"] == [
+        "In one sentence", "How it started", "Where it stands now"]
+    assert blocks[-3]["text"] == "A result was written down [#3]."  # emphasis marks are dropped
+
+
+def test_the_streamed_summary_is_checked_like_the_whole(story):
+    from app.services.ai_story import retell_stream
+
+    reply = "## How it started\n- It began with an idea [#1].\n- This proves authorship [#1]."
+    model = LocalModel("http://127.0.0.1:11434", "m", transport=fake_server(reply))
+    events = collect(retell_stream(story, model, "en"))
+    assert "".join(e["text"] for e in events[:-1]) == reply
+    out = events[-1]["result"]
+    assert [b["status"] for b in out["blocks"] if b["kind"] == "sentence"] == ["ok", "claim"]
+    assert out["counts"] == {"ok": 1, "flagged": 1}
 
 
 @pytest.mark.parametrize("sentence,status", [

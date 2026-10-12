@@ -3,11 +3,13 @@ and no endpoint that edits an existing record."""
 
 from __future__ import annotations
 
+import asyncio
 import json
 from typing import Annotated
 
+import anyio
 from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile
-from fastapi.responses import Response
+from fastapi.responses import Response, StreamingResponse
 from pydantic import BaseModel, Field
 
 from app.config import MAX_UPLOAD_BYTES
@@ -590,20 +592,72 @@ def ai_models(body: AiIn, request: Request):
 
 @router.post("/ai/story")
 def ai_retell(body: AiIn, request: Request):
-    """Retell the story with the chosen local model; nothing is sent anywhere but this computer."""
+    """Retell the story with the chosen local model; nothing is sent anywhere but this computer.
+
+    The answer comes as it is written, one JSON object per line — {"text": ...} pieces, then
+    {"result": ...} checked sentence by sentence, or {"error": ...} — so the page can show it
+    growing instead of a minutes-long wait. When the page stops reading (the author clicked
+    Stop), the connection to the model is closed and it stops writing.
+    """
     from app import preferences
-    from app.i18n import current
+    from app.i18n import current, language, tr_message
     from app.services import ai_story
     from provenance_core.providers.local_ai import LocalAIError
 
     c = ctx(request)
     try:
         model = ai_story.model_factory(body.url, body.model)
-        result = ai_story.retell(_narrative(c, body.project), model, current())
+        if not model.model:
+            raise LocalAIError("choose a model first")
     except LocalAIError as exc:
         raise HTTPException(400, str(exc)) from None
-    preferences.save(real(request).settings.data_dir, ai_url=model.base, ai_model=body.model)
-    return result
+    narrative = _narrative(c, body.project)
+    lang, label = current(), tr("AI inference")
+    data_dir = real(request).settings.data_dir
+
+    # Texts are put into the language now: the lines are written later, piece by piece. After each
+    # piece, and every half second while the model is quiet (loading, thinking), it looks whether
+    # the page is still reading; when it is not, the answer is cancelled, which closes the
+    # connection to the model. (Writing to a page that has gone raises no error to notice it by.)
+    async def lines():
+        events = ai_story.retell_stream(narrative, model, lang, label=label)
+        step: asyncio.Future | None = None
+        try:
+            while True:
+                step = asyncio.ensure_future(anext(events, None))
+                while True:
+                    await asyncio.wait({step}, timeout=0.5)
+                    if await request.is_disconnected():
+                        return
+                    if step.done():
+                        break
+                event = step.result()
+                if event is None:
+                    return
+                if "result" in event:
+                    preferences.save(data_dir, ai_url=model.base, ai_model=body.model)
+                yield json.dumps(event, ensure_ascii=False) + "\n"
+        except LocalAIError as exc:
+            with language(lang):
+                message = tr_message(str(exc))
+            yield json.dumps({"error": message}, ensure_ascii=False) + "\n"
+        finally:
+            # The page has gone while the model is between pieces (or still loading): hang up on
+            # the model, so the wait for its next piece ends, and wait until it has; cancelling is
+            # the fallback. Then the answer is closed. Nothing is left for the garbage collector.
+            with anyio.CancelScope(shield=True):
+                if step is not None and not step.done():
+                    if model.hang_up():
+                        await asyncio.wait({step}, timeout=5)
+                    if not step.done():
+                        step.cancel()
+                        await asyncio.wait({step}, timeout=5)
+                if step is not None and step.done() and not step.cancelled():
+                    step.exception()  # a broken answer after hanging up is expected; not "never retrieved"
+                await events.aclose()
+
+    return StreamingResponse(lines(), media_type="application/x-ndjson",
+                             headers={"Cache-Control": "no-store", "X-Accel-Buffering": "no"})
 
 
 # ---------------------------------------------------------------- watched folders and the inbox (D-049)
