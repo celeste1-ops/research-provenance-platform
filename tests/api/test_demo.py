@@ -111,7 +111,8 @@ def test_the_sample_is_the_same_research_in_both_languages():
 
 
 def test_the_sample_files_are_made_by_the_script(tmp_path, monkeypatch):
-    """fixtures/fsf_sample/files is exactly what tools/make_fsf_sample.py writes."""
+    """fixtures/fsf_sample/files is what tools/make_fsf_sample.py writes (pictures: same size; zips: same
+    contents; everything else byte for byte)."""
     import importlib.util
 
     spec = importlib.util.spec_from_file_location("make_fsf_sample", ROOT / "tools" / "make_fsf_sample.py")
@@ -122,5 +123,16 @@ def test_the_sample_files_are_made_by_the_script(tmp_path, monkeypatch):
     committed = ROOT / "fixtures" / "fsf_sample" / "files"
     made = sorted(p.relative_to(tmp_path) for p in tmp_path.rglob("*") if p.is_file())
     assert made == sorted(p.relative_to(committed) for p in committed.rglob("*") if p.is_file())
+    import zipfile
+
+    from PIL import Image
+
     for rel in made:
-        assert (tmp_path / rel).read_bytes() == (committed / rel).read_bytes(), rel
+        new, old = tmp_path / rel, committed / rel
+        if rel.suffix == ".png":  # drawn text and compression may differ a little between systems
+            assert Image.open(new).size == Image.open(old).size, rel
+        elif rel.suffix == ".zip":
+            with zipfile.ZipFile(new) as a, zipfile.ZipFile(old) as b:
+                assert [(i.filename, a.read(i)) for i in a.infolist()] == [(i.filename, b.read(i)) for i in b.infolist()]
+        else:
+            assert new.read_bytes() == old.read_bytes(), rel
