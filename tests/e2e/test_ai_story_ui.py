@@ -115,7 +115,7 @@ def test_retell_with_a_local_model(tmp_path, browser):
 
 
 @pytest.mark.parametrize("loading", [0.0, 2.0], ids=["while-writing", "while-loading"])
-def test_the_summary_shows_while_written_and_can_be_stopped(tmp_path, browser, loading):
+def test_the_summary_shows_while_written_and_can_be_stopped(tmp_path, browser, loading, caplog):
     FakeModel.delay, FakeModel.loading, FakeModel.aborted = 0.15, loading, threading.Event()
     model_server = ThreadingHTTPServer(("127.0.0.1", 0), FakeModel)
     threading.Thread(target=model_server.serve_forever, daemon=True).start()
@@ -144,6 +144,10 @@ def test_the_summary_shows_while_written_and_can_be_stopped(tmp_path, browser, l
             expect(panel.get_by_test_id("ai-draft")).to_have_count(0)
             expect(panel.get_by_test_id("ai-result")).to_have_count(0)
             assert FakeModel.aborted.wait(10)  # the model was told to stop, not left writing
+            # ...in order: nothing was left half-closed for the garbage collector.
+            page.wait_for_timeout(300)
+            assert not [r for r in caplog.records if "asynchronous generator" in r.getMessage()
+                        or "Task was destroyed" in r.getMessage()]
             expect(panel.get_by_test_id("ai-write")).to_be_enabled()
             page.close()
     finally:

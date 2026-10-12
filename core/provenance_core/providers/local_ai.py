@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import ipaddress
 import json
+import socket
 from collections.abc import AsyncIterator
 from urllib.parse import urlsplit
 
@@ -50,6 +51,7 @@ class LocalModel:
         self.model = model
         self.timeout = timeout
         self._transport = transport
+        self._sockets: list[socket.socket] = []  # of the answer being streamed, for hang_up()
 
     def _client(self) -> httpx.Client:
         return httpx.Client(base_url=self.base, timeout=self.timeout, transport=self._transport, trust_env=False,
@@ -91,13 +93,19 @@ class LocalModel:
 
     async def chat_stream(self, system: str, user: str) -> AsyncIterator[str]:
         """The answer piece by piece, as the model writes it, so the author sees it coming instead
-        of waiting minutes for all of it. Cancelling it, or closing it, closes the connection at
-        once — even while the model is still loading — and the server stops writing."""
+        of waiting minutes for all of it. Closing it closes the connection, and hang_up() ends it
+        from outside, even while the model is still loading; either way the server stops writing."""
         body = self._request(system, user, True)
+
+        async def trace(event: str, info: dict) -> None:
+            if event == "connection.connect_tcp.complete" and info.get("return_value") is not None:
+                self._sockets.append(info["return_value"].get_extra_info("socket"))
+
         try:
             async with httpx.AsyncClient(base_url=self.base, timeout=self.timeout, transport=self._transport,
                                          trust_env=False, follow_redirects=False) as client, \
-                    client.stream("POST", "/v1/chat/completions", json=body) as response:
+                    client.stream("POST", "/v1/chat/completions", json=body,
+                                  extensions={"trace": trace}) as response:
                 if response.status_code != 200:
                     raise LocalAIError(f"the local model answered HTTP {response.status_code}")
                 async for line in response.aiter_lines():
@@ -116,3 +124,17 @@ class LocalModel:
             raise LocalAIError("the local model took too long to answer") from None
         except httpx.HTTPError:
             raise LocalAIError("no local model answered at this address (is it running?)") from None
+
+    def hang_up(self) -> bool:
+        """Shut the connection of the answer being streamed, at once: the model stops writing, and
+        whatever waits for its next piece gets the end of the answer instead. (Cancelling that wait
+        is not enough everywhere: on Windows the connection could stay open.) False when there is
+        no connection to shut."""
+        shut = False
+        for sock in self._sockets:
+            try:
+                sock.shutdown(socket.SHUT_RDWR)
+                shut = True
+            except OSError:  # already closed
+                pass
+        return shut

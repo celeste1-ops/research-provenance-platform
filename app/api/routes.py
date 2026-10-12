@@ -642,11 +642,19 @@ def ai_retell(body: AiIn, request: Request):
                 message = tr_message(str(exc))
             yield json.dumps({"error": message}, ensure_ascii=False) + "\n"
         finally:
-            if step is not None and not step.done():
-                step.cancel()  # the model is in the middle of a piece: this ends its answer
-            else:
-                with anyio.CancelScope(shield=True):
-                    await events.aclose()
+            # The page has gone while the model is between pieces (or still loading): hang up on
+            # the model, so the wait for its next piece ends, and wait until it has; cancelling is
+            # the fallback. Then the answer is closed. Nothing is left for the garbage collector.
+            with anyio.CancelScope(shield=True):
+                if step is not None and not step.done():
+                    if model.hang_up():
+                        await asyncio.wait({step}, timeout=5)
+                    if not step.done():
+                        step.cancel()
+                        await asyncio.wait({step}, timeout=5)
+                if step is not None and step.done() and not step.cancelled():
+                    step.exception()  # a broken answer after hanging up is expected; not "never retrieved"
+                await events.aclose()
 
     return StreamingResponse(lines(), media_type="application/x-ndjson",
                              headers={"Cache-Control": "no-store", "X-Accel-Buffering": "no"})
