@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+from concurrent.futures import ThreadPoolExecutor
 
 import httpx
 import httpx2
@@ -13,10 +14,13 @@ from provenance_core.providers.cloud_ai import CloudAIError, CloudModel, service
 
 
 def collect(model: CloudModel, system: str = "SYS", user: str = "USER") -> str:
+    """The whole answer. In a thread of its own: the browser tests leave an event loop running in
+    this one (as tests/unit/test_local_ai.py does)."""
     async def run():
         return "".join([p async for p in model.chat_stream(system, user)])
 
-    return asyncio.run(run())
+    with ThreadPoolExecutor(1) as pool:
+        return pool.submit(asyncio.run, run()).result()
 
 
 @pytest.mark.parametrize(("url", "expected"), [
