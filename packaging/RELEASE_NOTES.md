@@ -3,6 +3,7 @@
 **New in v0.7.0**
 - **Three spaces, never mixed.** The switch at the top now has three places: **My research** (your real record), **Practice** (only what you try out yourself) and **Example** (the fictional FSF sample research). The example has its own purple colour and a banner saying it is a fictional research, not yours — so your own FSF steps and the sample's are never in the same place.
 - **Looking at the example changes nothing of yours.** "See a finished example first", Settings → **See the example** and **Example** in the switch all just go there, with the tour from its first stop. Change anything you like in it; **Settings → Load the example afresh** puts it back as it was. Your practice and your real record are not touched, and nothing asks to replace them any more.
+- **The example speaks your language.** Switching between 中文 and English while looking at the example now shows the example itself in that language — the same step, the same project — not only the buttons. The practice space's project is named in your language too. What you write yourself is never translated: your words are the record, signed and stamped as written.
 - **Upgrading.** If your practice space held the sample, it moves to Example by itself and practice starts empty. Practice steps of your own stay in practice; your real record is not touched.
 
 **New in v0.6.1**

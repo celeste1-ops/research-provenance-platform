@@ -51,7 +51,7 @@ try {
 
   # The sample research is in the app (D-059): the example space opens with it, in Chinese here (D-064).
   Invoke-RestMethod -Method Post "$base/api/example/open" -Headers $h -ContentType "application/json" -Body '{"lang":"zh"}' | Out-Null
-  $example = Invoke-RestMethod "$base/api/status" -Headers @{ "X-RPROV-Space" = "example" }
+  $example = Invoke-RestMethod "$base/api/status" -Headers @{ "X-RPROV-Space" = "example"; "X-RPROV-Lang" = "zh" }
   if ($example.entry_count -ne 32) { throw "sample research missing: $($example.entry_count) steps in the example" }
   Write-Host "Sample research: $($example.entry_count) steps in the example"
 

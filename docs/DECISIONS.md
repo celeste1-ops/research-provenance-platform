@@ -1076,3 +1076,31 @@ verification rules or what leaves the machine for time proofs.
      author's records on this computer, under this computer's user account, with one signing key.
      Someone else on the same computer uses their own computer user account, which has its own
      data folder and keychain.
+
+- **D-065 · What the language switch changes.** Asked for after the v0.7.0 trial: switching to
+  Chinese left the sample research in English, which looked as if only the buttons were
+  translated. D-046 3 stays: the author's words are never translated. The app's own content now
+  follows the switch everywhere, the example included.
+  1. *The example in each language.* The sample research exists in English and Chinese (D-059).
+     Each language now has its own example installation, `<data folder>/example/en` and
+     `<data folder>/example/zh`, loaded the first time the example is looked at in that language.
+     A request for the example gets the copy in the language it names (`X-RPROV-Lang`; plain links
+     to attachments carry `&lang=`). Switching the language while looking at the example shows
+     the other copy, with the same project and the same step open; the tour comes in that language
+     too. What was tried in one copy stays in that copy. "Load the example afresh" throws all
+     copies away and loads the one in the interface's language. Each copy has its own signing key
+     (two at most), so switching back and forth creates nothing new.
+  2. *Names the app gives.* The practice space's first project is named in the interface's
+     language when practice is made ("Practice project" / 「练习项目」), and the interface shows that
+     name in its current language whichever it was made in; so is the author's practice label
+     ("Ada (practice)" / 「Ada（练习）」).
+  3. *The author's own words: never translated.* Titles, texts, notes, reasons, file names and
+     project names are the record: signed and date-stamped exactly as written. A translation is
+     other words, which the stamp does not cover and which nobody could check; showing it in place
+     of the original would also make the record say something it does not. So they are shown as
+     written, in whichever language the interface is. A translation shown beside the original,
+     marked as a translation and never saved as a record, would be possible with the local model
+     (D-050); it is not built, and would be its own decision.
+  4. *Moving from older layouts.* A practice space holding the sample (up to v0.6.1) becomes the
+     example in the sample's language; the single `example` folder of the v0.7.0 trial build moves
+     into its language's folder.

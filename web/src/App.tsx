@@ -44,6 +44,8 @@ function initialView(): View {
   return "steps";
 }
 const NEW_PROJECT = "__new_project__"; // the last entry of the project list
+// The practice space's first project, named in the language of the day it was made (D-065).
+const PRACTICE_PROJECT = ["Practice project", "练习项目"];
 
 // Remembered per browser so a reload stays in the same space (a convenience only).
 function initialSpace(): Space {
@@ -227,20 +229,33 @@ export function App() {
     setNotice({ text: t("Loading the example afresh…") });
     try {
       await api.exampleReset(lang());
-      // The new example's status, its main project and the tour's restart all in one go: the tour
-      // of the example just replaced must not pick that example's (now gone) project.
-      const s = await api.status();
-      const main = s.sample?.projects.main ?? "";
-      setStatus(s);
       setNotice({ text: t("The example is as it was at the start again.") });
-      setTourStart((n) => n + 1);
-      setGraph(null);
-      setMilestonesOnly(false);
-      if (main !== projectId) setProjectId(main);  // a new project loads everything again
-      else await reload();
+      await showOtherExample(true);
     } catch (e) {
       setNotice({ text: (e as Error).message, kind: "error" });
     }
+  }
+
+  // Another copy of the example is shown now: loaded afresh, or the one in the other language
+  // (D-065), which is loaded the first time it is asked for. Its status, its project and the
+  // tour change at once, so that nothing (the tour of the copy before above all) picks a project
+  // of the copy before; the same project and step of the sample stay open.
+  async function showOtherExample(restartTour: boolean) {
+    const before = status?.sample;
+    const s = await api.status();
+    const after = s.sample;
+    const counterpart = (from?: Record<string, string>, to?: Record<string, string>, id?: string | null) => {
+      const key = from && id ? Object.keys(from).find((k) => from[k] === id) : undefined;
+      return key && to ? (to[key] ?? null) : null;
+    };
+    const pid = counterpart(before?.projects, after?.projects, projectId) ?? after?.projects.main ?? "";
+    setStatus(s);
+    if (restartTour) setTourStart((n) => n + 1);
+    setSelected(restartTour ? null : counterpart(before?.ids, after?.ids, selected));
+    setGraph(null);
+    setMilestonesOnly(false);
+    if (pid !== projectId) setProjectId(pid); // a new project loads everything again
+    else await reload();
   }
 
   // A stop of the sample tour (D-059): open the part of the app it is about.
@@ -299,7 +314,15 @@ export function App() {
     setLang(next);
     setUiLang(next);
     api.setPreferences({ language: next }).catch(() => undefined);
-    void reload();
+    if (space !== "example") {
+      void reload();
+      return;
+    }
+    // The example comes in the interface's language (D-065): the other language's copy now.
+    setNotice({ text: t("Opening the example…") });
+    showOtherExample(false)
+      .then(() => setNotice(null))
+      .catch((e) => setNotice({ text: (e as Error).message, kind: "error" }));
   }
 
   // The language is shared with the menu bar / tray menu (D-046): a choice made in another browser
@@ -472,6 +495,9 @@ export function App() {
   }
 
   const project = projects.find((p) => p.id === projectId);
+  // A name the app gave is shown in the interface's language (D-065); the author's are as written.
+  const projectName = (p: { title: string }) =>
+    practice && PRACTICE_PROJECT.includes(p.title) ? t("Practice project") : p.title;
   const steps = graph?.nodes.length ?? 0;
   const btcOff = status.providers.btc === null;
   const empty = graph !== null && steps === 0;
@@ -488,7 +514,7 @@ export function App() {
             {projects.length === 0 && <option value="">{t("No project")}</option>}
             {projects.map((p) => (
               <option key={p.id} value={p.id}>
-                {p.title}
+                {projectName(p)}
               </option>
             ))}
             <option value={NEW_PROJECT}>{t("+ New project…")}</option>
@@ -684,7 +710,7 @@ export function App() {
           )}
           {empty ? (
             <EmptyState
-              projectTitle={project?.title ?? t("your research")}
+              projectTitle={project ? projectName(project) : t("your research")}
               backup={status.backup}
               onAdd={openForm}
               onBackup={() => setDialog("backup")}
@@ -795,7 +821,7 @@ export function App() {
         <QuickNote projects={projects} projectId={projectId} onClose={() => setDialog(null)} onSaved={afterSaved} />
       )}
       {dialog === "export" && (
-        <ExportDialog rows={timeline} defaultTitle={project?.title ?? t("evidence")} onClose={() => setDialog(null)}
+        <ExportDialog rows={timeline} defaultTitle={project ? projectName(project) : t("evidence")} onClose={() => setDialog(null)}
           practice={practice} example={example} projectId={projectId} />
       )}
       {dialog === "practice-reset" && (

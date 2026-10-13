@@ -320,6 +320,10 @@ TEXTS: dict[str, str] = {
     "unknown type “{kind}”: recorded as a note": "不认识的类型“{kind}”：按笔记记录",
     "this date could not be read: left out": "读不懂这个日期：这一行照常导入，但不带日期",
     "builds on row {ref}, which is not an earlier row: left out": "“基于”第 {ref} 行，但那一行不在它前面：这个关系不导入",
+    # ---------------------------------------------------------------- the practice space (D-065)
+    "Practice project": "练习项目",
+    "{label} (practice)": "{label}（练习）",
+    "Practice": "练习",
     "Evidence bundle made with Research History. It holds report.html (open it in a browser), VERIFY.md and verify.py, with which anyone can check the records: that they existed by their date stamps and have not changed since. What the records do not show is written in report.html.":
         "用 Research History 做的证据包。里面有 report.html（用浏览器打开）、VERIFY.md 和 verify.py，任何人都能用它们核对这些记录：它们在日期章的时间已经存在，而且之后没有改动。记录不能说明什么，写在 report.html 里。",
 }

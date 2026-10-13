@@ -73,7 +73,7 @@ def test_the_sample_comes_in_the_interface_language(tmp_path, browser):
         expect(tour).to_contain_text("示例研究：FSF（虚构）")
         expect(page.get_by_test_id("steps").locator(".step-card")).to_have_count(29)
         assert "假设 H1′：指数随驱动强度变化" in page.get_by_test_id("steps").inner_text()
-        status = page.evaluate("() => fetch('/api/status', {headers: {'X-RPROV-Space': 'example'}}).then(r => r.json())")
+        status = page.evaluate("() => fetch('/api/status', {headers: {'X-RPROV-Space': 'example', 'X-RPROV-Lang': 'zh'}}).then(r => r.json())")
         assert status["sample"]["lang"] == "zh" and status["author_label"] == "示例作者（虚构）"
         page.close()
 
@@ -161,4 +161,48 @@ def test_the_example_is_a_space_of_its_own(tmp_path, browser):
         expect(page.get_by_test_id("sample-tour")).to_have_count(0)
         assert installation(page, "practice") == practice
         assert [r.id for r in ledger.records()] == real  # not one record more or less, in the same order
+        page.close()
+
+
+def test_switching_the_language_switches_the_example(tmp_path, browser):
+    """D-065: the example's own words follow the language switch, with the same step open; what was
+    tried in one language is still there on coming back to it. Practice is named in the language
+    too, and the author's own words are never changed."""
+    with LiveServer(tmp_path) as srv:
+        srv.ctx.ledger.init_identity("Author")
+        srv.ctx.ledger.create_project("My study, in English")
+        page = browser.new_page(viewport={"width": 1500, "height": 950})
+        page.goto(srv.url)
+        page.get_by_test_id("real-sample").click()
+        page.get_by_test_id("example-banner").wait_for()
+        steps = page.get_by_test_id("steps")
+        expect(steps.locator(".step-card")).to_have_count(29)
+        page.get_by_test_id("quick-note-open").click()
+        page.get_by_test_id("quick-note-text").fill("Tried in the English example")
+        page.get_by_test_id("quick-note-save").click()
+        expect(steps.locator(".step-card")).to_have_count(30)
+        page.get_by_test_id("sample-tour").get_by_test_id("tour-turn").click()
+        expect(page.get_by_test_id("detail")).to_contain_text("Hypothesis H1′")
+
+        page.get_by_test_id("lang-switch").click()  # to Chinese
+        expect(page.get_by_test_id("sample-tour")).to_contain_text("示例研究：FSF（虚构）")
+        expect(page.get_by_test_id("detail")).to_contain_text("假设 H1′")  # the same step, in Chinese
+        expect(steps.locator(".step-card")).to_have_count(29)
+        expect(steps).to_contain_text("假设 H1′：指数随驱动强度变化")
+        assert "Hypothesis" not in steps.inner_text() and "Tried in the English example" not in steps.inner_text()
+        expect(page.get_by_test_id("project-select").locator("option:checked")).to_have_text("FSF（示例）")
+
+        page.get_by_test_id("lang-switch").click()  # back to English: as it was left
+        expect(page.get_by_test_id("detail")).to_contain_text("Hypothesis H1′")
+        expect(steps.locator(".step-card")).to_have_count(30)
+        expect(steps).to_contain_text("Tried in the English example")
+
+        page.get_by_test_id("lang-switch").click()
+        page.get_by_test_id("space-practice").click()
+        expect(page.get_by_test_id("project-select").locator("option:checked")).to_have_text("练习项目")
+        page.get_by_test_id("lang-switch").click()
+        expect(page.get_by_test_id("project-select").locator("option:checked")).to_have_text("Practice project")
+        page.get_by_test_id("lang-switch").click()
+        page.get_by_test_id("space-real").click()
+        expect(page.get_by_test_id("project-select").locator("option:checked")).to_have_text("My study, in English")
         page.close()

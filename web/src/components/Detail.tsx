@@ -84,8 +84,10 @@ export function Detail({ id, version, onClose, onSelect, entries, relationTypes,
 
   useEffect(() => {
     let live = true;
-    // Clear only when switching records; a refresh of the same record keeps it on screen.
+    // Clear only when switching records; a refresh of the same record keeps it on screen. An error
+    // about another record (one the page has just moved away from) is no longer this one's.
     setDetail((d) => (d && d.id === id ? d : null));
+    setError(null);
     api
       .record(id)
       .then((d) => {

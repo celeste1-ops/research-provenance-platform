@@ -8,6 +8,7 @@ export const ZH: Record<string, string> = {
   "Space": "空间",
   "My research": "正式记录",
   "Practice": "练习区",
+  "Practice project": "练习项目",
   "Loading…": "正在加载…",
   "Name of the new research project": "新研究项目的名称",
   "New research project": "新研究项目",

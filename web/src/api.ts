@@ -72,13 +72,14 @@ export function tableTemplateUrl(): string {
 // For plain links (attachments), which cannot carry a header.
 export function contentUrl(id: string, file: string): string {
   const space = spaceQuery();
-  return `/api/records/${id}/content?file=${encodeURIComponent(file)}${space}`;
+  // The language too: the example comes in each, and its files are those of the page's (D-065).
+  return `/api/records/${id}/content?file=${encodeURIComponent(file)}${space}&lang=${lang()}`;
 }
 
 /** An attached image, or the start of a text file, as the app may show it (D-057). */
 export function previewUrl(id: string, file: string): string {
   const space = spaceQuery();
-  return `/api/records/${id}/preview?file=${encodeURIComponent(file)}${space}`;
+  return `/api/records/${id}/preview?file=${encodeURIComponent(file)}${space}&lang=${lang()}`;
 }
 
 export async function previewText(id: string, file: string): Promise<{ text: string; truncated: boolean }> {

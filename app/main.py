@@ -8,6 +8,7 @@ import os
 import sys
 from contextlib import asynccontextmanager
 from pathlib import Path
+from urllib.parse import parse_qs
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
@@ -26,7 +27,9 @@ log = logging.getLogger("rprov")
 
 
 class LanguageMiddleware:
-    """Texts the server writes follow the interface language the request names (D-046)."""
+    """Texts the server writes follow the interface language the request names (D-046): in its
+    ``X-RPROV-Lang`` header, or for a plain link (an attachment) in ``?lang=``. The example space
+    is chosen by it too (D-065)."""
 
     def __init__(self, app):
         self.app = app
@@ -36,6 +39,8 @@ class LanguageMiddleware:
             await self.app(scope, receive, send)
             return
         value = next((v.decode("latin-1") for k, v in scope.get("headers", []) if k == b"x-rprov-lang"), None)
+        if value is None:
+            value = next(iter(parse_qs(scope.get("query_string", b"").decode("latin-1")).get("lang", [])), None)
         set_language(value)
         await self.app(scope, receive, send)
 

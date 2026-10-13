@@ -95,8 +95,8 @@ E = {"X-RPROV-Space": "example"}
 
 
 def test_the_example_is_a_space_of_its_own(api, client, ctx):
-    """D-064: the FSF sample in a third installation, loaded when first opened; practice and the real
-    record are never touched by it."""
+    """D-064: the FSF sample in an installation of its own, loaded when first opened; practice and the
+    real record are never touched by it."""
     api.init(author="Ada")
     api.entry("Real step")
     real = [r.id for r in ctx.ledger.records()]
@@ -107,7 +107,8 @@ def test_the_example_is_a_space_of_its_own(api, client, ctx):
     assert r.status_code == 200 and r.json() == {"space": "example", "record_count": r.json()["record_count"]}
     st = client.get("/api/status", headers=E).json()
     assert st["space"] == "example" and st["entry_count"] == 32 and "fictional" in st["author_label"]
-    assert st["data_dir"] == str(ctx.settings.data_dir / "example") == client.get("/api/status").json()["example_dir"]
+    assert st["data_dir"] == str(ctx.settings.data_dir / "example" / "en")
+    assert client.get("/api/status").json()["example_dir"] == str(ctx.settings.data_dir / "example")
     installations = {st["installation"], client.get("/api/status", headers=P).json()["installation"],
                      ctx.ledger.installation}
     assert len(installations) == 3  # three keys, three installations
@@ -115,16 +116,10 @@ def test_the_example_is_a_space_of_its_own(api, client, ctx):
     assert st["sample"]["lang"] == "en" and set(st["sample"]["projects"]) == {"main", "side"}
     assert client.get("/api/status").json()["sample"] is None
     assert client.get("/api/status", headers=P).json()["sample"] is None
-    # Opening it again changes nothing; reloading it starts it afresh, in the language asked for.
+    # Opening it again changes nothing.
     first = st["installation"]
-    client.post("/api/example/open", json={"lang": "zh"})
+    client.post("/api/example/open", json={"lang": "en"})
     assert client.get("/api/status", headers=E).json()["installation"] == first
-    client.post("/api/example/reset", json={"lang": "zh"})
-    st = client.get("/api/status", headers=E).json()
-    assert st["installation"] != first and st["sample"]["lang"] == "zh" and st["author_label"] == "示例作者（虚构）"
-    titles = [p["title"] for p in client.get("/api/projects", headers=E).json()]
-    assert sorted(titles) == sorted(["FSF（示例）", "流道装置（示例）"])
-    assert ctx.keystore.load(first) is None  # the old example key is gone
 
     assert [r.id for r in ctx.ledger.records()] == real
     assert client.get(f"/api/records/{practice_step}", headers=P).status_code == 200
@@ -133,30 +128,102 @@ def test_the_example_is_a_space_of_its_own(api, client, ctx):
     assert len(spaces.anchor_services()) == 3  # stamps are checked in every space
 
 
+EZ = {**E, "X-RPROV-Lang": "zh"}
+
+
+def test_the_example_speaks_the_language_of_the_interface(api, client, ctx):
+    """D-065: switching the language switches the example's own words too. Each language has its own
+    copy, so what was tried in one is still there when coming back to it; loading the example
+    afresh throws every copy away."""
+    api.init(author="Ada")
+    real = [r.id for r in ctx.ledger.records()]
+    en = client.get("/api/status", headers=E).json()  # the first request opens it, in its language
+    assert en["sample"]["lang"] == "en" and en["entry_count"] == 32
+    pid = next(p["id"] for p in client.get("/api/projects", headers=E).json() if p["title"] == "FSF (sample)")
+    tried = client.post("/api/entries", headers=E, data={"project_id": pid, "node_type": "idea",
+                                                         "title": "Tried in the English example"}).json()["id"]
+
+    zh = client.get("/api/status", headers=EZ).json()
+    assert zh["installation"] != en["installation"] and zh["sample"]["lang"] == "zh"
+    assert zh["author_label"] == "示例作者（虚构）" and zh["entry_count"] == 32
+    assert zh["data_dir"] == str(ctx.settings.data_dir / "example" / "zh")
+    assert sorted(p["title"] for p in client.get("/api/projects", headers=EZ).json()) == ["FSF（示例）", "流道装置（示例）"]
+    assert "假设 H1′：指数随驱动强度变化" in [n["title"] for n in client.get("/api/graph", headers=EZ).json()["nodes"]]
+    assert client.post("/api/example/open", headers=EZ, json={"lang": "zh"}).json()["record_count"] > 32
+
+    # A plain link (an attachment) names the language in its address, as it names the space.
+    zh_step = client.get("/api/status", headers=EZ).json()["sample"]["ids"]
+    some = next(iter(zh_step.values()))
+    assert client.get(f"/api/records/{some}?space=example&lang=zh").status_code == 200
+    assert client.get(f"/api/records/{some}?space=example&lang=en").status_code == 404
+
+    back = client.get("/api/status", headers=E).json()  # back to English: as it was left
+    assert back["installation"] == en["installation"]
+    assert client.get(f"/api/records/{tried}", headers=E).status_code == 200
+    assert len(client.app.state.spaces.anchor_services()) == 3  # the real record and both examples
+
+    client.post("/api/example/reset", headers=EZ, json={"lang": "zh"})
+    assert ctx.keystore.load(en["installation"]) is None and ctx.keystore.load(zh["installation"]) is None
+    assert not (ctx.settings.data_dir / "example" / "en").exists()  # the other language comes when asked for
+    fresh = client.get("/api/status", headers=E).json()
+    assert fresh["installation"] not in (en["installation"], zh["installation"]) and fresh["entry_count"] == 32
+    assert client.get(f"/api/records/{tried}", headers=E).status_code == 404
+    assert [r.id for r in ctx.ledger.records()] == real
+
+
+def test_practice_is_named_in_the_language_of_the_interface(api, client):
+    api.init(author="Ada")
+    st = client.get("/api/status", headers={**P, "X-RPROV-Lang": "zh"}).json()
+    assert st["author_label"] == "Ada（练习）"
+    assert [p["title"] for p in client.get("/api/projects", headers=P).json()] == ["练习项目"]
+
+
+def _old_sample(spaces, folder, lang):
+    """An installation holding the sample, as an older version left it in ``folder``."""
+    from app.demo import load_sample
+
+    ctx = spaces._context(folder)
+    info = load_sample(ctx, lang)
+    (spaces.folder(folder) / "sample.json").write_text(__import__("json").dumps(info), encoding="utf-8")
+    return ctx.ledger.installation
+
+
 def test_a_practice_space_holding_the_old_sample_becomes_the_example(tmp_path):
     """Up to v0.6.1 the sample was loaded into practice (D-059, D-062): on the first start of the new
-    version that practice space becomes the example, and practice starts empty."""
+    version that practice space becomes the example in its language, and practice starts empty."""
     from app.services.spaces import Spaces
     from tests.conftest import make_ctx
 
     ctx = make_ctx(tmp_path)
     ctx.ledger.init_identity("Ada")
     old = Spaces(ctx)
-    old_practice = old.practice(auto_init=False)
-    from app.demo import load_sample
-
-    info = load_sample(old_practice, "en")
-    (old.practice_dir / "sample.json").write_text(__import__("json").dumps(info), encoding="utf-8")
-    installation = old_practice.ledger.installation
+    installation = _old_sample(old, "practice", "zh")
     old.close()
 
     new = Spaces(ctx)
     assert not (ctx.settings.data_dir / "practice").exists()
-    example = new.example()
-    assert example.ledger.installation == installation and new.sample_info()["lang"] == "en"
+    example = new.example("zh")
+    assert example.ledger.installation == installation and new.sample_info("zh")["lang"] == "zh"
     assert sum(1 for r in example.ledger.records() if r.kind == "entry") == 32
     practice = new.practice()
     assert sum(1 for r in practice.ledger.records() if r.kind == "entry") == 0
+    new.close()
+    ctx.close()
+
+
+def test_the_single_example_of_a_trial_build_moves_into_its_language(tmp_path):
+    """A trial build of v0.7.0 kept one example right in ``example``: it becomes that language's."""
+    from app.services.spaces import Spaces
+    from tests.conftest import make_ctx
+
+    ctx = make_ctx(tmp_path)
+    old = Spaces(ctx)
+    installation = _old_sample(old, "example", "en")
+    old.close()
+
+    new = Spaces(ctx)
+    assert (ctx.settings.data_dir / "example" / "en" / "sample.json").is_file()
+    assert new.example("en").ledger.installation == installation
     new.close()
     ctx.close()
 
