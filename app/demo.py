@@ -2,8 +2,8 @@
 
 * ``make demo`` loads the small fictional FSF sample (fixtures/fsf_demo, 14 steps; the tests use
   it too) into an empty data directory.
-* The app's practice space can be filled with the larger FSF sample (fixtures/fsf_sample,
-  DECISIONS D-059), in English or Chinese: two projects and 32 steps that use every kind of step,
+* The example space holds the larger FSF sample (fixtures/fsf_sample,
+  DECISIONS D-059, D-064), in English or Chinese: two projects and 32 steps that use every kind of step,
   relation and later addition, so a new user sees how the app works before recording anything.
 
 Records are append-only, so neither loads into a data directory that already holds records. To
@@ -92,7 +92,7 @@ def sample_spec(lang: str) -> dict:
 
 
 def load_sample(ctx: AppContext, lang: str = "en") -> dict:
-    """The FSF sample research in ``lang`` (D-059). Returns what the practice space remembers
+    """The FSF sample research in ``lang`` (D-059). Returns what the example space remembers
     about it: the language, and the record id of each step and project, which the sample tour in
     the interface points at."""
     lang = lang if lang in SAMPLE_LANGS else "en"

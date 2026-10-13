@@ -1044,3 +1044,93 @@ verification rules or what leaves the machine for time proofs.
      the cost is that someone who already holds the very same file could confirm to the stamping
      service that it existed. Changing it would mean a different check for those files in
      VERIFY.md and verify.py; for this version it stays as D-049 decided.
+
+- **D-064 · Three spaces: My research, Practice and the Example.** Asked for after v0.6.1: with the
+  sample research in the practice space, its author could no longer tell their own FSF steps from
+  the sample's, nor whether looking at the example would undo their practice. So the sample has a
+  space of its own. This replaces D-062 2–4 and the sample part of D-059's practice space.
+  1. *Three spaces, side by side in the switch.* My research (正式记录) is the real record.
+     Practice (练习区) holds only what the author tries out, and starts empty. The Example (示例)
+     holds the fictional FSF sample research and nothing else. Each is its own installation in its
+     own folder (`<data folder>/practice`, `<data folder>/example`) with its own database, files
+     and signing key; the real record is never written by the other two, and neither of them is
+     ever backed up.
+  2. *Told apart at a glance.* The example has its own colour (purple; practice keeps its orange)
+     and a banner: "Example: a fictional research, not yours. Look around and change anything —
+     your real record and your practice are not touched", with a way back to My research. Forms
+     and notes in it say "Add a step to the example", "Save in the example".
+  3. *Getting there.* "See a finished example first" on the first screen, the links on an empty
+     record or empty practice, Settings → "See the example" and the switch itself all just switch
+     to the example. The first time, the sample is put there in the interface's language
+     (`POST /api/example/open`); after that it is shown as it is, and the tour starts from its
+     first stop, even if it was put away before. Nothing is ever asked: nothing of the author's can
+     be replaced.
+  4. *Starting over.* Practice: "Start practice over…" empties it, as before; "Fill practice with
+     sample research" is gone. Example: "Load the example afresh" puts the sample back as it was at
+     the start (`POST /api/example/reset`, a new installation), without asking — whatever was
+     changed there was the author trying the example out. `GET /api/practice/state` is gone.
+  5. *Coming from an older version.* A practice space that held the sample (it has a
+     `sample.json`) becomes the example on first start, folder and all; practice then starts
+     empty. Practice of the author's own stays practice, and the real record is not touched.
+  6. *No accounts.* As before, there is no account and nothing to sign out of: the app keeps one
+     author's records on this computer, under this computer's user account, with one signing key.
+     Someone else on the same computer uses their own computer user account, which has its own
+     data folder and keychain.
+
+- **D-065 · What the language switch changes.** Asked for after the v0.7.0 trial: switching to
+  Chinese left the sample research in English, which looked as if only the buttons were
+  translated. D-046 3 stays: the author's words are never translated. The app's own content now
+  follows the switch everywhere, the example included.
+  1. *The example in each language.* The sample research exists in English and Chinese (D-059).
+     Each language now has its own example installation, `<data folder>/example/en` and
+     `<data folder>/example/zh`, loaded the first time the example is looked at in that language.
+     A request for the example gets the copy in the language it names (`X-RPROV-Lang`; plain links
+     to attachments carry `&lang=`). Switching the language while looking at the example shows
+     the other copy, with the same project and the same step open; the tour comes in that language
+     too. What was tried in one copy stays in that copy. "Load the example afresh" throws all
+     copies away and loads the one in the interface's language. Each copy has its own signing key
+     (two at most), so switching back and forth creates nothing new.
+  2. *Names the app gives.* The practice space's first project is named in the interface's
+     language when practice is made ("Practice project" / 「练习项目」), and the interface shows that
+     name in its current language whichever it was made in; so is the author's practice label
+     ("Ada (practice)" / 「Ada（练习）」).
+  3. *The author's own words: never translated.* Titles, texts, notes, reasons, file names and
+     project names are the record: signed and date-stamped exactly as written. A translation is
+     other words, which the stamp does not cover and which nobody could check; showing it in place
+     of the original would also make the record say something it does not. So they are shown as
+     written, in whichever language the interface is. A translation shown beside the original,
+     marked as a translation and never saved as a record, would be possible with the local model
+     (D-050); it is not built, and would be its own decision.
+  4. *Moving from older layouts.* A practice space holding the sample (up to v0.6.1) becomes the
+     example in the sample's language; the single `example` folder of the v0.7.0 trial build moves
+     into its language's folder.
+  5. *Opening it does not wait for the stamping services.* A trial on a Mac stayed on "Loading…":
+     the window had been left in the example, and loading a copy of the sample asked the stamping
+     services for each of its ~40 records in turn and waited for each answer — over a slow
+     connection, minutes. Records made while the sample is loaded now only queue their stamps
+     (`AnchorService.deferred`); every minute the background job asks for queued stamps, one at a
+     time (`submit_queued`), as does the hourly check. Loading a copy takes a few seconds. The
+     loading screen says "Opening the example…" there, and if the first answer fails it says what
+     went wrong, with Try again and a way back to My research; after twelve seconds it mentions the
+     system's keychain question, which an app without a developer signature gets after an upgrade.
+     A copy whose loading never finished (the app was quit meanwhile: it has no `sample.json`) is
+     thrown away and loaded again when next opened, instead of staying half there without its tour.
+
+- **D-066 · A translation beside the original, by the model on this computer.** Asked for with
+  D-065: the author's words are never translated in place, but a reader may want to know what a
+  step in the other language says.
+  1. *Where.* In a step's panel, when its title and text are mostly in the other language than the
+     interface's, a button "Translate into Chinese" / "Translate into English". The translation
+     appears under the title, in a box of its own marked "Translation — not part of the record",
+     with the model that made it and "Only the original is signed and stamped; this translation is
+     not saved". "Hide translation" closes it.
+  2. *Only on this computer.* The model is the local one of the AI summary (D-050), at the address
+     and with the model chosen there; with none chosen yet, the first model of the local server
+     that writes text. Nothing goes to an online service: those are never given a step's text
+     (D-061). Without a local model the panel says so and points to the AI summary.
+  3. *Never saved, never a record.* The translation lives in the page until it is closed or the page
+     moves on; it is not written to the database, the backup, a bundle or the report. Its words are
+     not covered by the stamps, so it is never shown in place of the original.
+  4. *What is sent to the model.* The step's title and text (the first 8,000 characters, said when
+     shortened), with the instruction to translate faithfully and keep numbers, formulas, code,
+     names, links and Markdown as they are. Attached files are not translated.

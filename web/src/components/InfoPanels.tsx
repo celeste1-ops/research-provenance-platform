@@ -42,12 +42,16 @@ export function WhereIsMyData({ status, onClose, onBackup }: { status: Status; o
           <p className="small">
             {tx("You are in the <b>practice space</b>. It is kept apart from your real record, in <mono>{dir}</mono>, with its own signing key. It is never backed up and can be started over from Settings.", boldMono, { dir: status.data_dir })}
           </p>
+        ) : status.space === "example" ? (
+          <p className="small">
+            {tx("You are in the <b>example</b>: a fictional research, kept apart from your real record and your practice, in <mono>{dir}</mono>, with its own signing key. It is never backed up and can be loaded afresh from Settings.", boldMono, { dir: status.data_dir })}
+          </p>
         ) : (
           <p className="small">
-            {tx("Everything you add — text, files, links between steps — is stored here: <mono>{dir}</mono>. The page you are looking at is served by this {device} to itself; nobody else can open it. Practice steps are kept apart, in <mono>{practice}</mono>.", boldMono, { dir: status.data_dir, device: dev(), practice: status.practice_dir })}
+            {tx("Everything you add — text, files, links between steps — is stored here: <mono>{dir}</mono>. The page you are looking at is served by this {device} to itself; nobody else can open it. Practice steps are kept apart, in <mono>{practice}</mono>, and the example in <mono>{example}</mono>.", boldMono, { dir: status.data_dir, device: dev(), practice: status.practice_dir, example: status.example_dir })}
           </p>
         )}
-        <h3>{status.space === "practice" ? t("Backups bring it back (for your real record)") : t("Backups bring it back")}</h3>
+        <h3>{status.space !== "real" ? t("Backups bring it back (for your real record)") : t("Backups bring it back")}</h3>
         {b?.configured ? (
           <p className="small">
             {tx("Automatic encrypted backups go to <mono>{folder}</mono> ({where}); last one {when}.", boldMono, { folder: b.location ?? "", where: b.where?.label ?? "", when: timeAgo(b.last_backup) })}

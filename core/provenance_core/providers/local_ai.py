@@ -45,10 +45,12 @@ def loopback_url(url: str) -> str:
 
 class LocalModel:
     def __init__(self, url: str, model: str = "", *, timeout: float = TIMEOUT_SECONDS,
+                 max_tokens: int = MAX_TOKENS,  # a translation (D-066) may be as long as the text
                  transport: httpx.MockTransport | None = None):  # tests answer in place of a server
         self.base = loopback_url(url)
         self.model = model
         self.timeout = timeout
+        self.max_tokens = max_tokens
         self._transport = transport
         self._streams: list = []  # connections of the answer being streamed, for hang_up()
 
@@ -79,7 +81,7 @@ class LocalModel:
         if not self.model:
             raise LocalAIError("choose a model first")
         return {
-            "model": self.model, "stream": stream, "temperature": 0.2, "max_tokens": MAX_TOKENS,
+            "model": self.model, "stream": stream, "temperature": 0.2, "max_tokens": self.max_tokens,
             "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}],
         }
 

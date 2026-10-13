@@ -192,8 +192,9 @@ export interface Status {
   relation_types: string[];
   key_backup_done: boolean;
   backup_location: string | null;
-  space: "real" | "practice";
+  space: "real" | "practice" | "example";
   practice_dir: string;
+  example_dir: string;
   data_dir_warning: string | null;
   device: string;
   keychain_name: string;
@@ -201,7 +202,7 @@ export interface Status {
   sample?: SampleInfo | null;
 }
 
-/** The practice space holds the FSF sample research (DECISIONS D-059). */
+/** The example space holds the FSF sample research (DECISIONS D-059, D-064). */
 export interface SampleInfo {
   version: number;
   lang: string;
@@ -392,3 +393,14 @@ export type CloudLogEntry = {
   system: string;
   user: string;
 };
+
+/** A step's title and text translated by the model on this computer (DECISIONS D-066): shown beside
+ * the original, never saved, never a record. */
+export interface Translation {
+  title: string;
+  text: string;
+  model: string;
+  url: string;
+  lang: string;
+  shortened: boolean;
+}

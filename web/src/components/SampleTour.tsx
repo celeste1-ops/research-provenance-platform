@@ -151,7 +151,7 @@ export function SampleTour({ sample, onAction, start = 0, onStarted }: {
     <div className="sample-tour" data-testid="sample-tour">
       <div className="sample-tour-head">
         <b>{t("Sample research: FSF (fictional)")}</b>
-        <span className="muted small">{t("Click a stop to see what the app does with it. Change anything you like: this is the practice space.")}</span>
+        <span className="muted small">{t("Click a stop to see what the app does with it. Change anything you like: this is only the example.")}</span>
         <span className="spacer" />
         <button className="link small" onClick={() => hide(true)} data-testid="sample-tour-hide">{t("Hide")}</button>
       </div>

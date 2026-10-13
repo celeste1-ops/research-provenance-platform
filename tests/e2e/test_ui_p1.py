@@ -578,11 +578,18 @@ def test_practice_space(tmp_path, browser):
         page.get_by_test_id("empty-state").wait_for()
         wait_for_step_count(page, "0 steps")
 
-        page.get_by_test_id("practice-sample").click()  # the FSF sample research (D-059), main project
+        page.get_by_test_id("practice-sample").click()  # the FSF sample research, in its own space (D-064)
+        page.get_by_test_id("example-banner").wait_for()
+        assert page.get_by_test_id("practice-banner").count() == 0
+        assert "space-example" in (page.locator(".app").get_attribute("class") or "")
         page.get_by_test_id("steps").locator(".step-card").nth(28).wait_for()
         wait_for_step_count(page, "29 steps")
         page.get_by_test_id("sample-tour").wait_for()
         assert srv.ctx.ledger.record_count() == real_count
+        page.get_by_test_id("space-practice").click()  # practice is still empty: the sample is not in it
+        page.get_by_test_id("practice-banner").wait_for()
+        wait_for_step_count(page, "0 steps")
+        assert page.get_by_test_id("sample-tour").count() == 0
 
         # Back to the real record: a reminder that saving there is permanent.
         page.get_by_test_id("space-real").click()
@@ -601,7 +608,7 @@ SLOW_PROJECT_MAP = """(() => { const f = window.fetch;
 
 
 def test_practice_sample_survives_a_late_answer(tmp_path, browser):
-    """Filling practice with the sample replaces its project; a late map for the old one is dropped."""
+    """Going from practice to the example changes the project; a late map for the old one is dropped."""
     with LiveServer(tmp_path) as srv:
         srv.ctx.ledger.init_identity("Tester")
         page = browser.new_page(viewport={"width": 1400, "height": 900})
@@ -615,6 +622,7 @@ def test_practice_sample_survives_a_late_answer(tmp_path, browser):
         assert old
         page.evaluate("id => { window.__slowProject = id; }", old)
         page.get_by_test_id("practice-sample").click()
+        page.get_by_test_id("example-banner").wait_for()
         page.get_by_test_id("steps").locator(".step-card").nth(28).wait_for()
         page.wait_for_timeout(2500)  # the late answer for the replaced project has arrived by now
         assert page.get_by_test_id("steps").locator(".step-card").count() == 29

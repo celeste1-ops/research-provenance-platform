@@ -62,7 +62,7 @@ export function Setup({ onDone, onPractice, onSample, onLang }: {
               <div>
                 <b>{t("See a finished example first")}</b>
                 <p className="small muted">
-                  {t("A fictional research project, FSF: 32 steps in two projects, using everything the app does, with a short tour. It opens in the practice space, so nothing goes into your real record.")}
+                  {t("A fictional research project, FSF: 32 steps in two projects, using everything the app does, with a short tour. It opens in a space of its own, the example, so nothing goes into your real record or your practice.")}
                 </p>
               </div>
               <button type="button" className="secondary" onClick={onSample} data-testid="setup-sample">

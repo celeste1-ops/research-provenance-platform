@@ -1,6 +1,6 @@
 [project]
 name = "rprov"
-version = "0.6.1"
+version = "0.7.0"
 description = "Local research-evolution evidence tool: append-only signed records with third-party timestamps."
 requires-python = ">=3.12,<3.14"
 readme = "README.md"

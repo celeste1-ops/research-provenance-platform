@@ -39,6 +39,8 @@ interface Rel {
 
 export function RecordForm({ projectId, nodeTypes, relationTypes, existing, onCreated, onCancel, initialType, initialFiles, space }: Props) {
   const practice = space === "practice";
+  const example = space === "example";
+  const sandbox = practice || example; // saved directly, never into the real record
   const [confirming, setConfirming] = useState(false);
   const [nodeType, setNodeType] = useState(initialType ?? "");
   const [title, setTitle] = useState("");
@@ -69,7 +71,7 @@ export function RecordForm({ projectId, nodeTypes, relationTypes, existing, onCr
     e.preventDefault();
     setError(null);
     // The real record is permanent: show exactly what will be saved first. Practice saves directly.
-    if (practice) save();
+    if (sandbox) save();
     else setConfirming(true);
   }
 
@@ -169,8 +171,9 @@ export function RecordForm({ projectId, nodeTypes, relationTypes, existing, onCr
         setDragging(false);
         addFiles(e.dataTransfer.files);
       }}>
-      <h2>{practice ? t("Add a practice step") : t("Add a step")}</h2>
+      <h2>{practice ? t("Add a practice step") : example ? t("Add a step to the example") : t("Add a step")}</h2>
       {practice && <p className="practice-note">{t("Practice: this does not go into your real record.")}</p>}
+      {example && <p className="practice-note example-note">{t("Example: this does not go into your real record or your practice.")}</p>}
       <fieldset className="types">
         <legend>{t("What kind of step is it?")}</legend>
         {nodeTypes.map((kind) => (
@@ -313,13 +316,15 @@ export function RecordForm({ projectId, nodeTypes, relationTypes, existing, onCr
           {t("Cancel")}
         </button>
         <button className="primary" disabled={busy || !nodeType || !title.trim()} data-testid="submit-record">
-          {practice ? t("Save practice step") : t("Save step")}
+          {practice ? t("Save practice step") : example ? t("Save in the example") : t("Save step")}
         </button>
       </div>
       <p className="note center">
         {practice
           ? t("Practice steps work like real ones, but they stay in the practice space and can be thrown away.")
-          : t("Saved steps can't be edited later — changes are added as new steps or notes, so the history stays honest.")}
+          : example
+            ? t("Steps added here stay in the example and are gone when it is loaded afresh.")
+            : t("Saved steps can't be edited later — changes are added as new steps or notes, so the history stays honest.")}
       </p>
     </form>
     </>

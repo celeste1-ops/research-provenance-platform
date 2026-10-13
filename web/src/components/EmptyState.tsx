@@ -46,7 +46,7 @@ export function EmptyState({
             <p className="lead">
               {t("This is the practice space: add a few steps, link them, share them — nothing here goes into your real record.")}{" "}
               <button className="link" onClick={onSample} data-testid="practice-sample">
-                {t("Or fill it with sample research to look around")}
+                {t("Or look at the finished example first")}
               </button>
             </p>
           </>
@@ -56,7 +56,7 @@ export function EmptyState({
             <p className="lead">
               {t("Build a verifiable history of how this research develops.")}{" "}
               <button className="link" onClick={onSample} data-testid="real-sample">
-                {t("Not sure how? Look at a finished example (in the practice space)")}
+                {t("Not sure how? Look at a finished example")}
               </button>
             </p>
           </>

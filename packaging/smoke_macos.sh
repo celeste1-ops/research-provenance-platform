@@ -36,9 +36,9 @@ curl -fsS "${H[@]}" -H 'Content-Type: application/json' -d '{"title":"Smoke","de
 mkdir -p "$DATA/bundle" && (cd "$DATA/bundle" && unzip -q ../bundle.zip)
 uv run python "$DATA/bundle/verify.py" "$DATA/bundle" --offline   # needs cryptography + rfc3161-client
 
-# The sample research is in the app (D-059): practice fills with it, in Chinese here.
-curl -fsS "${H[@]}" -H 'Content-Type: application/json' -d '{"sample":true,"lang":"zh"}' "$BASE/api/practice/reset" >/dev/null
-curl -fsS -H 'X-RPROV-Space: practice' "$BASE/api/status" | grep -q '"entry_count":32' || { echo "sample research missing"; exit 1; }
+# The sample research is in the app (D-059): the example space opens with it, in Chinese here (D-064).
+curl -fsS "${H[@]}" -H 'Content-Type: application/json' -d '{"lang":"zh"}' "$BASE/api/example/open" >/dev/null
+curl -fsS -H 'X-RPROV-Space: example' -H 'X-RPROV-Lang: zh' "$BASE/api/status" | grep -q '"entry_count":32' || { echo "sample research missing"; exit 1; }
 # Anthropic's SDK is in the app (D-061): a made-up key is refused by the service, or the service
 # cannot be reached; either way the app answers 400, not an internal error.
 AI="$(curl -sS "${H[@]}" -H 'Content-Type: application/json' -d '{"provider":"anthropic","key":"sk-smoke-test-not-a-key"}' \

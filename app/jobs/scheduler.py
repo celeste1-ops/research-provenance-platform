@@ -1,6 +1,7 @@
 """In-process background jobs (PRD §13 后台任务 — no Celery or Redis): check time proofs once
-at start-up, then hourly; every minute, record new commits of watched git repositories (D-047)
-and look for new versions in watched folders (D-049)."""
+at start-up, then hourly; every minute, record new commits of watched git repositories (D-047),
+look for new versions in watched folders (D-049) and ask for stamps that were only queued (the
+example's, D-065)."""
 
 from __future__ import annotations
 
@@ -73,3 +74,9 @@ class SourcesScheduler:
                     log.info("%d new commit step(s) or inbox version(s)", found)
             except Exception:  # noqa: BLE001 - keep the job alive
                 log.exception("recording from git or folders failed")
+            try:
+                asked = self.spaces.submit_queued()
+                if asked:
+                    log.info("asked for %d queued stamp(s)", asked)
+            except Exception:  # noqa: BLE001
+                log.exception("asking for queued stamps failed")

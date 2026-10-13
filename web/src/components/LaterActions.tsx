@@ -37,10 +37,10 @@ export function LaterActions({ detail, node, entries, relationTypes, onChanged, 
   const older = entries.filter((e) => e.seq < detail.seq);
   const statements = detail.later.items.filter((l) => l.kind === "statement");
 
-  // In the real record every action is permanent, so it is confirmed first; practice runs directly.
+  // In the real record every action is permanent, so it is confirmed first; practice and the example run directly.
   function run(fn: () => Promise<unknown>, title: string, items: SummaryItem[] = []) {
     setError(null);
-    if (space === "practice") void execute(fn);
+    if (space !== "real") void execute(fn);
     else setPending({ title, items, action: fn });
   }
 
@@ -207,7 +207,7 @@ export function WithdrawRelation({ from, to, rel, onChanged, space, label }: {
   return (
     <>
       <button className="link small" disabled={busy} title={t("Adds a new entry that withdraws this link")}
-        onClick={() => (space === "practice" ? void withdraw() : setAsking(true))}>
+        onClick={() => (space !== "real" ? void withdraw() : setAsking(true))}>
         {t("withdraw")}
       </button>
       {asking && (

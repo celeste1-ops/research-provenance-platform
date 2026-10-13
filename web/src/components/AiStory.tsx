@@ -224,7 +224,7 @@ function CloudLog({ onClose }: { onClose: () => void }) {
         <details key={e.fingerprint + e.time} className="cloud-log-entry">
           <summary>
             {e.time.slice(0, 16).replace("T", " ")} · {e.service} · {e.model} · {e.title}
-            {e.space === "practice" && ` · ${t("Practice")}`} · {tn(e.characters, "{n} character", "{n} characters")}
+            {e.space === "practice" && ` · ${t("Practice")}`}{e.space === "example" && ` · ${t("Example")}`} · {tn(e.characters, "{n} character", "{n} characters")}
           </summary>
           <pre className="cloud-text">{e.system}</pre>
           <pre className="cloud-text">{e.user}</pre>
