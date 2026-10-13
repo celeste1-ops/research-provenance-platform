@@ -1,6 +1,6 @@
 [project]
 name = "rprov"
-version = "0.5.0"
+version = "0.6.0"
 description = "Local research-evolution evidence tool: append-only signed records with third-party timestamps."
 requires-python = ">=3.12,<3.14"
 readme = "README.md"
@@ -15,6 +15,7 @@ dependencies = [
     "jinja2>=3.1",
     "keyring>=25",
     "markdown-it-py>=3.0",
+    "anthropic>=1.13",
 ]
 
 [project.optional-dependencies]

@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import asyncio
 import json
-from typing import Annotated
+from typing import Annotated, Literal
 
 import anyio
 from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile
@@ -586,22 +586,94 @@ def git_remove(source_id: str, request: Request):
     return c.git.status()
 
 
-# ---------------------------------------------------------------- retelling with a local AI (D-050)
+# ---------------------------------------------------------------- retelling with an AI model (D-050, D-061)
 
 
 class AiIn(BaseModel):
     url: str = ""
     model: str = ""
     project: str | None = None
+    mode: Literal["local", "cloud"] = "local"
+    confirm: str = ""  # cloud: the fingerprint of the text the author was shown and agreed to send
+
+
+class CloudIn(BaseModel):
+    provider: str
+    key: str = Field(min_length=8, max_length=500)
+    url: str = ""
+
+
+def _cloud_call(fn, *args):
+    from provenance_core.providers.cloud_ai import CloudAIError
+
+    try:
+        return _keystore_call(fn, *args)
+    except CloudAIError as exc:
+        raise HTTPException(400, str(exc)) from None
 
 
 @router.get("/ai")
 def ai_settings(request: Request):
     from app import preferences
+    from app.services import ai_cloud
     from provenance_core.providers.local_ai import DEFAULT_URL
 
     prefs = preferences.load(real(request).settings.data_dir)
-    return {"url": prefs.get("ai_url") or DEFAULT_URL, "model": prefs.get("ai_model") or ""}
+    return {"url": prefs.get("ai_url") or DEFAULT_URL, "model": prefs.get("ai_model") or "",
+            "cloud": {**_cloud_call(ai_cloud.describe, real(request).keystore),
+                      "model": prefs.get("cloud_model") or ""}}
+
+
+@router.post("/ai/cloud")
+def ai_cloud_connect(body: CloudIn, request: Request):
+    """Connect an online AI service with the author's own key (checked by listing its models)."""
+    from app.services import ai_cloud
+
+    keystore = real(request).keystore
+    models, first = _cloud_call(ai_cloud.connect, keystore, body.provider, body.key, body.url)
+    return {**_cloud_call(ai_cloud.describe, keystore), "default_model": first, "models": models}
+
+
+@router.delete("/ai/cloud")
+def ai_cloud_forget(request: Request):
+    from app.services import ai_cloud
+
+    _cloud_call(ai_cloud.forget, real(request).keystore)
+    return {"connected": False}
+
+
+@router.post("/ai/cloud/models")
+def ai_cloud_models(request: Request):
+    from app.services import ai_cloud
+
+    m = _cloud_call(ai_cloud.open_model, real(request).keystore)
+    return {"models": _cloud_call(m.models)}
+
+
+@router.post("/ai/cloud/preview")
+def ai_cloud_preview(body: AiIn, request: Request):
+    """Exactly what Send would send, and where to; nothing leaves the computer here. Before a
+    service is connected it shows the text alone, so the author can decide whether to connect one."""
+    from app.i18n import current
+    from app.services import ai_cloud, ai_story
+
+    keystore = real(request).keystore
+    system, user, _known, count = ai_story.prompt(_narrative(ctx(request), body.project), current())
+    text = {"system": system, "user": user, "facts": count, "characters": len(system) + len(user)}
+    if _cloud_call(ai_cloud.settings, keystore) is None:
+        return {"connected": False, **text}
+    m = _cloud_call(ai_cloud.open_model, keystore, body.model)
+    if not m.model:
+        raise HTTPException(400, "choose a model first")
+    return {"connected": True, "service": m.service, "host": m.host, "model": m.model, **text,
+            "fingerprint": ai_cloud.fingerprint(m, system, user)}
+
+
+@router.get("/ai/cloud/log")
+def ai_cloud_log(request: Request):
+    from app.services import ai_cloud
+
+    return ai_cloud.read_log(real(request).settings.data_dir)
 
 
 @router.post("/ai/models")
@@ -619,7 +691,8 @@ def ai_models(body: AiIn, request: Request):
 
 @router.post("/ai/story")
 def ai_retell(body: AiIn, request: Request):
-    """Retell the story with the chosen local model; nothing is sent anywhere but this computer.
+    """Retell the story with the chosen model: one on this computer, or — only with the
+    fingerprint of the text the author was shown — the online service the author connected.
 
     The answer comes as it is written, one JSON object per line — {"text": ...} pieces, then
     {"result": ...} checked sentence by sentence, or {"error": ...} — so the page can show it
@@ -628,26 +701,39 @@ def ai_retell(body: AiIn, request: Request):
     """
     from app import preferences
     from app.i18n import current, language, tr_message
-    from app.services import ai_story
+    from app.services import ai_cloud, ai_story
+    from provenance_core.providers.cloud_ai import CloudAIError
     from provenance_core.providers.local_ai import LocalAIError
 
     c = ctx(request)
-    try:
-        model = ai_story.model_factory(body.url, body.model)
-        if not model.model:
-            raise LocalAIError("choose a model first")
-    except LocalAIError as exc:
-        raise HTTPException(400, str(exc)) from None
-    narrative = _narrative(c, body.project)
     lang, label = current(), tr("AI inference")
     data_dir = real(request).settings.data_dir
+    narrative = _narrative(c, body.project)
+    prepared = ai_story.prompt(narrative, lang)
+    if body.mode == "cloud":
+        model = _cloud_call(ai_cloud.open_model, real(request).keystore, body.model)
+        if not model.model:
+            raise HTTPException(400, "choose a model first")
+        system, user = prepared[0], prepared[1]
+        if body.confirm != ai_cloud.fingerprint(model, system, user):
+            raise HTTPException(409, "what would be sent has changed since you looked at it; look at it again")
+        ai_cloud.write_log(data_dir, model, system, user, title=narrative["title"], space=space_name(request))
+        remember = {"cloud_model": model.model}
+    else:
+        try:
+            model = ai_story.model_factory(body.url, body.model)
+            if not model.model:
+                raise LocalAIError("choose a model first")
+        except LocalAIError as exc:
+            raise HTTPException(400, str(exc)) from None
+        remember = {"ai_url": model.base, "ai_model": body.model}
 
     # Texts are put into the language now: the lines are written later, piece by piece. After each
     # piece, and every half second while the model is quiet (loading, thinking), it looks whether
     # the page is still reading; when it is not, the answer is cancelled, which closes the
     # connection to the model. (Writing to a page that has gone raises no error to notice it by.)
     async def lines():
-        events = ai_story.retell_stream(narrative, model, lang, label=label)
+        events = ai_story.retell_stream(narrative, model, lang, label=label, prepared=prepared)
         step: asyncio.Future | None = None
         try:
             while True:
@@ -662,9 +748,9 @@ def ai_retell(body: AiIn, request: Request):
                 if event is None:
                     return
                 if "result" in event:
-                    preferences.save(data_dir, ai_url=model.base, ai_model=body.model)
+                    preferences.save(data_dir, **remember)
                 yield json.dumps(event, ensure_ascii=False) + "\n"
-        except LocalAIError as exc:
+        except (LocalAIError, CloudAIError) as exc:
             with language(lang):
                 message = tr_message(str(exc))
             yield json.dumps({"error": message}, ensure_ascii=False) + "\n"

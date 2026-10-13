@@ -482,6 +482,21 @@ MESSAGES: dict[str, str] = {
     "Zenodo did not accept the token (it needs the deposit:write scope)": "Zenodo 不接受这个令牌（它需要 deposit:write 权限）",
     "Zenodo said: {detail} (HTTP {value})": "Zenodo 回答：{detail}（HTTP {value}）",
     "Zenodo did not say where to put the file": "Zenodo 没有说文件该传到哪里",
+    # an online AI service (D-061)
+    "connect an online AI service first": "请先连接一个在线 AI 服务",
+    "paste the API key first": "请先粘贴 API 密钥",
+    "unknown AI service {provider}": "未知的 AI 服务 {provider}",
+    "give the service's https address (for example https://api.example.com/v1)":
+        "请填这个服务的 https 地址（例如 https://api.example.com/v1）",
+    "the AI service did not accept the key": "这个 AI 服务不接受这个密钥",
+    "the AI service does not know this model (or the address is wrong)": "这个 AI 服务不认识这个模型（或者地址不对）",
+    "the AI service is busy, or the key has used up its limit; try again later": "这个 AI 服务正忙，或者这个密钥的额度用完了；请稍后再试",
+    "the AI service answered HTTP {code}": "AI 服务回答了 HTTP {code}",
+    "the AI service declined to write this summary": "这个 AI 服务拒绝写这份总结",
+    "the AI service took too long to answer": "这个 AI 服务太久没有回答",
+    "could not reach the AI service (check the internet connection)": "连不上这个 AI 服务（请检查网络）",
+    "the AI service's answer was not readable": "读不懂这个 AI 服务的回答",
+    "what would be sent has changed since you looked at it; look at it again": "要发送的内容在你看过之后变了；请再看一遍",
     # importing notes and tables (D-060)
     "there are no Markdown notes (.md) in that folder": "这个文件夹里没有 Markdown 笔记（.md）",
     "that folder holds more than {MAX_NOTES} notes; choose one of its subfolders": "这个文件夹里的笔记超过 {MAX_NOTES} 篇；请选其中一个子文件夹",

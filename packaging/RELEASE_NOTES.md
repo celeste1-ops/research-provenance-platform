@@ -1,4 +1,9 @@
-## What's in this version (v0.5.0)
+## What's in this version (v0.6.0)
+
+**New in v0.6.0**
+- **An online AI can write the summary, if you want.** In the Story tab, the AI summary now has two tabs: "On this computer" (as before, the default) and "Online AI service" — Claude (Anthropic), ChatGPT (OpenAI), Gemini (Google), DeepSeek, Qwen (Alibaba Cloud), or another service with the common chat API. (In mainland China, DeepSeek and Qwen are usually the ones that can be reached.) Connect once with an API key of your own from the service's website; it stays in your system keychain and goes only to that service, which charges the summaries to your account.
+- **Nothing is sent before you have seen it.** You can look at what would be sent even before connecting a service; once connected, "Look at what will be sent…" shows the whole text and its length. Only **Send** sends it — every time. What goes is the story's sentences (titles, your reasons and notes, the names of attached files, dates), never the text of a step or what its files hold.
+- **Every send is written down** on your computer first; "What was sent" in the panel lists them. "Where is my data?" now also says plainly what can leave your computer, and when.
 
 **New in v0.5.0**
 - **Record a repository from its GitHub address.** In Settings → Record from git…, paste an address such as `github.com/you/project` instead of choosing a folder. The app keeps a copy in its own data folder and looks for new commits every ten minutes. This only downloads; a private repository works once your computer is signed in to GitHub (GitHub Desktop, or git in a terminal).

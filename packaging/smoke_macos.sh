@@ -39,6 +39,11 @@ uv run python "$DATA/bundle/verify.py" "$DATA/bundle" --offline   # needs crypto
 # The sample research is in the app (D-059): practice fills with it, in Chinese here.
 curl -fsS "${H[@]}" -H 'Content-Type: application/json' -d '{"sample":true,"lang":"zh"}' "$BASE/api/practice/reset" >/dev/null
 curl -fsS -H 'X-RPROV-Space: practice' "$BASE/api/status" | grep -q '"entry_count":32' || { echo "sample research missing"; exit 1; }
+# Anthropic's SDK is in the app (D-061): a made-up key is refused by the service, or the service
+# cannot be reached; either way the app answers 400, not an internal error.
+AI="$(curl -sS "${H[@]}" -H 'Content-Type: application/json' -d '{"provider":"anthropic","key":"sk-smoke-test-not-a-key"}' \
+  -w '\n%{http_code}' "$BASE/api/ai/cloud")"
+echo "$AI" | tail -1 | grep -q '^400$' || { echo "$AI"; cat "$DATA/logs/app.log" || true; echo "online AI check failed"; exit 1; }
 kill $PID 2>/dev/null || true
 wait $PID 2>/dev/null || true
 

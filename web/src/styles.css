@@ -419,6 +419,14 @@ button.map-legend-open { box-shadow: 0 2px 8px rgba(16, 24, 40, 0.1); }
 .ai-section p { margin: 4px 0; }
 .ai-section:first-child { border-left: 4px solid #7c5cc4; font-size: 16px; }
 .ai-progress { margin: 10px 0; }
+.ai-panel > .segmented { margin-bottom: 8px; }
+.cloud-connect, .cloud-preview, .cloud-log { margin: 8px 0; padding: 10px 12px; background: #fff; border: 1px solid #e3d9f8;
+  border-radius: 10px; }
+.cloud-preview { border-color: #c9b8ef; }
+.cloud-text { max-height: 220px; overflow: auto; margin: 6px 0; padding: 8px 10px; background: #faf9fc; border: 1px solid #ece8f4;
+  border-radius: 6px; font-size: 12px; line-height: 1.5; white-space: pre-wrap; word-break: break-word; }
+.cloud-log-entry { margin: 4px 0; font-size: 12.5px; }
+.cloud-log-entry summary { cursor: pointer; }
 .ai-draft { padding: 10px 14px; background: #fff; border: 1px dashed #c9b8ef; border-radius: 10px; color: #4a4f5c; line-height: 1.6; }
 .ai-draft h4 { margin: 8px 0 2px; font-size: 13px; color: #4b2f91; }
 .ai-draft h4:first-child { margin-top: 0; }
