@@ -1134,3 +1134,15 @@ verification rules or what leaves the machine for time proofs.
   4. *What is sent to the model.* The step's title and text (the first 8,000 characters, said when
      shortened), with the instruction to translate faithfully and keep numbers, formulas, code,
      names, links and Markdown as they are. Attached files are not translated.
+
+- **D-067 · The example's two projects, and which one is open.** Found in the v0.7.0 check: with the
+  second project of the sample open (the flow channel setup), the tour bar still said "Sample
+  research: FSF (fictional)" and the panel still showed a figure of the FSF project, which read as
+  if the two did not belong together.
+  1. *Said in the bar.* "FSF" stays the name of the whole sample research. Under it the bar says
+     which project is open: "Project 1 of 2: the FSF research itself." or "Project 2 of 2: the flow
+     channel setup — the apparatus built for the FSF experiments, recorded as a project of its own."
+     The sample's records are not changed.
+  2. *A step stays with its project.* Choosing another project in the list at the top closes the
+     open step, in every space; a tour stop that opens a step first opens its project (as before),
+     and a language switch keeps the same step of the same project (D-065).

@@ -1,4 +1,8 @@
-## What's in this version (v0.7.0)
+## What's in this version (v0.7.1)
+
+**Fixed in v0.7.1**
+- **Which project of the example you are in.** "FSF" is the name of the whole sample research, which has two projects: the FSF research itself and the flow channel setup (the apparatus built for it). The tour bar now says which one is open — "Project 1 of 2" or "Project 2 of 2" — so the second is not taken for a different research.
+- **No step of another project left open.** Choosing another project in the list at the top now closes the step that was open, instead of leaving a step of the first project beside the second project's list.
 
 **New in v0.7.0**
 - **Three spaces, never mixed.** The switch at the top now has three places: **My research** (your real record), **Practice** (only what you try out yourself) and **Example** (the fictional FSF sample research). The example has its own purple colour and a banner saying it is a fictional research, not yours — so your own FSF steps and the sample's are never in the same place.

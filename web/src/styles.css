@@ -512,3 +512,4 @@ pre.file-text { max-height: 260px; overflow: auto; margin: 6px 0 8px; padding: 8
 .translate-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 8px 0 4px; }
 .translation { margin: 10px 0; padding: 10px 12px; border: 1px dashed var(--line); border-radius: 8px; background: #fafafa; }
 .translation h4 { margin: 4px 0 6px; }
+.sample-tour-where { margin: 2px 0 6px; font-weight: 600; }

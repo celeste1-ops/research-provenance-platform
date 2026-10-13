@@ -236,3 +236,28 @@ def test_the_loading_screen_says_what_went_wrong(tmp_path, browser):
         expect(page.get_by_test_id("empty-state")).to_be_visible()  # My research, as it was
         expect(page.get_by_test_id("space-real")).to_have_attribute("aria-pressed", "true")
         page.close()
+
+
+def test_the_tour_says_which_of_the_two_projects_is_open(tmp_path, browser):
+    """"FSF" names the whole sample research, which has two projects: the bar says which one is open,
+    and a step of one project is not left open beside the other's list."""
+    with LiveServer(tmp_path) as srv:
+        page = browser.new_page(viewport={"width": 1500, "height": 950})
+        page.goto(srv.url)
+        page.get_by_test_id("setup-sample").click()
+        page.get_by_test_id("example-banner").wait_for()
+        tour = page.get_by_test_id("sample-tour")
+        expect(tour.get_by_test_id("sample-tour-where")).to_have_text("Project 1 of 2: the FSF research itself.")
+        tour.get_by_test_id("tour-files").click()  # a figure of the FSF project opens
+        expect(page.get_by_test_id("detail")).to_be_visible()
+
+        page.get_by_test_id("project-select").select_option(label="Flow channel setup (sample)")
+        expect(page.get_by_test_id("steps").locator(".step-card")).to_have_count(3)
+        expect(page.get_by_test_id("detail")).to_have_count(0)  # FSF's figure is not left beside it
+        expect(tour.get_by_test_id("sample-tour-where")).to_contain_text(
+            "Project 2 of 2: the flow channel setup — the apparatus built for the FSF experiments")
+
+        page.get_by_test_id("lang-switch").click()
+        expect(tour.get_by_test_id("sample-tour-where")).to_contain_text("项目 2/2：流道装置", timeout=LOADING)
+        expect(page.get_by_test_id("project-select").locator("option:checked")).to_have_text("流道装置（示例）")
+        page.close()
