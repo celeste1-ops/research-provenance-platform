@@ -9,6 +9,7 @@ from tests.e2e.server import LiveServer
 
 pytestmark = pytest.mark.e2e
 expect = pytest.importorskip("playwright.sync_api").expect
+LOADING = 30_000  # ms: loading a copy of the sample takes seconds, more on a busy Windows runner
 
 
 def test_the_first_screen_opens_the_sample_with_its_tour(tmp_path, browser):
@@ -69,6 +70,7 @@ def test_the_sample_comes_in_the_interface_language(tmp_path, browser):
         page.goto(srv.url)
         page.get_by_role("button", name="中文").click()
         page.get_by_test_id("setup-sample").click()
+        page.get_by_test_id("example-banner").wait_for()  # loading the sample takes a few seconds
         tour = page.get_by_test_id("sample-tour")
         expect(tour).to_contain_text("示例研究：FSF（虚构）")
         expect(page.get_by_test_id("steps").locator(".step-card")).to_have_count(29)
@@ -147,7 +149,8 @@ def test_the_example_is_a_space_of_its_own(tmp_path, browser):
         expect(page.get_by_test_id("steps").locator(".step-card")).to_have_count(30)
         page.get_by_test_id("settings-menu").click()
         page.get_by_test_id("menu-example-reload").click()
-        expect(page.get_by_test_id("notice")).to_contain_text("The example is as it was at the start again.")
+        expect(page.get_by_test_id("notice")).to_contain_text("The example is as it was at the start again.",
+                                                              timeout=LOADING)
         expect(page.get_by_test_id("steps").locator(".step-card")).to_have_count(29)
         expect(page.get_by_test_id("sample-tour").get_by_test_id("tour-steps")).to_have_class("on")
         assert installation(page, "example") != example
@@ -184,9 +187,9 @@ def test_switching_the_language_switches_the_example(tmp_path, browser):
         page.get_by_test_id("sample-tour").get_by_test_id("tour-turn").click()
         expect(page.get_by_test_id("detail")).to_contain_text("Hypothesis H1′")
 
-        page.get_by_test_id("lang-switch").click()  # to Chinese
+        page.get_by_test_id("lang-switch").click()  # to Chinese: its copy is loaded now, which takes seconds
+        expect(page.get_by_test_id("detail")).to_contain_text("假设 H1′", timeout=LOADING)  # the same step
         expect(page.get_by_test_id("sample-tour")).to_contain_text("示例研究：FSF（虚构）")
-        expect(page.get_by_test_id("detail")).to_contain_text("假设 H1′")  # the same step, in Chinese
         expect(steps.locator(".step-card")).to_have_count(29)
         expect(steps).to_contain_text("假设 H1′：指数随驱动强度变化")
         assert "Hypothesis" not in steps.inner_text() and "Tried in the English example" not in steps.inner_text()
