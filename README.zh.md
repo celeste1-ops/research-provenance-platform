@@ -316,6 +316,7 @@ GitHub Actions 的 **Package** 工作流在每次推送时自动打两个安装�
 - **P0 已完成**：只追加的记录、签名、重放；第三方签名时间证明（RFC 3161）；导出证据包、`report.html`（含静态演化图）、`verify.py`、篡改测试；记录表单和演化图。
 - **P1 已完成**：比特币时间锚定（OpenTimestamps）和区块浏览器核对；「只看里程碑」视图；时间线视图；详情侧栏的完整分区（Verified record / Author statement / Later additions / Changes，以及在侧栏里追加关系、里程碑、说明、撤回）；备份与恢复；FSF 样例数据。
 - **第 4 轮（安装包）**：macOS（Apple 芯片）和 Windows 10/11 安装包，菜单栏/通知区域图标，只开一份；Windows 的备份位置建议和全套测试（含浏览器测试）在 GitHub Actions 上跑；日期章增加 DigiCert 作为备用；Settings → Check stamp services 检查各个时间证明服务能不能连上（见 DECISIONS D-043 – D-045）。
+- **v0.6.1**：「记一步」表单和保存确认框里不再显示一行程序代码。
 - **v0.6.0**：AI 总结也可以交给你用自己的密钥连接的在线 AI 服务来写——Claude、ChatGPT、Gemini、DeepSeek、通义千问或其他——但只在你看过要发的全部内容、点了「发送」之后；每次发送都记在这台电脑上（DECISIONS D-061）。
 - **v0.5.0**：导入和导出——直接用 GitHub 网址记录一个仓库；把证据包放进 git 仓库（并推送到 GitHub），或者放进 Zenodo 草稿、在那里发布；导入 Markdown / Obsidian 笔记文件夹或 CSV 表格；把步骤下载成 CSV 表格（DECISIONS D-060）。
 - **v0.4.1**：软件里带了一个虚构的 FSF 示例研究（32 步、两个项目、用到所有功能），首页就能打开，在练习区里按界面语言显示，并有 12 站导览（DECISIONS D-059）。

@@ -151,7 +151,7 @@ export function RecordForm({ projectId, nodeTypes, relationTypes, existing, onCr
         onCancel={() => setConfirming(false)}
       />
     )}
-    // Files can be dropped anywhere on the form, not only on the attachment box.
+    {/* Files can be dropped anywhere on the form, not only on the attachment box. */}
     <form className={`record-form ${dragging ? "dragging" : ""}`} onSubmit={submit} data-testid="record-form" hidden={confirming}
       onDragOver={(e) => {
         if (!e.dataTransfer.types.includes("Files")) return;

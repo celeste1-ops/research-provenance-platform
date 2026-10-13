@@ -1,4 +1,7 @@
-## What's in this version (v0.6.0)
+## What's in this version (v0.6.1)
+
+**Fixed in v0.6.1**
+- A line of the app's own source code ("// Files can be dropped anywhere on the form…") no longer shows on top of the "Add a step" form and under the save confirmation.
 
 **New in v0.6.0**
 - **An online AI can write the summary, if you want.** In the Story tab, the AI summary now has two tabs: "On this computer" (as before, the default) and "Online AI service" — Claude (Anthropic), ChatGPT (OpenAI), Gemini (Google), DeepSeek, Qwen (Alibaba Cloud), or another service with the common chat API. (In mainland China, DeepSeek and Qwen are usually the ones that can be reached.) Connect once with an API key of your own from the service's website; it stays in your system keychain and goes only to that service, which charges the summaries to your account.
