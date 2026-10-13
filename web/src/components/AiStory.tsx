@@ -148,6 +148,8 @@ function clock(seconds: number): string {
 
 const PROVIDERS: { id: CloudProvider; name: string }[] = [
   { id: "anthropic", name: "Claude (Anthropic)" },
+  { id: "openai", name: "ChatGPT (OpenAI)" },
+  { id: "gemini", name: "Gemini (Google)" },
   { id: "deepseek", name: "DeepSeek" },
   { id: "qwen", name: "Qwen (Alibaba Cloud)" },
 ];
@@ -346,7 +348,7 @@ export function AiStory({ projectId, onSelect, open, onOpen }: {
 
   async function write() {
     const sent = where === "cloud" ? preview : null;
-    if (where === "cloud" && !sent) return;
+    if (where === "cloud" && !sent?.connected) return;
     const control = new AbortController();
     writing.current = control;
     setBusy("writing");
@@ -358,7 +360,7 @@ export function AiStory({ projectId, onSelect, open, onOpen }: {
     setStarted(Date.now());
     setNow(Date.now());
     try {
-      const body = sent
+      const body = sent?.connected
         ? { mode: "cloud" as const, model: sent.model, confirm: sent.fingerprint, project: projectId || undefined }
         : { url, model, project: projectId || undefined };
       const out = await api.aiStory(body, (piece) => setDraft((d) => d + piece), control.signal);
@@ -404,11 +406,23 @@ export function AiStory({ projectId, onSelect, open, onOpen }: {
             {tx("An online service writes the summary instead. <b>Nothing is sent until you have seen it and clicked Send</b>, every time. What is sent is the story's sentences — titles, your reasons and notes, the names of attached files, dates — never the text of a step or what its files hold. The service then has it, under its own rules.", { b: (s) => <b>{s}</b> })}
           </p>
           {cloud && !cloud.connected && (
-            <CloudConnect onConnected={(s, list) => {
-              setCloud(s);
-              setCloudModels(list);
-              if (s.connected) setCloudModel(s.default_model || list[0] || "");
-            }} />
+            <>
+              <CloudConnect onConnected={(s, list) => {
+                setCloud(s);
+                setCloudModels(list);
+                setPreview(null);
+                if (s.connected) setCloudModel(s.default_model || list[0] || "");
+              }} />
+              <p className="small">
+                <button className="link small" onClick={look} disabled={busy !== null} data-testid="cloud-look">
+                  {busy === "preview" ? t("Looking…") : t("First look at what would be sent (nothing is sent)…")}
+                </button>
+                {" · "}
+                <button className="link small" onClick={() => setShowLog(!showLog)} data-testid="cloud-log-open">
+                  {t("What was sent")}
+                </button>
+              </p>
+            </>
           )}
           {cloud?.connected && (
             <>
@@ -439,14 +453,20 @@ export function AiStory({ projectId, onSelect, open, onOpen }: {
                   </button>
                 )}
               </div>
-              {preview && (
-                <div className="cloud-preview" data-testid="cloud-preview">
-                  <p className="small">
-                    {tx("This is exactly what goes to <b>{service}</b> ({host}), for {model} — {n} characters:", { b: (c) => <b>{c}</b> },
-                      { service: preview.service, host: preview.host, model: preview.model, n: preview.characters })}
-                  </p>
-                  <pre className="cloud-text" data-testid="cloud-preview-system">{preview.system}</pre>
-                  <pre className="cloud-text" data-testid="cloud-preview-user">{preview.user}</pre>
+            </>
+          )}
+          {preview && (
+            <div className="cloud-preview" data-testid="cloud-preview">
+              <p className="small">
+                {preview.connected
+                  ? tx("This is exactly what goes to <b>{service}</b> ({host}), for {model} — {n} characters:", { b: (c) => <b>{c}</b> },
+                    { service: preview.service, host: preview.host, model: preview.model, n: preview.characters })
+                  : t("This is what would be sent — {n} characters. Nothing has been sent; connect a service above to send it.", { n: preview.characters })}
+              </p>
+              <pre className="cloud-text" data-testid="cloud-preview-system">{preview.system}</pre>
+              <pre className="cloud-text" data-testid="cloud-preview-user">{preview.user}</pre>
+              {preview.connected ? (
+                <>
                   <p className="warning small">{t("Once sent, the service has this text; it cannot be taken back. It is also written to the log on this {device}.", { device: dev() })}</p>
                   <div className="actions start">
                     <button className="secondary" onClick={() => setPreview(null)}>{t("Cancel")}</button>
@@ -454,11 +474,15 @@ export function AiStory({ projectId, onSelect, open, onOpen }: {
                       {t("Send to {service} and write the summary", { service: preview.service })}
                     </button>
                   </div>
+                </>
+              ) : (
+                <div className="actions start">
+                  <button className="secondary" onClick={() => setPreview(null)}>{t("Close")}</button>
                 </div>
               )}
-              {showLog && <CloudLog onClose={() => setShowLog(false)} />}
-            </>
+            </div>
           )}
+          {showLog && <CloudLog onClose={() => setShowLog(false)} />}
         </div>
       ) : (
       <div className="ai-steps">

@@ -180,3 +180,42 @@ def test_no_model_no_request():
     with pytest.raises(CloudAIError, match="choose a model"):
         collect(CloudModel("deepseek", "sk-ds-1", "", transport=chat_service(seen=seen)))
     assert seen == []
+
+
+def test_chatgpt_gets_the_parameter_names_its_newer_models_take():
+    seen: list = []
+    model = CloudModel("openai", "sk-oa-1", "gpt-5-mini", transport=chat_service(["ok"], seen=seen))
+    assert collect(model) == "ok"
+    body = json.loads(seen[-1].content)
+    assert str(seen[-1].url) == "https://api.openai.com/v1/chat/completions"
+    assert body["max_completion_tokens"] == 8000 and "max_tokens" not in body and "temperature" not in body
+    assert model.service == "ChatGPT (OpenAI)"
+
+
+def test_gemini_through_googles_endpoint_for_the_chat_api():
+    seen: list = []
+
+    def gemini(request):
+        seen.append(request)
+        if request.url.path.endswith("/models"):
+            return httpx.Response(200, json={"data": [{"id": "models/gemini-2.5-flash"}, {"id": "models/embedding-001"}]})
+        return chat_service(["ok"]).handle_request(request)
+
+    model = CloudModel("gemini", "AIza-test-1", "gemini-2.5-flash", transport=httpx.MockTransport(gemini))
+    assert model.models() == ["embedding-001", "gemini-2.5-flash"]
+    assert collect(model) == "ok"
+    assert str(seen[-1].url) == "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions"
+    assert seen[-1].headers["authorization"] == "Bearer AIza-test-1"
+
+
+@pytest.mark.parametrize(("provider", "models", "first"), [
+    ("openai", ["dall-e-3", "gpt-4o-mini", "gpt-5-mini", "text-embedding-3-small"], "gpt-5-mini"),
+    ("openai", ["dall-e-3", "gpt-4o-audio-preview", "gpt-4o-mini", "whisper-1"], "gpt-4o-mini"),
+    ("gemini", ["embedding-001", "gemini-3-flash", "imagen-4"], "gemini-3-flash"),
+    ("other", ["text-embedding", "kimi-k2"], "kimi-k2"),
+    ("deepseek", [], "deepseek-chat"),
+])
+def test_the_model_offered_first_writes_text(provider, models, first):
+    from provenance_core.providers.cloud_ai import pick_model
+
+    assert pick_model(provider, models) == first

@@ -9,8 +9,9 @@ the text of a step or its files.
 Two kinds of service:
 
 * Claude, through Anthropic's own SDK, at api.anthropic.com.
-* Services that speak the common chat API (``/chat/completions``): DeepSeek and Qwen are named
-  here, and any other can be given by its https address.
+* Services that speak the common chat API (``/chat/completions``): ChatGPT (OpenAI), Gemini
+  (Google's endpoint for this API), DeepSeek and Qwen are named here, and any other can be given
+  by its https address.
 
 The key is sent only to that service's own address: redirects are not followed, and the SDK is
 given the address and the key itself rather than reading them from the environment.
@@ -19,6 +20,7 @@ given the address and the key itself rather than reading them from the environme
 from __future__ import annotations
 
 import json
+import re
 from collections.abc import AsyncIterator
 from urllib.parse import urlsplit, urlunsplit
 
@@ -27,6 +29,9 @@ import httpx
 
 PROVIDERS = {
     "anthropic": {"name": "Claude (Anthropic)", "base": "https://api.anthropic.com", "model": "claude-opus-5-5"},
+    "openai": {"name": "ChatGPT (OpenAI)", "base": "https://api.openai.com/v1", "model": "gpt-5-mini"},
+    "gemini": {"name": "Gemini (Google)", "base": "https://generativelanguage.googleapis.com/v1beta/openai",
+               "model": "gemini-2.5-flash"},
     "deepseek": {"name": "DeepSeek", "base": "https://api.deepseek.com", "model": "deepseek-chat"},
     "qwen": {"name": "Qwen (Alibaba Cloud)", "base": "https://dashscope.aliyuncs.com/compatible-mode/v1",
              "model": "qwen-plus"},
@@ -39,10 +44,26 @@ TIMEOUT = httpx.Timeout(30.0, read=300.0)
 _EFFORT_PREFIXES = ("claude-opus-5", "claude-sonnet-5", "claude-fable-5", "claude-haiku-5", "claude-mythos-5")
 _FALLBACK_MODELS = {"claude-fable-5-1", "claude-opus-5-5", "claude-opus-5", "claude-sonnet-5-5"}
 _FALLBACK_BETA = "server-side-fallback-2026-07-01"
+# What a service's model names start with, and models it lists that do not write text (pictures,
+# speech, embeddings…), for choosing a model when the usual one is not in its list.
+_FAMILY = {"anthropic": "claude-", "openai": "gpt-", "gemini": "gemini-", "deepseek": "deepseek-", "qwen": "qwen"}
+_NOT_FOR_TEXT = re.compile(r"embed|audio|tts|image|dall-e|whisper|transcri|realtime|moderation|search|imagen|veo|aqa"
+                           r"|rerank|codex", re.I)
 
 
 class CloudAIError(Exception):
     pass
+
+
+def pick_model(provider: str, models: list[str]) -> str:
+    """The model offered first: the usual one if this key may use it, else one of the service's
+    own text models."""
+    usual = PROVIDERS[provider]["model"]
+    if not models or usual in models:
+        return usual
+    text = [m for m in models if not _NOT_FOR_TEXT.search(m)] or models
+    family = _FAMILY.get(provider, "")
+    return next((m for m in text if family and m.startswith(family)), text[0])
 
 
 def service_url(url: str) -> str:
@@ -136,8 +157,12 @@ class CloudModel:
         return {"Authorization": f"Bearer {self.key}"}
 
     async def _compatible_stream(self, system: str, user: str) -> AsyncIterator[str]:
-        body = {"model": self.model, "stream": True, "temperature": 0.2, "max_tokens": 4000,
+        body = {"model": self.model, "stream": True,
                 "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}]}
+        if self.provider == "openai":  # its newer models take only this name, and their own temperature
+            body["max_completion_tokens"] = 8000
+        else:
+            body.update(temperature=0.2, max_tokens=4000)
         try:
             async with httpx.AsyncClient(timeout=TIMEOUT, transport=self._transport, follow_redirects=False) as client, \
                     client.stream("POST", f"{self.base}/chat/completions", json=body,
@@ -184,7 +209,8 @@ class CloudModel:
             raise _status_error(response.status_code)
         try:
             data = response.json().get("data", [])
-            return sorted(str(m["id"]) for m in data if isinstance(m, dict) and m.get("id"))
+            # Gemini lists "models/gemini-…" and is asked for "gemini-…".
+            return sorted(str(m["id"]).removeprefix("models/") for m in data if isinstance(m, dict) and m.get("id"))
         except (ValueError, AttributeError):
             raise CloudAIError("the AI service's answer was not readable") from None
 

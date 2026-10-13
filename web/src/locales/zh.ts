@@ -720,4 +720,6 @@ export const ZH: Record<string, string> = {
   "{n} characters": "{n} 个字符",
   "What leaves this {device}": "什么会离开这台{device}",
   "Only those fingerprints — unless you click for more: downloading a repository you named, putting a bundle into a repository or onto Zenodo, or sending the story's sentences to an online AI service after you have seen them. Every send to an AI service is listed under <b>What was sent</b> in the AI summary.": "只有上面说的指纹——除非你点了别的：下载你指定的仓库、把证据包放进仓库或 Zenodo，或者在看过之后把研究经过的句子发给在线 AI 服务。每一次发给 AI 服务的内容，都列在 AI 总结里的<b>发送记录</b>中。",
+  "First look at what would be sent (nothing is sent)…": "先看看会发送哪些内容（不会发送）…",
+  "This is what would be sent — {n} characters. Nothing has been sent; connect a service above to send it.": "下面就是会发送的内容，共 {n} 个字符。现在什么都没有发出去；要发送，请先在上面连接一个服务。",
 };

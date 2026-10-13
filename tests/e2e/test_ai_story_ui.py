@@ -182,6 +182,11 @@ def test_summary_by_an_online_service_after_a_look(tmp_path, browser, monkeypatc
         page.get_by_test_id("ai-open").click()
         panel = page.get_by_test_id("ai-panel")
         panel.get_by_test_id("ai-where-cloud").click()
+        # Before connecting anything, the text can be looked at; it cannot be sent.
+        panel.get_by_test_id("cloud-look").click()
+        expect(panel.get_by_test_id("cloud-preview")).to_contain_text("Nothing has been sent")
+        expect(panel.get_by_test_id("cloud-send")).to_have_count(0)
+        expect(panel.get_by_test_id("cloud-provider").locator("option")).to_have_count(6)  # ChatGPT, Gemini …
         panel.get_by_test_id("cloud-provider").select_option("deepseek")
         panel.get_by_test_id("cloud-key").fill("sk-test-123456789")
         panel.get_by_test_id("cloud-connect-button").click()

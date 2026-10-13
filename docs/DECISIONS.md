@@ -962,9 +962,12 @@ verification rules or what leaves the machine for time proofs.
   default.
   1. *Off until the author connects a service.* The AI panel has two tabs, "On this computer"
      and "Online AI service". Nothing is connected until the author pastes an API key of their
-     own: Claude (Anthropic), DeepSeek, Qwen (Alibaba Cloud), or any service with the common
-     chat API at an https address. Connecting checks the key by listing the service's models —
-     nothing of the records is sent. The service and key are kept in the system keychain; the
+     own: Claude (Anthropic), ChatGPT (OpenAI), Gemini (Google), DeepSeek, Qwen (Alibaba Cloud),
+     or any service with the common chat API at an https address (the author asked for ChatGPT
+     and Gemini after trying the first version). Connecting checks the key by listing the
+     service's models — nothing of the records is sent — and offers the service's usual model if
+     the key may use it, else one of its text models. Before connecting, the author can already
+     look at the text that would be sent (it cannot be sent then). The service and key are kept in the system keychain; the
      key is never shown again, written to a log or sent anywhere but that service.
   2. *Shown, then sent — every time.* "Look at what will be sent…" returns the exact request
      text (the instructions and the story's sentences), the service, its address, the model and
@@ -986,7 +989,9 @@ verification rules or what leaves the machine for time proofs.
      travels in a header). The model offered is `claude-opus-5-5`, at effort "medium" (a short
      summary); for the models that support it a declined request is handed to another model on
      the server (`fallbacks: "default"`), and a refusal that remains is said plainly. The other
-     services use the chat API over httpx, also without following redirects. The privacy test
+     services use the chat API over httpx, also without following redirects; Gemini through
+     Google's endpoint for that API, and ChatGPT with `max_completion_tokens` and no temperature,
+     the only form its newer models accept. The privacy test
      now also forbids `anthropic` and `httpx2` outside `providers/`.
   6. *The answer.* Checked sentence by sentence and labelled exactly as a local model's (D-050
      3, 4), with the service named: "AI inference — written by <model> at <service> on <date>".

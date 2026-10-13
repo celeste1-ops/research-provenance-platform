@@ -47,6 +47,10 @@ def test_nothing_is_sent_without_a_connection_and_a_look(api, client, ctx, servi
     api.entry("Flow speed levels off", "idea", body=SECRET_BODY, files=[("data.csv", SECRET_FILE)],
               author_statement="the old notebook said so")
     assert client.get("/api/ai").json()["cloud"] == {"connected": False, "model": ""}
+    # Before connecting, the text can be looked at — and nothing can be sent.
+    look = client.post("/api/ai/cloud/preview", json={"project": api.project_id}).json()
+    assert look["connected"] is False and "fingerprint" not in look and "Flow speed levels off" in look["user"]
+    assert seen == []
     r = client.post("/api/ai/story", json={"mode": "cloud", "model": "deepseek-chat", "confirm": "x"})
     assert r.status_code == 400 and r.json()["detail"] == "connect an online AI service first"
 

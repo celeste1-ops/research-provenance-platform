@@ -16,7 +16,7 @@ import json
 from datetime import UTC, datetime
 from pathlib import Path
 
-from provenance_core.providers.cloud_ai import PROVIDERS, CloudAIError, CloudModel
+from provenance_core.providers.cloud_ai import PROVIDERS, CloudAIError, CloudModel, pick_model
 
 SECRET = "cloud_ai"  # in the system keychain: {"provider": …, "url": …, "key": …}
 LOG = "ai-sent.jsonl"
@@ -53,13 +53,14 @@ def describe(keystore) -> dict:
             "default_model": PROVIDERS[s["provider"]]["model"]}
 
 
-def connect(keystore, provider: str, key: str, url: str = "") -> list[str]:
-    """Check the key by asking the service for its models; keep it only if that works."""
+def connect(keystore, provider: str, key: str, url: str = "") -> tuple[list[str], str]:
+    """Check the key by asking the service for its models; keep it only if that works. Returns the
+    models and the one to offer first."""
     m = model_factory(provider, key, "", url)
     models = m.models()
     keystore.save_secret(SECRET, json.dumps({"provider": provider, "url": m.base if provider == "other" else "",
                                              "key": m.key}))
-    return models
+    return models, pick_model(provider, models)
 
 
 def forget(keystore) -> None:

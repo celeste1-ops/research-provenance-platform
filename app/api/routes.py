@@ -630,8 +630,8 @@ def ai_cloud_connect(body: CloudIn, request: Request):
     from app.services import ai_cloud
 
     keystore = real(request).keystore
-    models = _cloud_call(ai_cloud.connect, keystore, body.provider, body.key, body.url)
-    return {**_cloud_call(ai_cloud.describe, keystore), "models": models}
+    models, first = _cloud_call(ai_cloud.connect, keystore, body.provider, body.key, body.url)
+    return {**_cloud_call(ai_cloud.describe, keystore), "default_model": first, "models": models}
 
 
 @router.delete("/ai/cloud")
@@ -652,16 +652,21 @@ def ai_cloud_models(request: Request):
 
 @router.post("/ai/cloud/preview")
 def ai_cloud_preview(body: AiIn, request: Request):
-    """Exactly what Send would send, and where to; nothing leaves the computer here."""
+    """Exactly what Send would send, and where to; nothing leaves the computer here. Before a
+    service is connected it shows the text alone, so the author can decide whether to connect one."""
     from app.i18n import current
     from app.services import ai_cloud, ai_story
 
-    m = _cloud_call(ai_cloud.open_model, real(request).keystore, body.model)
+    keystore = real(request).keystore
+    system, user, _known, count = ai_story.prompt(_narrative(ctx(request), body.project), current())
+    text = {"system": system, "user": user, "facts": count, "characters": len(system) + len(user)}
+    if _cloud_call(ai_cloud.settings, keystore) is None:
+        return {"connected": False, **text}
+    m = _cloud_call(ai_cloud.open_model, keystore, body.model)
     if not m.model:
         raise HTTPException(400, "choose a model first")
-    system, user, _known, count = ai_story.prompt(_narrative(ctx(request), body.project), current())
-    return {"service": m.service, "host": m.host, "model": m.model, "system": system, "user": user,
-            "facts": count, "characters": len(system) + len(user), "fingerprint": ai_cloud.fingerprint(m, system, user)}
+    return {"connected": True, "service": m.service, "host": m.host, "model": m.model, **text,
+            "fingerprint": ai_cloud.fingerprint(m, system, user)}
 
 
 @router.get("/ai/cloud/log")

@@ -369,21 +369,16 @@ export type AiResult = {
 };
 
 // An online AI service the author connected (D-061). The key itself never comes back to the page.
-export type CloudProvider = "anthropic" | "deepseek" | "qwen" | "other";
+export type CloudProvider = "anthropic" | "openai" | "gemini" | "deepseek" | "qwen" | "other";
 export type CloudStatus =
   | { connected: false; model?: string }
   | { connected: true; provider: CloudProvider; service: string; host: string; default_model: string; model?: string };
 
-export type CloudPreview = {
-  service: string;
-  host: string;
-  model: string;
-  system: string;
-  user: string;
-  facts: number;
-  characters: number;
-  fingerprint: string;
-};
+// The text that would go; before a service is connected, the text alone (nothing can be sent).
+type CloudText = { system: string; user: string; facts: number; characters: number };
+export type CloudPreview =
+  | (CloudText & { connected: false })
+  | (CloudText & { connected: true; service: string; host: string; model: string; fingerprint: string });
 
 export type CloudLogEntry = {
   time: string;
