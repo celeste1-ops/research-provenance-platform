@@ -8,13 +8,18 @@ import type {
   GitInspect,
   GitStatus,
   Narrative,
+  NotesPreview,
   LocationCheck,
   Graph,
   Project,
   RecordDetail,
+  RepoExport,
   ServiceCheckResult,
   Status,
+  TablePreview,
   TimelineRow,
+  ZenodoDraft,
+  ZenodoStatus,
 } from "./types";
 import { lang, t, type Lang } from "./i18n";
 
@@ -42,6 +47,18 @@ function spaceHeaders(): Record<string, string> {
   const h: Record<string, string> = { "X-RPROV-Lang": lang() };
   if (currentSpace === "practice") h["X-RPROV-Space"] = "practice";
   return h;
+}
+
+type ExportBody = { title: string; records: Record<string, string>; default: string; language?: string };
+
+/** Every step of a project as a table (CSV) — a plain link, so the download is the browser's own. */
+export function tableUrl(projectId: string): string {
+  const space = currentSpace === "practice" ? "&space=practice" : "";
+  return `/api/export/table?project=${encodeURIComponent(projectId)}&lang=${lang()}${space}`;
+}
+
+export function tableTemplateUrl(): string {
+  return `/api/import/table/template?lang=${lang()}`;
 }
 
 // For plain links (attachments), which cannot carry a header.
@@ -176,6 +193,26 @@ export const api = {
     request<{ id: string }>("POST", "/api/retractions", { target, reason }),
   refreshAnchors: () => request<Record<string, number>>("POST", "/api/anchors/refresh"),
   networkCheck: () => request<ServiceCheckResult>("POST", "/api/network/check"),
+  exportToRepository: (body: ExportBody & { path: string; commit: boolean; push: boolean }) =>
+    request<RepoExport>("POST", "/api/export/repository", body),
+  exportToZenodo: (body: ExportBody) => request<ZenodoDraft>("POST", "/api/export/zenodo", body),
+  zenodoStatus: () => request<ZenodoStatus>("GET", "/api/zenodo"),
+  zenodoConnect: (token: string, sandbox: boolean) => request<ZenodoStatus>("POST", "/api/zenodo", { token, sandbox }),
+  zenodoForget: () => request<ZenodoStatus>("DELETE", "/api/zenodo"),
+  importNotesInspect: (path: string) => request<NotesPreview>("POST", "/api/import/notes/inspect", { path }),
+  importNotes: (path: string, project_id: string, selected: string[] | null) =>
+    request<{ imported: number }>("POST", "/api/import/notes", { path, project_id, selected }),
+  importTableInspect: (file: File) => {
+    const form = new FormData();
+    form.append("file", file);
+    return request<TablePreview>("POST", "/api/import/table/inspect", form);
+  },
+  importTable: (file: File, projectId: string) => {
+    const form = new FormData();
+    form.append("file", file);
+    form.append("project_id", projectId);
+    return request<{ imported: number }>("POST", "/api/import/table", form);
+  },
   gitStatus: () => request<GitStatus>("GET", "/api/git"),
   gitInspect: (path: string) => request<GitInspect>("POST", "/api/git/inspect", { path }),
   gitAdd: (body: { path: string; branch: string; project_id: string; history: boolean; keep_code: boolean }) =>

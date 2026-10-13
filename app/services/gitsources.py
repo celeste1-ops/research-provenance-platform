@@ -1,10 +1,12 @@
-"""Recording a local git repository automatically (DECISIONS D-047).
+"""Recording a git repository automatically (DECISIONS D-047, D-060).
 
-The author points the app at a repository folder on this computer and picks a branch and a
-project. From then on every new commit on that branch becomes a "code" step — title and text
-from the commit message, the commit as its external reference, "revises" the previous commit's
-step — and gets its date stamps like any other step. Only local git commands are used
-(app/services/gitrepo.py); nothing is fetched and nothing extra leaves the computer.
+The author points the app at a repository — a folder on this computer, or an address such as
+https://github.com/owner/repo — and picks a branch and a project. From then on every new commit
+on that branch becomes a "code" step — title and text from the commit message, the commit as its
+external reference, "revises" the previous commit's step — and gets its date stamps like any
+other step. A folder is only read. A repository recorded from its address is downloaded once as
+a bare copy into ``<data folder>/git-mirrors`` and brought up to date every few minutes; that
+only downloads (app/services/gitrepo.py), and the author's records are not sent anywhere.
 
 The history before that point can be added once, grouped into a few steps (one per tag, or
 per month when there are no tags). Those steps are older material added now: the dates git
@@ -27,13 +29,26 @@ from pathlib import Path
 
 from app.config import MAX_UPLOAD_BYTES
 from app.i18n import tr_message
-from app.services.gitrepo import Commit, GitError, Repo, find_git
+from app.services.gitrepo import (
+    Commit,
+    GitError,
+    Repo,
+    clone_mirror,
+    find_git,
+    normalize_remote,
+    remote_branches,
+    remove_copy,
+    repo_name,
+    strip_credentials,
+)
 from app.services.ledger import EntryInput, LedgerError, UploadedFile
 from provenance_core.jcs import parse_json_strict
 
 log = logging.getLogger("rprov.git")
 
 FILE = "git_sources.json"
+MIRRORS = "git-mirrors"  # downloaded copies of repositories recorded from their address
+FETCH_EVERY_SECONDS = 600
 MAX_SEPARATE = 20  # more new commits than this at once become one step listing them
 MAX_MONTH_STEPS = 48  # longer histories without tags are grouped by year
 TITLE_LIMIT = 200
@@ -87,6 +102,20 @@ def _now() -> str:
 
 def _today() -> str:
     return datetime.now().astimezone().date().isoformat()
+
+
+def _older_than(stamp: str | None, seconds: int) -> bool:
+    if not stamp:
+        return True
+    try:
+        then = datetime.strptime(stamp, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=UTC)
+    except ValueError:
+        return True
+    return (datetime.now(UTC) - then).total_seconds() >= seconds
+
+
+def _safe(name: str) -> str:
+    return "".join(ch if ch.isalnum() or ch in "-_." else "-" for ch in name)[:60] or "repository"
 
 
 class GitSources:
@@ -152,6 +181,9 @@ class GitSources:
 
     def inspect(self, path: str) -> dict:
         """What the add dialog shows before anything is recorded."""
+        url = normalize_remote(path)
+        if url is not None:
+            return self._inspect_remote(url)
         repo = Repo(self._folder(path))
         top = repo.toplevel()
         repo = Repo(top, repo.git)
@@ -170,8 +202,25 @@ class GitSources:
             "already": any(Path(s["path"]) == top and s["branch"] == branch for s in self._load()),
         }
 
+    def _inspect_remote(self, url: str) -> dict:
+        """A repository on GitHub (or another server): its branches, without downloading it yet."""
+        branches, default = remote_branches(url)
+        if not branches:
+            raise GitError("this repository has no branches yet")
+        shown = strip_credentials(url)
+        return {
+            "path": url, "name": repo_name(url), "branches": branches, "branch": default, "remote": True,
+            "remote_url": shown, "commits": None, "tags": 0, "first_date": None, "last_date": None,
+            "history_steps": None,
+            "already": any(s.get("remote") == url and s["branch"] == default for s in self._load()),
+        }
+
     def add(self, path: str, branch: str, project_id: str, *, history: bool, keep_code: bool,
             background: bool = True) -> dict:
+        url = normalize_remote(path)
+        if url is not None:
+            return self._add_remote(url, branch, project_id, history=history, keep_code=keep_code,
+                                    background=background)
         repo = Repo(self._folder(path))
         top = repo.toplevel()
         repo = Repo(top, repo.git)
@@ -203,14 +252,70 @@ class GitSources:
             job.run()
         return source
 
+    def _add_remote(self, url: str, branch: str, project_id: str, *, history: bool, keep_code: bool,
+                    background: bool) -> dict:
+        if project_id not in {p.id for p in self.ctx.ledger.projects()}:
+            raise LedgerError("unknown project")
+        if not branch:
+            raise GitError("there is no such branch")
+        with self._lock:
+            sources = self._load()
+            if any(s.get("remote") == url and s["branch"] == branch for s in sources):
+                raise GitError("this branch of this repository is already being recorded")
+            sid = uuid.uuid4().hex
+            name = repo_name(url)
+            mirror = self.mirrors / f"{_safe(name)}-{sid[:8]}.git"
+            source = {
+                "id": sid, "path": str(mirror), "name": name, "branch": branch, "remote": url,
+                "project_id": project_id, "repo_url": strip_credentials(url), "keep_code": bool(keep_code),
+                "added": _now(), "last_commit": None, "last_entry": None, "recorded": 0,
+                "checked": None, "fetched": None, "error": None,
+            }
+            sources.append(source)
+            self._save(sources)
+        self._busy[sid] = {"done": 0, "total": None, "phase": "download"}
+        job = threading.Thread(target=self._download_then_record, args=(sid, history), name="rprov-git-clone",
+                               daemon=True)
+        if background:
+            job.start()
+        else:
+            job.run()
+        return source
+
+    @property
+    def mirrors(self) -> Path:
+        return Path(self.ctx.settings.data_dir) / MIRRORS
+
+    def _download_then_record(self, source_id: str, history: bool) -> None:
+        source = next((s for s in self._load() if s["id"] == source_id), None)
+        if source is None:
+            return
+        try:
+            clone_mirror(source["remote"], Path(source["path"]))
+            repo = Repo(source["path"])
+            if source["branch"] not in repo.branches():
+                raise GitError("there is no such branch")
+            self._update(source_id, fetched=_now())
+        except (GitError, OSError) as exc:
+            log.warning("git download failed: %s", exc)
+            self._update(source_id, error=str(exc), checked=_now())
+            self._busy.pop(source_id, None)
+            return
+        self._first_run(source_id, history)
+
     def remove(self, source_id: str) -> None:
-        """Stop recording a repository; the steps already recorded stay, as every step does."""
+        """Stop recording a repository; the steps already recorded stay, as every step does. A
+        downloaded copy is deleted (it is only a copy of what is on the server)."""
         with self._lock:
             sources = self._load()
             kept = [s for s in sources if s["id"] != source_id]
             if len(kept) == len(sources):
                 raise LedgerError("no such record")
             self._save(kept)
+        gone = next(s for s in sources if s["id"] == source_id)
+        mirror = Path(gone["path"])
+        if gone.get("remote") and mirror.parent == self.mirrors:
+            remove_copy(mirror)
 
     # ------------------------------------------------------------ recording
 
@@ -265,7 +370,15 @@ class GitSources:
             self._recording.release()
 
     def _check_one(self, source: dict) -> int:
-        if not Path(source["path"]).is_dir():
+        if source.get("remote"):
+            if not Path(source["path"]).is_dir():  # the first download failed: try again
+                clone_mirror(source["remote"], Path(source["path"]))
+                self._update(source["id"], fetched=_now())
+            elif _older_than(source.get("fetched"), FETCH_EVERY_SECONDS):
+                Repo(source["path"]).fetch()
+                self._update(source["id"], fetched=_now())
+                source["fetched"] = _now()
+        elif not Path(source["path"]).is_dir():
             raise GitError("the repository folder is not there (is the drive connected?)")
         repo = Repo(source["path"])
         head = repo.head(source["branch"])

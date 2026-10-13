@@ -1,4 +1,4 @@
-# Research provenance (v0.3)
+# Research provenance (v0.5)
 
 **English** · [中文](README.zh.md)
 
@@ -151,7 +151,7 @@ To back up the signing key on its own: **Settings → Back up signing key only�
 
 **A separate sample from the command line?** `make demo && make run` loads the fictional FSF sample (14 records, 9 types, 3 relations, key steps, relations added later, notes, L1/L2 imports, a retraction) into an empty data folder. Records can't be deleted, so move the sample aside before recording real material: `mv ~/.rprov ~/.rprov-demo` (see it again later with `RPROV_HOME=~/.rprov-demo make run`). Or start with `RPROV_HOME=~/.rprov-demo make demo`.
 
-All data is in `~/.rprov/` (permissions 0700). Texts, attachments, titles and notes never leave your computer; the only thing sent out is the hash a time proof needs (the record ID), and the time-proof services see the IP address and time of the request. There is no account, no cloud service of ours, no analytics and no crash reports. Automatic backup only writes an encrypted file into a local folder you chose; if your own iCloud / Dropbox syncs that folder, what leaves the computer is still only that unreadable encrypted file (DECISIONS D-033).
+All data is in `~/.rprov/` (permissions 0700). Texts, attachments, titles and notes never leave your computer; the only thing sent out is the hash a time proof needs (the record ID), and the time-proof services see the IP address and time of the request. There is no account, no cloud service of ours, no analytics and no crash reports. Automatic backup only writes an encrypted file into a local folder you chose; if your own iCloud / Dropbox syncs that folder, what leaves the computer is still only that unreadable encrypted file (DECISIONS D-033). Three things go further, each only when you click for it: recording a repository by its GitHub address downloads it (nothing of yours is sent); Share can put a bundle into a git repository and push it to GitHub, or make a draft on Zenodo — only the bundle you made, with what you chose to disclose (D-060).
 
 ## Chinese / English
 
@@ -185,12 +185,21 @@ This README uses the English button names.
   3. The recorded step keeps the date stamp from when it arrived (`<file name>.tsr` next to the file), so it loses no time: the report, `verify.py` and the `openssl` commands in `VERIFY.md` can all check that the file existed when it arrived in the inbox.
   - Hidden files, Office and editor lock and temporary files, folders such as `.git`, and files over 50 MB are skipped; a folder with more than 2000 files is refused (most likely the wrong folder).
   - Copies in the inbox stay in the app's data folder on this computer and are not backed up; once recorded as a step, they are recorded and backed up like any other step.
-- **Record from git (Settings → Record from git…)**: choose a git repository folder on your computer and a branch, and from then on **every new commit** on that branch becomes a "code" step on the map: the title and text come from the commit message, the external reference is the commit, and it "revises" the step of the previous commit. While the app runs it looks once a minute; on the next start it catches up on the commits in between (more than 20 at once become one step that lists them).
-  - Only the local repository is read: nothing is fetched or pushed, and GitHub is never contacted; what leaves the computer is still only the fingerprints the time stamps need. Git must be installed.
+- **Record from git (Settings → Record from git…)**: choose a git repository folder on your computer — or paste its address on GitHub, GitLab or Gitee — and a branch, and from then on **every new commit** on that branch becomes a "code" step on the map: the title and text come from the commit message, the external reference is the commit, and it "revises" the step of the previous commit. While the app runs it looks once a minute; on the next start it catches up on the commits in between (more than 20 at once become one step that lists them).
+  - A folder on your computer is only read: nothing is fetched or pushed. A repository given by its address is downloaded once into the app's data folder and brought up to date from the server every ten minutes — this only downloads; for a private repository the computer must already be signed in to GitHub (GitHub Desktop, or git in a terminal). Either way, what leaves the computer is still only the fingerprints the time stamps need. Git must be installed.
   - Earlier history can be recorded too: in parts at each tag, or by month without tags (by year if it goes back far), one step per part. **The dates git shows are only author statements** (they can be changed), so these steps are marked as older material added now, and their dates are shown as claimed dates (L1), not verified times; likewise, any commit date earlier than today counts only as an author statement.
   - Optionally "Keep a copy of the code with each step (zip)": the code can then be checked even if the repository is deleted or rewritten, but each commit stores a copy of the whole repository (up to 50 MB each). Without it, only the commit is recorded, and the app says "External reference, code content not saved".
   - A tagged commit is marked as a key step automatically; a tag added later marks that step as a key step through an "added later" record. A mark you removed is never added again.
   - In My research, every recorded commit is a permanent step. You can "Stop recording" at any time; steps already recorded stay.
+
+### Bringing in earlier material: notes and tables
+
+**Settings → Import notes or a table…** (DECISIONS D-060):
+
+- **A notes folder** (Markdown, an Obsidian vault): every `.md` note becomes a step, oldest first. Links between notes (`[[…]]`) become "uses", and pictures a note shows are attached. You see the list first and can untick notes.
+- **A table** (CSV; in Excel: File → Save As → CSV UTF-8): one row per step. A `title` column is needed; `date`, `type`, `text`, `builds on` (row numbers) and `key step` are read when present, with headings in English or Chinese. Problems are shown row by row before anything is saved; **Download an example table** gives one to fill in.
+- **The dates are your own statement.** The date in a note (`date:` in its front matter) or a table is kept as "the author says it is from … — not verified"; without one, a note uses the file's date, which changes when a file is copied. The date stamp shows the day you imported it.
+- Importing into My research asks first, because imported steps can't be changed or deleted afterwards.
 
 ### Story: the research told in sentences, without AI
 
@@ -235,6 +244,16 @@ manifests/ payloads/ content/ signatures/ proofs/ certs/ identity/ chain.json bu
 ```
 
 ![Report](docs/screenshots/report.png)
+
+### Putting the bundle on GitHub or Zenodo
+
+At the bottom of Share, **Where should it go?** (DECISIONS D-060):
+
+- **Download a zip file** — as before.
+- **Into a git repository on this computer (and on to GitHub)**: the bundle is unpacked into `provenance/<bundle name>/` of the repository and committed there on its own; your other changes are left as they are. Tick **Also push it** to send it to GitHub; on GitHub, VERIFY.md then reads as a page. In a public repository everyone can see what you chose to disclose.
+- **Zenodo, as a draft**: connect once with a personal token from Zenodo (scope `deposit:write`; it is kept in the system keychain and sent only to Zenodo; Zenodo's test site can be tried first). The app makes a private draft with the zip, the title, your author label, a short description and a reserved DOI. Look at it on zenodo.org and publish it there yourself: then it gets its DOI, and Zenodo will not let it be deleted.
+
+**Download the steps as a table (CSV)**, also in Share, gives every step of the project in a table for Excel or Numbers. A table is for reading and counting; it can't be checked like the bundle.
 
 ### Why do the dates show the day a step was recorded?
 
@@ -290,6 +309,7 @@ Code layout: `core/provenance_core/` is the only library with trust logic (JCS, 
 - **P0 done**: append-only records, signing, replay; third-party timestamps (RFC 3161); evidence bundle export, `report.html` (with a static evolution map), `verify.py`, tamper tests; the record form and evolution map.
 - **P1 done**: Bitcoin anchors (OpenTimestamps) and block-explorer checks; the key-steps-only view; the timeline view; the full detail panel (Verified record / Author statement / Later additions / Changes, with adding relations, key steps, notes and retractions from the panel); backup and restore; the FSF sample data.
 - **Round 4 (installers)**: macOS (Apple silicon) and Windows 10/11 installers, a menu bar / notification area icon, a single running copy; Windows backup-location suggestions, and the full test suite (browser tests included) on GitHub Actions; DigiCert as a fallback for date stamps; Settings → Check stamp services checks whether each time-proof service can be reached (DECISIONS D-043 – D-045).
+- **v0.5.0**: import and export — record a repository straight from its GitHub address; put the evidence bundle into a git repository (and push it to GitHub) or into a Zenodo draft to publish there; import a Markdown / Obsidian notes folder or a CSV table; download the steps as a CSV table (DECISIONS D-060).
 - **v0.4.1**: a fictional FSF sample research (32 steps, two projects, every feature) comes with the app, offered on the first screen and opened in the practice space in the interface's language, with a twelve-stop tour (DECISIONS D-059).
 - **v0.4.0**: the app opens in a window of its own, drawn by the system's web engine (WKWebView on macOS, WebView2 on Windows); closing the window keeps the app running by its icon, opening it again or the Dock icon shows the window, Quit stops it; downloads ask where to save, web links open in the browser, pictures open larger in the window; without an engine the browser is used as before (DECISIONS D-058).
 - **v0.3.4**: step cards and map boxes show what each step says — the first lines of its text, its files, its code commit or DOI — without opening it (DECISIONS D-056); pictures and text files are shown in place, DOIs and repositories open on the web, earlier dates the author gave appear as "not verified", pointing at a step on the map shows its content, and the shared report does the same on hover and says plainly what was not shared (D-057).

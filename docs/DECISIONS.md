@@ -553,6 +553,8 @@ verification rules or what leaves the machine for time proofs.
      symbolic-ref, for-each-ref, log, merge-base, remote get-url, ls-tree and cat-file —
      never fetch, pull or push — with `core.fsmonitor` off, no console window on Windows, and arguments
      checked (full hashes, existing branch names) so nothing can be read as an option.
+     (D-060 adds two things the author asks for: downloading a repository named by its address,
+     and committing — and if asked, pushing — an evidence bundle.)
      `repo_url` is the `origin` address with any password or token removed, or the folder
      path when there is no remote; like every entry field it stays local unless the author
      discloses it in a bundle. Apps started from the Dock or Start menu do not get the
@@ -888,3 +890,66 @@ verification rules or what leaves the machine for time proofs.
   6. *Stamps as usual.* Sample steps get date stamps and public stamps like any practice step,
      so the stamps appear within minutes when the computer is online; all of them carry the day
      the sample was loaded, which is the point the "older material" stop makes.
+
+- **D-060 · Bringing material in, and sending a bundle out.** Asked for: record a repository
+  straight from its GitHub address; put the evidence bundle into a git repository and on GitHub,
+  and onto another platform (the author left the choice to the most used: GitHub and Zenodo);
+  bring in earlier notes (Markdown, Obsidian) and tables (CSV, Excel); get the steps out as a
+  table.
+  1. *A repository from its address.* "Record from git…" also takes an address: https://…,
+     git@host:owner/repo, or github.com/owner/repo (a GitHub page address such as
+     …/tree/main is cut back to the repository). Its branches are read with `ls-remote`
+     without downloading; when recording starts, a bare copy is downloaded once
+     (`clone --mirror`) into `git-mirrors/` in the data folder and brought up to date with
+     `fetch --prune` before the check, at most every ten minutes. Recording then works as for
+     a folder (D-047). Only https and ssh (`GIT_ALLOW_PROTOCOL`), never local paths or helper
+     transports; git never asks for a password (`GIT_TERMINAL_PROMPT=0`, ssh in batch mode), so
+     a private repository works when the computer is already signed in, and otherwise says
+     what to do. This only downloads: nothing of the records is sent. Stopping the recording
+     deletes the copy; the steps recorded stay, as every step does.
+  2. *Into a git repository.* Share → "Into a git repository on this computer": the bundle —
+     the same files as the zip, with the disclosure chosen for each step — is unpacked into
+     `provenance/<bundle name>/` of the repository, so that GitHub shows VERIFY.md as a page
+     and verify.py runs in that folder, and committed on its own (`commit --only`), leaving
+     the author's other changes as they are. A folder of that name that is not a bundle is
+     never overwritten; an earlier bundle of the same name is replaced, and its old version
+     stays in git history. It is pushed only when the author ticks "Also push it", next to a
+     warning that a public repository shows everyone what was disclosed. git's own errors
+     are turned into what to do (sign in, set name and e-mail, pull first).
+  3. *A draft on Zenodo.* Share → "Zenodo, as a draft": with a personal token (scope
+     `deposit:write`, kept in the system keychain, sent only to Zenodo; Zenodo's test site can
+     be chosen to try first), the app makes a deposit, uploads the bundle zip, fills in the
+     metadata — the bundle name as title, the author label as creator, a fixed description in
+     the report's language, dataset, CC BY 4.0, open access — and reserves a DOI. It never
+     publishes: the author looks at the draft on zenodo.org and publishes it there, after
+     which Zenodo does not allow deleting it, as the dialog says. The client refuses to send
+     anything to an address on another server than the Zenodo it was set up for.
+  4. *A notes folder.* Settings → "Import notes or a table…": each .md file of a folder (at
+     most 500; hidden folders, `.obsidian` and `.trash` are skipped) becomes a note step,
+     oldest first. The date is the note's own (`date:` or `created:` in its front matter),
+     else the file's date, which copying changes, as the dialog says. Either is kept as the
+     author's own statement — a claimed date at level L1, only when before today — and never
+     as a verified time: the date stamp shows the day of the import. The title is the front
+     matter's, the first heading or the file name. `[[links]]` and Markdown links to other
+     notes of the folder become "uses" relations to earlier notes; pictures a note shows are
+     attached. The list is shown first, and notes can be left out.
+  5. *A table.* A CSV file (Excel: Save As → CSV UTF-8; a Chinese Excel's GBK is read too;
+     commas, semicolons or tabs) with a title column and, when present, date, type, text,
+     builds on (row numbers) and key step, headed in English or Chinese. Each row becomes a
+     step; dates are claimed dates as for notes. Problems — no title, an unknown type, a date
+     that cannot be read, a link to a later row — are shown per row before anything is saved.
+     At most 1000 rows. An example table can be downloaded in either language.
+  6. *The steps as a table.* Share has "Download the steps as a table (CSV)": number, date,
+     date stamp ✓, earlier claimed date, kind, title, text, relations, key step, withdrawn,
+     reference and files, in UTF-8 with the byte-order mark so that Excel opens it. It is for
+     reading and counting: it is not evidence and cannot be checked like a bundle. It reads
+     back in through the table import (the step numbers in "builds on" are matched to rows).
+  7. *Asked first.* Importing into the real record asks first, since the steps cannot be
+     changed or deleted afterwards (PRD §7 rule 1); practice imports straight away.
+  8. *What leaves the computer (PRD §7 rule 3).* Nothing, unless the author clicks for it: a
+     download of a repository they named, a bundle into a repository they chose and a push
+     they ticked, a draft on Zenodo with the token they gave. Only the bundle they made goes
+     out, with the disclosure they chose — the same files the Download button gives. git runs
+     as the author's own program; the Zenodo client is in `core/provenance_core/providers/`,
+     with the other network code. The app still sends nothing of a step on its own but its
+     fingerprint for the stamps.

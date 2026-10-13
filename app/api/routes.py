@@ -13,7 +13,7 @@ from fastapi.responses import Response, StreamingResponse
 from pydantic import BaseModel, Field
 
 from app.config import MAX_UPLOAD_BYTES
-from app.i18n import tr
+from app.i18n import tr, tr_message
 from app.services.context import AppContext
 from app.services.ledger import EntryInput, LedgerError, NotInitialized, UploadedFile
 from app.services.spaces import PRACTICE, REAL, SPACE_HEADER
@@ -807,6 +807,199 @@ def export_bundle(body: ExportIn, request: Request):
     os.chmod(exports, 0o700)
     (exports / name).write_bytes(data)
     return Response(data, media_type="application/zip",
+                    headers={"Content-Disposition": f'attachment; filename="{name}"'})
+
+
+def _bundle_files(request: Request, body: ExportIn):
+    from app.i18n import current, language
+    from app.services.export import build_bundle_files, plan_export
+
+    c = ctx(request)
+    try:
+        plan = plan_export(c.ledger, body.title, body.records, body.default)
+    except LedgerError as exc:
+        raise _bad(exc) from None
+    with language(body.language or current()):
+        files = build_bundle_files(c.ledger, c.anchors, plan)
+    return c, plan, files
+
+
+class ExportRepoIn(ExportIn):
+    path: str  # a git repository on this computer
+    commit: bool = True
+    push: bool = False
+
+
+@router.post("/export/repository")
+def export_to_repository(body: ExportRepoIn, request: Request):
+    """The evidence bundle into provenance/<title>/ of a repository, committed, pushed if asked (D-060)."""
+    from app.services.publish import PublishError, to_repository
+
+    _c, plan, files = _bundle_files(request, body)
+    try:
+        out = to_repository(files, plan.title, body.path, commit=body.commit, push=body.push)
+    except PublishError as exc:
+        raise HTTPException(400, str(exc)) from None
+    if out.get("error"):  # saved, but the commit or the push did not go through
+        out["error"] = tr_message(out["error"])
+    return out
+
+
+ZENODO_DESCRIPTION = (
+    "Evidence bundle made with Research History. It holds report.html (open it in a browser), VERIFY.md and "
+    "verify.py, with which anyone can check the records: that they existed by their date stamps and have not "
+    "changed since. What the records do not show is written in report.html."
+)
+
+
+def _keystore_call(fn, *args):
+    from app.services.keystore import KeyStoreError
+    from app.services.publish import PublishError
+
+    try:
+        return fn(*args)
+    except PublishError as exc:
+        raise HTTPException(400, str(exc)) from None
+    except KeyStoreError as exc:
+        raise HTTPException(409, str(exc)) from None
+
+
+def _zenodo_status(request: Request) -> dict:
+    from app.services.publish import zenodo_settings
+
+    s = _keystore_call(zenodo_settings, real(request).keystore)
+    return {"connected": bool(s), "sandbox": bool(s and s.get("sandbox"))}
+
+
+@router.get("/zenodo")
+def zenodo_status(request: Request):
+    return _zenodo_status(request)
+
+
+class ZenodoIn(BaseModel):
+    token: str = Field(min_length=10, max_length=500)
+    sandbox: bool = False
+
+
+@router.post("/zenodo")
+def zenodo_connect(body: ZenodoIn, request: Request):
+    """Check the author's Zenodo token and keep it in the system keychain."""
+    from app.services.publish import connect_zenodo
+
+    _keystore_call(connect_zenodo, real(request).keystore, body.token, body.sandbox)
+    return _zenodo_status(request)
+
+
+@router.delete("/zenodo")
+def zenodo_forget(request: Request):
+    from app.services.publish import forget_zenodo
+
+    _keystore_call(forget_zenodo, real(request).keystore)
+    return _zenodo_status(request)
+
+
+@router.post("/export/zenodo")
+def export_to_zenodo(body: ExportIn, request: Request):
+    """The evidence bundle as a draft deposit on Zenodo, to be published there by the author (D-060)."""
+    from app.i18n import current, language
+    from app.services.export import bundle_filename, write_zip
+    from app.services.publish import to_zenodo, zenodo_metadata
+
+    c, plan, files = _bundle_files(request, body)
+    rows = c.ledger.records()
+    label = json.loads(rows[0].payload_bytes).get("author_label") if rows else None
+    with language(body.language or current()):
+        description = tr(ZENODO_DESCRIPTION)
+    meta = zenodo_metadata(plan.title, label, f"<p>{description}</p>")
+    return _keystore_call(to_zenodo, real(request).keystore, bundle_filename(plan.title), write_zip(files), meta)
+
+
+@router.get("/export/table")
+def export_table(request: Request, project: str | None = None, lang: str | None = None):
+    """Every step of a project as a CSV table (Excel opens it); not evidence (D-060). A plain link
+    cannot send the language header, so it comes as ``lang``."""
+    import re as _re
+    from datetime import date
+
+    from app.i18n import current, language
+    from app.services.importer import steps_table
+
+    c = ctx(request)
+    snap = Snapshot.load(c.ledger, c.anchors)
+    title = next((p.title for p in c.ledger.projects() if p.id == project), "steps")
+    slug = _re.sub(r"[^A-Za-z0-9._-]+", "-", title).strip("-")[:60] or "steps"
+    with language(lang or current()):
+        data = steps_table(snap, c.ledger.blobs, project)
+    return Response(data, media_type="text/csv; charset=utf-8",
+                    headers={"Content-Disposition": f'attachment; filename="steps-{slug}-{date.today()}.csv"'})
+
+
+# ---------------------------------------------------------------- importing notes and tables (D-060)
+
+
+class NotesIn(BaseModel):
+    path: str
+    project_id: str = ""
+    selected: list[str] | None = None
+
+
+@router.post("/import/notes/inspect")
+def import_notes_inspect(body: NotesIn):
+    from app.services.importer import ImportProblem, inspect_notes
+
+    try:
+        return inspect_notes(body.path)
+    except (ImportProblem, OSError) as exc:
+        raise HTTPException(400, str(exc)) from None
+
+
+@router.post("/import/notes")
+def import_notes_route(body: NotesIn, request: Request):
+    from app.services.importer import ImportProblem, import_notes
+
+    c = ctx(request)
+    try:
+        return import_notes(c.ledger, body.path, body.project_id, body.selected)
+    except (ImportProblem, LedgerError, OSError) as exc:
+        raise _bad(exc) from None
+
+
+async def _table_bytes(file: UploadFile) -> bytes:
+    data = await file.read()
+    if len(data) > MAX_UPLOAD_BYTES:
+        raise HTTPException(413, "the table is too large")
+    return data
+
+
+@router.post("/import/table/inspect")
+async def import_table_inspect(file: Annotated[UploadFile, File()]):
+    from app.services.importer import ImportProblem, inspect_table
+
+    try:
+        return inspect_table(await _table_bytes(file))
+    except ImportProblem as exc:
+        raise HTTPException(400, str(exc)) from None
+
+
+@router.post("/import/table")
+async def import_table_route(request: Request, file: Annotated[UploadFile, File()],
+                             project_id: Annotated[str, Form()]):
+    from app.services.importer import ImportProblem, import_table
+
+    data = await _table_bytes(file)
+    c = ctx(request)
+    try:
+        return await anyio.to_thread.run_sync(lambda: import_table(c.ledger, data, project_id))
+    except (ImportProblem, LedgerError) as exc:
+        raise _bad(exc) from None
+
+
+@router.get("/import/table/template")
+def import_table_template(lang: str = "en"):
+    from app.services.importer import table_template
+
+    name = "steps-template.csv" if lang != "zh" else "steps-template-zh.csv"
+    return Response(table_template(lang), media_type="text/csv; charset=utf-8",
                     headers={"Content-Disposition": f'attachment; filename="{name}"'})
 
 
