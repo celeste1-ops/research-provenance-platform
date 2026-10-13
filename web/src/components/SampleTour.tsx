@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { t } from "../i18n";
 import type { SampleInfo } from "../types";
 
@@ -96,7 +96,12 @@ const STOPS: Stop[] = [
 
 const HIDE_KEY = "rprov-tour-hidden";
 
-export function SampleTour({ sample, onAction }: { sample: SampleInfo; onAction: (action: TourAction) => void }) {
+export function SampleTour({ sample, onAction, start = 0, onStarted }: {
+  sample: SampleInfo;
+  onAction: (action: TourAction) => void;
+  start?: number; // "See the example" (D-062): when this is set, the tour shows and opens its first stop
+  onStarted?: () => void;
+}) {
   const [active, setActive] = useState<string | null>(null);
   const [hidden, setHidden] = useState(() => {
     try {
@@ -122,6 +127,15 @@ export function SampleTour({ sample, onAction }: { sample: SampleInfo; onAction:
     else if ("project" in a) onAction({ project: sample.projects[a.project] ?? a.project });
     else onAction(a);
   }
+
+  // Asked for from Settings: shown even if it was hidden before, from the first stop.
+  useEffect(() => {
+    if (!start) return;
+    hide(false);
+    go(STOPS[0]);
+    onStarted?.();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [start]);
 
   if (hidden) {
     return (

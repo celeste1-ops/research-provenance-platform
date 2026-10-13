@@ -192,6 +192,20 @@ def test_the_evidence_bundle_goes_into_a_repository(api, ctx, tmp_path, monkeypa
     assert repo.git("show", "--stat", "--format=", "HEAD").count("provenance/FSF-evidence/") >= 3
     assert "work-in-progress.py" in repo.git("status", "--porcelain")  # left alone
 
+    # A repository the app is recording does not record the app's own evidence-bundle commit as a
+    # step of the research (the v0.6.0 check, D-062).
+    assert repo.git("log", "-1", "--format=%b").strip() == "Research-History: evidence bundle"
+    ctx.git.add(str(repo.path), "main", api.project_id, history=False, keep_code=False, background=False)
+    steps = len(payloads(ctx))
+    (repo.path / "model.py").write_text("version = 2\n")
+    repo.git("commit", "-q", "-am", "A real change")
+    api.entry("Step one, revised")
+    r = api.client.post("/api/export/repository", json=body)
+    assert r.status_code == 200 and r.json()["commit"], r.text
+    assert ctx.git.check()["recorded"] == 1  # the real change, not the bundle
+    assert [p["title"] for p in payloads(ctx)][steps:] == ["Step one, revised", "A real change"]
+    ctx.git.remove(ctx.git.sources()[0]["id"])
+
     # A folder of that name that is not a bundle is never overwritten.
     (repo.path / "provenance" / "Notes").mkdir()
     (repo.path / "provenance" / "Notes" / "mine.txt").write_text("keep me")

@@ -21,6 +21,9 @@ from app.services.gitrepo import GitError, Repo
 from provenance_core.providers.zenodo import Zenodo, ZenodoError
 
 FOLDER = "provenance"
+# The last line of the app's own commit message: a repository being recorded (D-047) does not
+# record such a commit as a step of the research.
+BUNDLE_TRAILER = "Research-History: evidence bundle"
 ZENODO_SECRET = "zenodo"  # in the system keychain: {"token": …, "sandbox": bool}
 
 
@@ -56,13 +59,19 @@ def to_repository(files: dict[str, bytes], title: str, path: str, *, commit: boo
     if not commit:
         return out
     try:
-        out["commit"] = repo.commit_paths([rel], f"Evidence bundle: {title}")
+        out["commit"] = repo.commit_paths([rel], f"Evidence bundle: {title}\n\n{BUNDLE_TRAILER}")
         if push:
             repo.push()
             out["pushed"] = True
     except GitError as exc:
         out["error"] = str(exc)
     return out
+
+
+def is_bundle_commit(subject: str, body: str) -> bool:
+    """A commit the app made to put an evidence bundle into a repository (older versions wrote no
+    trailer, only the subject)."""
+    return BUNDLE_TRAILER in body or subject.startswith("Evidence bundle: ")
 
 
 # ---------------------------------------------------------------- Zenodo

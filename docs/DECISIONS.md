@@ -1001,3 +1001,46 @@ verification rules or what leaves the machine for time proofs.
      fingerprints, unless the author clicks for a repository download, a bundle into a
      repository or onto Zenodo (D-060), or a send to an online AI service after looking at it.
      README and the release notes say the same.
+
+- **D-062 · The example from Settings, at any time.** Asked for after the v0.6.0 check: someone who
+  skipped "See a finished example first" on the first screen should find it again later, without
+  knowing about the practice space.
+  1. *Where.* Settings → "See the example" (中文「看示例」), under About, in My research and in
+     practice alike. "Fill practice with sample research" stays in practice (it always loads the
+     sample afresh).
+  2. *What it does.* It switches to the practice space, puts the sample there and shows the tour
+     from its first stop — even if the tour was put away before (the "hidden" choice is set back).
+     If practice already holds the sample, it switches there and starts the tour, without loading
+     it again (the practice installation stays the same).
+  3. *Practice of the author's own.* If practice holds steps that are not the sample, it asks
+     first: "This replaces what is in the practice space. Your real record is not touched."
+     (「这会替换练习区里的内容。你「正式记录」里的内容不会受影响。」 — the Chinese interface calls My
+     research 正式记录). Cancel leaves practice as it was.
+  4. *The real record is never touched.* The only server call it makes besides the practice reset
+     of D-059 is `GET /api/practice/state` (does practice hold the sample, and how many steps of its
+     own), which reads the practice space only and does not create one. A browser test saves a
+     step in the real record, uses the entry from both spaces, and checks that the real record
+     holds exactly the same records in the same order.
+
+- **D-063 · Three findings of the v0.6.0 check.** A full walk-through of v0.6.0 from a new data folder
+  found four small problems besides the one D-062 answers.
+  1. *A source comment on screen.* A `//` comment written between JSX elements is text to React:
+     "// Files can be dropped anywhere on the form…" showed on top of the "Add a step" form and
+     under the save confirmation. It is `{/* … */}` now, and a test checks that no `//` comment
+     stands between JSX elements anywhere in `web/src`.
+  2. *The app's own commit recorded as a step.* With a repository both recorded (D-047) and used as
+     the place for an evidence bundle (D-060), the bundle's commit became a permanent code step
+     that nobody made. The commit message now ends with the trailer `Research-History: evidence
+     bundle`, and recording leaves out commits with it — or, from older versions, with a subject
+     starting "Evidence bundle: " — in new commits and in the first run alike.
+  3. *The note after saving.* With the backup folder on the computer's own disk, it said
+     "Automatic backup is not set up yet", which was not true. It now says the step goes into the
+     next backup but the folder is only on this computer; other states that need attention (an
+     error, another copy, a refused keychain, a folder not found) say "needs a look" and open
+     Backup.
+  4. *Not changed: the inbox stamps the file's own fingerprint* (D-049). The date stamp of a watched
+     file is on its plain SHA-256, unlike steps, whose stamps are on the record id. That is what
+     lets anyone check the file with the `openssl ts -verify -data <file>` command in VERIFY.md;
+     the cost is that someone who already holds the very same file could confirm to the stamping
+     service that it existed. Changing it would mean a different check for those files in
+     VERIFY.md and verify.py; for this version it stays as D-049 decided.
