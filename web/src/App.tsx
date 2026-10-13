@@ -543,7 +543,11 @@ export function App() {
         {spaceSwitch}
         <div className="project-picker">
           <select value={projectId} aria-label={t("Project")} data-testid="project-select"
-            onChange={(e) => (e.target.value === NEW_PROJECT ? setDialog("new-project") : setProjectId(e.target.value))}>
+            onChange={(e) => {
+              if (e.target.value === NEW_PROJECT) return setDialog("new-project");
+              setSelected(null); // a step of the project left behind is not shown beside another's
+              setProjectId(e.target.value);
+            }}>
             {projects.length === 0 && <option value="">{t("No project")}</option>}
             {projects.map((p) => (
               <option key={p.id} value={p.id}>
@@ -724,7 +728,7 @@ export function App() {
         </div>
       )}
       {example && status.sample && (
-        <SampleTour key={status.installation ?? ""} sample={status.sample} onAction={tourStop}
+        <SampleTour key={status.installation ?? ""} sample={status.sample} projectId={projectId} onAction={tourStop}
           start={tourStart} onStarted={() => setTourStart(0)} />
       )}
       <main className={`main ${selected ? "with-detail" : ""}`}>

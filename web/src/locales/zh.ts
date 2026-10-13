@@ -722,6 +722,8 @@ export const ZH: Record<string, string> = {
   "See the example": "看示例",
   // the example as a space of its own (D-064)
   "Opening the example…": "正在打开示例…",
+  "Project 1 of 2: the FSF research itself.": "项目 1/2：FSF 研究本身。",
+  "Project 2 of 2: the flow channel setup — the apparatus built for the FSF experiments, recorded as a project of its own.": "项目 2/2：流道装置——为 FSF 实验搭建的装置，单独记成一个项目。",
   "Translate into Chinese": "翻译成中文",
   "Translate into English": "翻译成英文",
   "Translating on this computer…": "正在本机翻译…",

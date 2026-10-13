@@ -96,8 +96,9 @@ const STOPS: Stop[] = [
 
 const HIDE_KEY = "rprov-tour-hidden";
 
-export function SampleTour({ sample, onAction, start = 0, onStarted }: {
+export function SampleTour({ sample, projectId, onAction, start = 0, onStarted }: {
   sample: SampleInfo;
+  projectId: string; // the project open now: the bar says which of the sample's two it is
   onAction: (action: TourAction) => void;
   start?: number; // "See the example" (D-062): when this is set, the tour shows and opens its first stop
   onStarted?: () => void;
@@ -147,6 +148,13 @@ export function SampleTour({ sample, onAction, start = 0, onStarted }: {
     );
   }
   const current = STOPS.find((s) => s.key === active);
+  // "FSF" names the whole sample research; it has two projects. Say which one is open, so the second
+  // (the flow channel setup) is not taken for a different research.
+  const where = projectId === sample.projects.side
+    ? t("Project 2 of 2: the flow channel setup — the apparatus built for the FSF experiments, recorded as a project of its own.")
+    : projectId === sample.projects.main
+      ? t("Project 1 of 2: the FSF research itself.")
+      : null;
   return (
     <div className="sample-tour" data-testid="sample-tour">
       <div className="sample-tour-head">
@@ -155,6 +163,7 @@ export function SampleTour({ sample, onAction, start = 0, onStarted }: {
         <span className="spacer" />
         <button className="link small" onClick={() => hide(true)} data-testid="sample-tour-hide">{t("Hide")}</button>
       </div>
+      {where && <p className="sample-tour-where small" data-testid="sample-tour-where">{where}</p>}
       <ol className="sample-tour-stops">
         {STOPS.map((s, i) => (
           <li key={s.key}>
