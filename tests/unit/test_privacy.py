@@ -29,7 +29,7 @@ from provenance_core.providers.rfc3161 import Rfc3161Provider
 from tests.conftest import Api, make_ctx
 
 ROOT = Path(__file__).resolve().parent.parent.parent
-NETWORK_MODULES = {"httpx", "requests", "urllib3", "aiohttp", "http.client", "urllib.request", "socket",
+NETWORK_MODULES = {"httpx", "httpx2", "anthropic", "requests", "urllib3", "aiohttp", "http.client", "urllib.request", "socket",
                    "ftplib", "smtplib", "websockets", "pycurl"}
 
 

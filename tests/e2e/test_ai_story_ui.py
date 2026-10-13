@@ -153,3 +153,65 @@ def test_the_summary_shows_while_written_and_can_be_stopped(tmp_path, browser, l
     finally:
         FakeModel.delay = FakeModel.loading = 0.0
         model_server.shutdown()
+
+
+def test_summary_by_an_online_service_after_a_look(tmp_path, browser, monkeypatch):
+    """D-061: connect with a key, look at exactly what will be sent, send, and find it in the log."""
+    import httpx
+
+    from app.services import ai_cloud
+    from provenance_core.providers.cloud_ai import CloudModel
+
+    sent: list[dict] = []
+
+    def service(request):
+        if request.url.path.endswith("/models"):
+            return httpx.Response(200, json={"data": [{"id": "deepseek-chat"}, {"id": "deepseek-reasoner"}]})
+        sent.append(json.loads(request.content))
+        sse = "".join(f"data: {json.dumps({'choices': [{'delta': {'content': REPLY[i:i + 40]}}]})}\n\n"
+                      for i in range(0, len(REPLY), 40))
+        return httpx.Response(200, text=sse + "data: [DONE]\n\n", headers={"Content-Type": "text/event-stream"})
+
+    monkeypatch.setattr(ai_cloud, "model_factory", lambda provider, key, model="", url="": CloudModel(
+        provider, key, model, url, transport=httpx.MockTransport(service)))
+    with LiveServer(tmp_path) as srv:
+        load_demo(srv.ctx)
+        page = browser.new_page(viewport={"width": 1400, "height": 900})
+        page.goto(srv.url)
+        page.get_by_test_id("tab-story").click()
+        page.get_by_test_id("ai-open").click()
+        panel = page.get_by_test_id("ai-panel")
+        panel.get_by_test_id("ai-where-cloud").click()
+        panel.get_by_test_id("cloud-provider").select_option("deepseek")
+        panel.get_by_test_id("cloud-key").fill("sk-test-123456789")
+        panel.get_by_test_id("cloud-connect-button").click()
+        expect(panel.get_by_test_id("cloud-connected")).to_contain_text("Connected to DeepSeek (api.deepseek.com)")
+        expect(panel.get_by_test_id("cloud-model")).to_have_value("deepseek-chat")
+        assert sent == []  # connecting sent nothing of the records
+
+        panel.get_by_test_id("cloud-look").click()
+        preview = panel.get_by_test_id("cloud-preview")
+        expect(preview).to_contain_text("This is exactly what goes to DeepSeek (api.deepseek.com), for deepseek-chat")
+        shown = panel.get_by_test_id("cloud-preview-user").inner_text()
+        assert "Old notebook page" not in shown  # step bodies are never sent
+        assert sent == []  # looking sent nothing either
+        panel.get_by_test_id("cloud-send").click()
+        result = panel.get_by_test_id("ai-result")
+        expect(result).to_contain_text("AI inference — written by deepseek-chat at DeepSeek")
+        [request] = sent
+        assert request["messages"][1]["content"] == shown
+
+        panel.get_by_test_id("cloud-log-open").click()
+        log = panel.get_by_test_id("cloud-log")
+        expect(log).to_contain_text("DeepSeek · deepseek-chat")
+
+        # Reopened later, it starts on the online service — and still sends nothing before Send.
+        page.reload()
+        page.get_by_test_id("tab-story").click()
+        page.get_by_test_id("ai-open").click()
+        expect(page.get_by_test_id("ai-cloud")).to_be_visible()
+        expect(page.get_by_test_id("cloud-model")).to_have_value("deepseek-chat")
+        page.get_by_test_id("cloud-disconnect").click()
+        expect(page.get_by_test_id("cloud-connect")).to_be_visible()
+        assert len(sent) == 1
+        page.close()

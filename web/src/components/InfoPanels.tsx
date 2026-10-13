@@ -64,6 +64,10 @@ export function WhereIsMyData({ status, onClose, onBackup }: { status: Status; o
         <p className="small">
           {t("The date stamp services (FreeTSA, or DigiCert when FreeTSA can't be reached) and the Bitcoin network only receive a fingerprint (hash) of each step. From a fingerprint nobody can read or rebuild your content — so they can't give it back either, not even through Bitcoin. Only a backup can bring your files back.")}
         </p>
+        <h3>{t("What leaves this {device}", { device: dev() })}</h3>
+        <p className="small" data-testid="what-leaves">
+          {tx("Only those fingerprints — unless you click for more: downloading a repository you named, putting a bundle into a repository or onto Zenodo, or sending the story's sentences to an online AI service after you have seen them. Every send to an AI service is listed under <b>What was sent</b> in the AI summary.", bold)}
+        </p>
         <h3>{t("If this {device} is lost", { device: dev() })}</h3>
         <p className="small">
           {tx("Install the app on the new {device} and choose <b>Restore from a backup</b> on the first screen. You need the backup file and its password. Your steps, files, stamps and signing key come back as they were.", bold, { device: dev() })}

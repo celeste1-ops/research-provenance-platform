@@ -1,6 +1,10 @@
 import type {
   AiResult,
   BackupStatus,
+  CloudLogEntry,
+  CloudPreview,
+  CloudProvider,
+  CloudStatus,
   BackupSuggestion,
   ExportPreview,
   FolderInspect,
@@ -119,7 +123,7 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
 // The local model's answer arrives as it is written, one JSON object per line: {"text"} pieces,
 // then {"result"} (checked) or {"error"}. Aborting the signal stops the model (D-050).
 async function aiStoryStream(
-  body: { url: string; model: string; project?: string },
+  body: { url?: string; model: string; project?: string; mode?: "local" | "cloud"; confirm?: string },
   onText: (piece: string) => void,
   signal?: AbortSignal,
 ): Promise<AiResult> {
@@ -150,7 +154,10 @@ async function aiStoryStream(
       else if (event.result) return event.result;
       else if (event.error) throw new ApiError(502, event.error);
     }
-    if (done) throw new ApiError(502, t("The local model stopped before it finished."));
+    if (done) {
+      throw new ApiError(502, body.mode === "cloud" ? t("The AI service stopped before it finished.")
+        : t("The local model stopped before it finished."));
+    }
   }
 }
 
@@ -167,7 +174,14 @@ export const api = {
   timeline: (project?: string) =>
     request<TimelineRow[]>("GET", `/api/timeline${project ? `?project=${encodeURIComponent(project)}` : ""}`),
   record: (id: string) => request<RecordDetail>("GET", `/api/records/${id}`),
-  aiSettings: () => request<{ url: string; model: string }>("GET", "/api/ai"),
+  aiSettings: () => request<{ url: string; model: string; cloud: CloudStatus }>("GET", "/api/ai"),
+  cloudConnect: (provider: CloudProvider, key: string, url: string) =>
+    request<CloudStatus & { models: string[] }>("POST", "/api/ai/cloud", { provider, key, url }),
+  cloudForget: () => request<CloudStatus>("DELETE", "/api/ai/cloud"),
+  cloudModels: () => request<{ models: string[] }>("POST", "/api/ai/cloud/models"),
+  cloudPreview: (model: string, project?: string) =>
+    request<CloudPreview>("POST", "/api/ai/cloud/preview", { mode: "cloud", model, project }),
+  cloudLog: () => request<{ count: number; entries: CloudLogEntry[] }>("GET", "/api/ai/cloud/log"),
   aiModels: (url: string) => request<{ url: string; models: string[] }>("POST", "/api/ai/models", { url }),
   aiStory: aiStoryStream,
   narrative: (project?: string) =>

@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from "react";
 import { api, download } from "../api";
-import { dev } from "../device";
 import { t } from "../i18n";
 import type { Narrative, NarrativeSentence } from "../types";
 import { AiStory } from "./AiStory";
@@ -60,7 +59,7 @@ export function Story({ projectId, version, onSelect }: {
     <article className="story-view" data-testid="story">
       <div className="story-tools">
         <button className="secondary small ai-jump" onClick={openAi} data-testid="ai-jump"
-          title={t("Summarise with an AI model on this {device} (optional)…", { device: dev() })}>
+          title={t("Summarise with an AI model (optional)…")}>
           {t("AI summary…")}
         </button>
         <button className="secondary small" data-testid="story-markdown"

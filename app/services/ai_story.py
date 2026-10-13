@@ -1,10 +1,12 @@
-"""Retelling the story with a language model on this computer — optional (DECISIONS D-050).
+"""Retelling the story with a language model — optional (DECISIONS D-050, D-061).
 
 PRD §4 sets the rules for AI: answer only from the records, point every important sentence at
 its records, label everything "AI inference" and keep it apart from verified records and author
 statements, and either ask before sending anything to an AI company or use a model on the
-author's own computer. This is the second way: the model must run on this computer
-(provenance_core.providers.local_ai only accepts loopback addresses).
+author's own computer. Both ways are here: a model on this computer
+(provenance_core.providers.local_ai only accepts loopback addresses), or an online service the
+author connected, which is sent only the text the author was shown and agreed to send, each time
+(app/services/ai_cloud.py).
 
 What the model gets is the template story (app/services/narrative.py) as numbered facts — the
 same sentences the author already sees, never the bodies of steps or their files. It must name
@@ -174,6 +176,7 @@ def result(narrative: dict, model: LocalModel, reply: str, known: dict[int, str]
     sentences = [b for b in blocks if b["kind"] == "sentence"]
     return {
         "label": label or tr("AI inference"), "model": model.model, "url": model.base,
+        "service": getattr(model, "service", None),  # an online service by name; None on this computer
         "created": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"), "title": narrative["title"],
         "facts": count,
         "blocks": blocks,
@@ -188,12 +191,13 @@ def retell(narrative: dict, model: LocalModel, lang: str) -> dict:
     return result(narrative, model, model.chat(system, user), known, count)
 
 
-async def retell_stream(narrative: dict, model: LocalModel, lang: str,
-                        label: str | None = None) -> AsyncIterator[dict]:
+async def retell_stream(narrative: dict, model: LocalModel, lang: str, label: str | None = None,
+                        prepared: tuple[str, str, dict[int, str], int] | None = None) -> AsyncIterator[dict]:
     """The same, as it is written: {"text": piece} while the model writes, then {"result": ...},
-    checked sentence by sentence like retell()."""
+    checked sentence by sentence like retell(). ``prepared`` is prompt()'s answer when the caller
+    already has it — the very text the author was shown before an online service gets it."""
     lang = "zh" if lang == "zh" else "en"
-    system, user, known, count = prompt(narrative, lang)
+    system, user, known, count = prepared or prompt(narrative, lang)
     reply: list[str] = []
     # Closed as soon as this is: that ends the connection to the model there and then.
     async with aclosing(model.chat_stream(system, user)) as pieces:

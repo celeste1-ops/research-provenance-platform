@@ -360,9 +360,40 @@ export type AiResult = {
   label: string;
   model: string;
   url: string;
+  service: string | null; // an online service by name (D-061); null for a model on this computer
   created: string;
   title: string;
   facts: number;
   blocks: AiBlock[];
   counts: { ok: number; flagged: number };
+};
+
+// An online AI service the author connected (D-061). The key itself never comes back to the page.
+export type CloudProvider = "anthropic" | "deepseek" | "qwen" | "other";
+export type CloudStatus =
+  | { connected: false; model?: string }
+  | { connected: true; provider: CloudProvider; service: string; host: string; default_model: string; model?: string };
+
+export type CloudPreview = {
+  service: string;
+  host: string;
+  model: string;
+  system: string;
+  user: string;
+  facts: number;
+  characters: number;
+  fingerprint: string;
+};
+
+export type CloudLogEntry = {
+  time: string;
+  service: string;
+  host: string;
+  model: string;
+  title: string;
+  space: string;
+  characters: number;
+  fingerprint: string;
+  system: string;
+  user: string;
 };

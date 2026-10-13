@@ -54,6 +54,18 @@ try {
   $practice = Invoke-RestMethod "$base/api/status" -Headers @{ "X-RPROV-Space" = "practice" }
   if ($practice.entry_count -ne 32) { throw "sample research missing: $($practice.entry_count) steps in practice" }
   Write-Host "Sample research: $($practice.entry_count) steps in practice"
+
+  # Anthropic's SDK is in the app (D-061): a made-up key is refused by the service, or the service
+  # cannot be reached; either way the app answers 400, not an internal error.
+  $aiCode = 0
+  try {
+    Invoke-RestMethod -Method Post "$base/api/ai/cloud" -Headers $h -ContentType "application/json" -Body '{"provider":"anthropic","key":"sk-smoke-test-not-a-key"}' | Out-Null
+    $aiCode = 200
+  } catch {
+    if ($_.Exception.Response) { $aiCode = [int]$_.Exception.Response.StatusCode }
+  }
+  if ($aiCode -ne 400) { throw "online AI check failed: HTTP $aiCode" }
+  Write-Host "Online AI service code answers"
 } finally {
   Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue
 }

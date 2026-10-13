@@ -127,7 +127,8 @@ def test_ai_retelling_over_the_api(api, client, monkeypatch, ctx):
                         lambda url, model="": LocalModel(url, model, transport=httpx.MockTransport(handle)))
     api.init()
     api.entry("Idea", "idea", body="hello")
-    assert client.get("/api/ai").json() == {"url": "http://127.0.0.1:11434", "model": ""}
+    assert client.get("/api/ai").json() == {"url": "http://127.0.0.1:11434", "model": "",
+                                            "cloud": {"connected": False, "model": ""}}
     assert client.post("/api/ai/models", json={"url": "localhost:11434"}).json() == {
         "url": "http://localhost:11434", "models": ["qwen2.5:7b"]}
     zh = {"X-RPROV-Lang": "zh"}

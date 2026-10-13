@@ -628,6 +628,7 @@ verification rules or what leaves the machine for time proofs.
   important sentence at its records, label it "AI inference" and keep it apart, and either ask
   before sending anything to an AI company or use a model on the author's computer. The
   author asked for the local model first (round 5); a cloud service is not part of this.
+  (D-061 adds an online service as the other way PRD §4 allows: asking first, every time.)
   1. *Only this computer.* `provenance_core/providers/local_ai.py` (the one place network code
      may live) speaks the chat API that Ollama, LM Studio and llama.cpp's server share
      (`/v1/models`, `/v1/chat/completions`). It accepts only loopback addresses (127.0.0.0/8,
@@ -953,3 +954,45 @@ verification rules or what leaves the machine for time proofs.
      as the author's own program; the Zenodo client is in `core/provenance_core/providers/`,
      with the other network code. The app still sends nothing of a step on its own but its
      fingerprint for the stamps.
+
+- **D-061 · An online AI service for the summary — asking first, every time.** Asked for, after
+  v0.5.0: an AI on the internet as well as one on the computer, with the documents protected by
+  default and the exposure stated. PRD §4 allows an AI company "only if the author is asked
+  before anything is sent"; this is that way, next to the local model of D-050, which stays the
+  default.
+  1. *Off until the author connects a service.* The AI panel has two tabs, "On this computer"
+     and "Online AI service". Nothing is connected until the author pastes an API key of their
+     own: Claude (Anthropic), DeepSeek, Qwen (Alibaba Cloud), or any service with the common
+     chat API at an https address. Connecting checks the key by listing the service's models —
+     nothing of the records is sent. The service and key are kept in the system keychain; the
+     key is never shown again, written to a log or sent anywhere but that service.
+  2. *Shown, then sent — every time.* "Look at what will be sent…" returns the exact request
+     text (the instructions and the story's sentences), the service, its address, the model and
+     the number of characters, and a fingerprint (SHA-256) of all of these. Send must name that
+     fingerprint; the server builds the text again and sends nothing if it differs — the story,
+     the model, the service or the language changed — so what goes is always what the author
+     saw. A send is one request; there is no automatic or background use.
+  3. *What is sent.* The same facts a local model gets (D-050 2): titles, the author's reasons
+     and notes, the names of attached files, dates and stamp marks, for the project in view.
+     Never the text of a step or what its files hold. The panel says that the service then has
+     the text under its own rules, and that it cannot be taken back.
+  4. *Written down first.* Before the request leaves, `ai-sent.jsonl` in the data folder gets
+     the time, service, address, model, title, space, number of characters, the fingerprint and
+     the full text. "What was sent" in the panel lists the latest 50; the file keeps all.
+     Sends from the practice space are logged there too, marked as practice.
+  5. *How it is sent.* `provenance_core/providers/cloud_ai.py`, next to the other network code.
+     Claude goes through Anthropic's own SDK (`anthropic`), given the address and the key
+     itself, so neither can come from the environment, and redirects are not followed (the key
+     travels in a header). The model offered is `claude-opus-5-5`, at effort "medium" (a short
+     summary); for the models that support it a declined request is handed to another model on
+     the server (`fallbacks: "default"`), and a refusal that remains is said plainly. The other
+     services use the chat API over httpx, also without following redirects. The privacy test
+     now also forbids `anthropic` and `httpx2` outside `providers/`.
+  6. *The answer.* Checked sentence by sentence and labelled exactly as a local model's (D-050
+     3, 4), with the service named: "AI inference — written by <model> at <service> on <date>".
+     It is never a record and never goes into a bundle; the model chosen is remembered in
+     `preferences.json`.
+  7. *Where it is said.* "Where is my data?" gains "What leaves this computer": only
+     fingerprints, unless the author clicks for a repository download, a bundle into a
+     repository or onto Zenodo (D-060), or a send to an online AI service after looking at it.
+     README and the release notes say the same.
