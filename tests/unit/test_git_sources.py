@@ -297,3 +297,15 @@ def test_what_git_says_becomes_what_to_do():
     assert "internet connection" in _friendly("fatal: unable to access 'https://x/': Could not resolve host: x")
     assert "user.name" in _friendly("Please tell me who you are.")
     assert "pull them first" in _friendly("! [rejected] main -> main (fetch first)")
+
+
+def test_a_downloaded_copy_is_removed_although_git_made_files_read_only(tmp_path):
+    from app.services.gitrepo import remove_copy
+
+    copy = tmp_path / "fsf-code.git" / "objects" / "pack"
+    copy.mkdir(parents=True)
+    pack = copy / "pack-1.pack"
+    pack.write_bytes(b"PACK")
+    pack.chmod(0o444)  # as git leaves its pack files (Windows then refuses to delete them)
+    remove_copy(tmp_path / "fsf-code.git")
+    assert not (tmp_path / "fsf-code.git").exists()

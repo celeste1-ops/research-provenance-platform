@@ -21,7 +21,6 @@ from __future__ import annotations
 import json
 import logging
 import os
-import shutil
 import threading
 import uuid
 from dataclasses import dataclass, field
@@ -38,6 +37,7 @@ from app.services.gitrepo import (
     find_git,
     normalize_remote,
     remote_branches,
+    remove_copy,
     repo_name,
     strip_credentials,
 )
@@ -315,7 +315,7 @@ class GitSources:
         gone = next(s for s in sources if s["id"] == source_id)
         mirror = Path(gone["path"])
         if gone.get("remote") and mirror.parent == self.mirrors:
-            shutil.rmtree(mirror, ignore_errors=True)
+            remove_copy(mirror)
 
     # ------------------------------------------------------------ recording
 

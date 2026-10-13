@@ -21,6 +21,7 @@ import io
 import os
 import re
 import shutil
+import stat
 import subprocess
 import sys
 import zipfile
@@ -340,8 +341,21 @@ def clone_mirror(url: str, target: Path, git: str | None = None) -> None:
     try:
         _run_network(git, ["clone", "--mirror", "--quiet", "--", url, str(target)])
     except GitError:
-        shutil.rmtree(target, ignore_errors=True)  # half a copy (it took too long): start again next time
+        remove_copy(target)  # half a copy (it took too long): start again next time
         raise
+
+
+def remove_copy(path: Path) -> None:
+    """Delete a downloaded copy. git marks its pack files read-only, which keeps Windows from
+    deleting them, so the mark is taken off first."""
+    def writable(func, name, _exc):
+        os.chmod(name, stat.S_IWRITE)
+        func(name)
+
+    try:
+        shutil.rmtree(path, onexc=writable)
+    except OSError:
+        pass  # still in use (Windows): it is only a copy, and is not used any more
 
 
 def _check_sha(sha: str) -> str:
