@@ -257,8 +257,17 @@ ul.files { list-style: none; padding: 0; margin: 6px 0; }
 .space-practice .project-picker select { background-color: #fff; }
 .space-practice .canvas { background: #fffdf8; }
 .space-practice button.primary { background: #c26a00; border-color: #c26a00; }
+.space-example .appbar { background: #f4efff; border-bottom-color: #cbbcf0; }
+.space-example .toolbar, .space-example .footbar { background: #faf8ff; }
+.space-example .project-picker select { background-color: #fff; }
+.space-example .canvas { background: #fdfcff; }
+.space-example button.primary { background: #6a4bc4; border-color: #6a4bc4; }
 .practice-banner { display: flex; align-items: center; gap: 10px; padding: 7px 16px; color: #6b4100; font-size: 14px; border-bottom: 1px solid #efc98d; background: repeating-linear-gradient(-45deg, #ffe8c4, #ffe8c4 12px, #fff1db 12px, #fff1db 24px); }
 .practice-banner .link { margin-left: auto; }
+/* The example (D-064): its own colour, so it is never taken for practice or the real record. */
+.example-banner { color: #3f2a7a; border-bottom-color: #cbbcf0; background: repeating-linear-gradient(-45deg, #ece4ff, #ece4ff 12px, #f6f1ff 12px, #f6f1ff 24px); }
+.space-example .space-switch button.on { background: #6a4bc4; }
+.example-note { color: #4b2f91; }
 .practice-note { margin: 0 0 8px; padding: 6px 10px; border-radius: 6px; background: #fff1db; color: #6b4100; font-size: 13px; }
 .confirm-real h2 { margin-top: 0; }
 .summary { display: block; font-size: 14px; margin: 10px 0; border: 1px solid var(--line); border-radius: 8px; padding: 6px 12px; background: #fafbfc; }

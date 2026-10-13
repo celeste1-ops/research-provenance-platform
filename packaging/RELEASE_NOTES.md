@@ -1,7 +1,12 @@
-## What's in this version (v0.6.1)
+## What's in this version (v0.7.0)
+
+**New in v0.7.0**
+- **Three spaces, never mixed.** The switch at the top now has three places: **My research** (your real record), **Practice** (only what you try out yourself) and **Example** (the fictional FSF sample research). The example has its own purple colour and a banner saying it is a fictional research, not yours — so your own FSF steps and the sample's are never in the same place.
+- **Looking at the example changes nothing of yours.** "See a finished example first", Settings → **See the example** and **Example** in the switch all just go there, with the tour from its first stop. Change anything you like in it; **Settings → Load the example afresh** puts it back as it was. Your practice and your real record are not touched, and nothing asks to replace them any more.
+- **Upgrading.** If your practice space held the sample, it moves to Example by itself and practice starts empty. Practice steps of your own stay in practice; your real record is not touched.
 
 **New in v0.6.1**
-- **See the example, any time.** Settings → **See the example** opens the fictional FSF sample research with its tour from the first stop, from My research or from practice. If practice holds steps of your own, it asks before replacing them. Your real record is never touched.
+- **See the example, any time.** Settings → **See the example** opens the fictional FSF sample research with its tour from the first stop. (Since v0.7.0 the example has a space of its own.)
 
 **Fixed in v0.6.1**
 - A line of the app's own source code ("// Files can be dropped anywhere on the form…") no longer shows on top of the "Add a step" form and under the save confirmation.

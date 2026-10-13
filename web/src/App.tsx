@@ -27,7 +27,7 @@ import { LangSwitch } from "./components/LangSwitch";
 import { GearIcon, ListIcon, LogoMark, MapIcon, NoteIcon, PlusIcon, ShareIcon, StoryIcon } from "./components/Icons";
 
 type Dialog = null | "form" | "export" | "backup" | "key" | "where" | "tech" | "services" | "practice-reset" | "new-project" | "git"
-  | "quick" | "folders" | "inbox" | "import" | "example-confirm";
+  | "quick" | "folders" | "inbox" | "import";
 const QUICK_NOTE_HASH = "#quick-note"; // the menu bar / tray icon opens the page with it (D-047)
 const SPACE_KEY = "rprov-space";
 const TIPS_KEY = "rprov-tips-hidden"; // the person clicked "Got it" on the how-to line
@@ -53,7 +53,7 @@ function initialSpace(): Space {
   } catch {
     /* storage unavailable */
   }
-  const space: Space = saved === "practice" ? "practice" : "real";
+  const space: Space = saved === "practice" || saved === "example" ? saved : "real";
   setSpace(space);
   return space;
 }
@@ -87,7 +87,7 @@ export function App() {
   const [stepsTable, setStepsTable] = useState(false);
   const [milestonesOnly, setMilestonesOnly] = useState(false);
   const [notice, setNotice] = useState<Notice | null>(null);
-  const [tourStart, setTourStart] = useState(0); // "See the example" asked for the tour (D-062)
+  const [tourStart, setTourStart] = useState(0); // "See the example" asked for the tour (D-062, D-064)
   const [menuOpen, setMenuOpen] = useState(false);
   const [uiLang, setUiLang] = useState<Lang>(lang);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -187,18 +187,14 @@ export function App() {
     }
   }
 
-  async function resetPractice(sample: boolean) {
+  async function resetPractice() {
     setDialog(null);
     setMenuOpen(false);
     setSelected(null);
-    setNotice({ text: sample ? t("Filling practice with the sample research…") : t("Starting practice over…") });
+    setNotice({ text: t("Starting practice over…") });
     try {
-      await api.practiceReset(sample, lang());
-      setNotice({ text: sample ? t("Practice now holds the fictional sample research. Look around freely.") : t("Practice is empty again.") });
-      if (space !== "practice") {
-        switchSpace("practice", false);  // from the first screen or the real record
-        return;
-      }
+      await api.practiceReset();
+      setNotice({ text: t("Practice is empty again.") });
       setProjectId("");
       setGraph(null);
       setMilestonesOnly(false);
@@ -208,31 +204,42 @@ export function App() {
     }
   }
 
-  // "See the example" (D-062), from either space: the sample in practice, with its tour from the
-  // first stop. Only the practice space is ever changed — and a practice space holding steps of the
-  // author's own is replaced only after they say so.
+  // "See the example" (D-064): the fictional FSF sample in a space of its own, with its tour from
+  // the first stop. Opening it never changes My research or practice.
   async function seeExample() {
     setMenuOpen(false);
     setDialog(null);
+    setTourStart((n) => n + 1);
+    if (space === "example") return;
+    setNotice({ text: t("Opening the example…") });
     try {
-      const state = await api.practiceState();
-      if (!state.sample && state.own_steps > 0) {
-        setDialog("example-confirm");
-        return;
-      }
-      await openExample(state.sample);
+      await api.exampleOpen(lang());
+      switchSpace("example");
     } catch (e) {
       setNotice({ text: (e as Error).message, kind: "error" });
     }
   }
 
-  async function openExample(alreadyThere: boolean) {
+  async function reloadExample() {
+    setMenuOpen(false);
     setDialog(null);
-    setTourStart((n) => n + 1);
-    if (!alreadyThere) {
-      await resetPractice(true);
-    } else if (space !== "practice") {
-      switchSpace("practice", false);
+    setSelected(null);
+    setNotice({ text: t("Loading the example afresh…") });
+    try {
+      await api.exampleReset(lang());
+      // The new example's status, its main project and the tour's restart all in one go: the tour
+      // of the example just replaced must not pick that example's (now gone) project.
+      const s = await api.status();
+      const main = s.sample?.projects.main ?? "";
+      setStatus(s);
+      setNotice({ text: t("The example is as it was at the start again.") });
+      setTourStart((n) => n + 1);
+      setGraph(null);
+      setMilestonesOnly(false);
+      if (main !== projectId) setProjectId(main);  // a new project loads everything again
+      else await reload();
+    } catch (e) {
+      setNotice({ text: (e as Error).message, kind: "error" });
     }
   }
 
@@ -308,15 +315,21 @@ export function App() {
   }, []);
 
   const practice = space === "practice";
+  const example = space === "example";
+  const sandbox = practice || example; // never the real record: saved directly, never backed up
   const spaceSwitch = (
     <div className="space-switch" role="group" aria-label={t("Space")}>
-      <button aria-pressed={!practice} className={!practice ? "on" : ""} onClick={() => switchSpace("real")}
+      <button aria-pressed={space === "real"} className={space === "real" ? "on" : ""} onClick={() => switchSpace("real")}
         data-testid="space-real">
         {t("My research")}
       </button>
       <button aria-pressed={practice} className={practice ? "on" : ""} onClick={() => switchSpace("practice")}
         data-testid="space-practice">
         {t("Practice")}
+      </button>
+      <button aria-pressed={example} className={example ? "on example" : ""} onClick={() => void seeExample()}
+        data-testid="space-example">
+        {t("Example")}
       </button>
     </div>
   );
@@ -369,7 +382,7 @@ export function App() {
   if (!status) return <div className="loading">{t("Loading…")}</div>;
   if (!status.initialized)
     return <Setup key={uiLang} onDone={reload} onPractice={() => switchSpace("practice")}
-      onSample={() => void resetPractice(true)} onLang={changeLang} />;
+      onSample={() => void seeExample()} onLang={changeLang} />;
 
   function projectCreated(id: string) {
     setDialog(null);
@@ -426,6 +439,8 @@ export function App() {
     const b = (await api.status()).backup;
     if (practice) {
       setNotice({ text: t("Saved in practice. It is not part of your real record.") });
+    } else if (example) {
+      setNotice({ text: t("Saved in the example. It is not part of your real record.") });
     } else if (b?.state === "paused") {
       setNotice({
         text: t("Saved. Automatic backup is paused since the restore — confirm the folder to resume it."),
@@ -488,7 +503,7 @@ export function App() {
             {t("Inbox ({n})", { n: status.inbox ?? 0 })}
           </button>
         )}
-        {!practice && <BackupPill status={status.backup} onClick={() => setDialog("backup")} />}
+        {!sandbox && <BackupPill status={status.backup} onClick={() => setDialog("backup")} />}
         <div className="menu-wrap" ref={menuRef}>
           <button className="ghost" aria-expanded={menuOpen} data-testid="settings-menu"
             onClick={() => setMenuOpen(!menuOpen)}>
@@ -511,8 +526,8 @@ export function App() {
               <button role="menuitem" onClick={checkProofs}>{t("Check stamps now")}</button>
               <button role="menuitem" onClick={() => openMenuItem("services")}>{t("Check stamp services…")}</button>
               <div className="menu-section" role="presentation">{t("Your data")}</div>
-              {!practice && <button role="menuitem" onClick={() => openMenuItem("backup")}>{t("Backup…")}</button>}
-              {!practice && (
+              {!sandbox && <button role="menuitem" onClick={() => openMenuItem("backup")}>{t("Backup…")}</button>}
+              {!sandbox && (
                 <button role="menuitem" onClick={() => openMenuItem("key")}>{t("Back up signing key only…")}</button>
               )}
               <button role="menuitem" onClick={() => openMenuItem("where")}>{t("Where is my data?")}</button>
@@ -520,7 +535,14 @@ export function App() {
                 <>
                   <div className="menu-section" role="presentation">{t("Practice")}</div>
                   <button role="menuitem" onClick={() => openMenuItem("practice-reset")}>{t("Start practice over…")}</button>
-                  <button role="menuitem" onClick={() => resetPractice(true)}>{t("Fill practice with sample research")}</button>
+                </>
+              )}
+              {example && (
+                <>
+                  <div className="menu-section" role="presentation">{t("Example")}</div>
+                  <button role="menuitem" onClick={() => void reloadExample()} data-testid="menu-example-reload">
+                    {t("Load the example afresh")}
+                  </button>
                 </>
               )}
               <div className="menu-section" role="presentation">{t("About")}</div>
@@ -593,7 +615,7 @@ export function App() {
           </button>
         </div>
       )}
-      {!practice && status.backup?.other_copy && status.backup.state !== "paused" && (
+      {!sandbox && status.backup?.other_copy && status.backup.state !== "paused" && (
         <div className="banner error small" data-testid="other-copy-banner">
           <span>
             {t("Another copy of this research (another {device}?) is also backing up into your backup folder. Use only one {device} to add steps.", { device: dev() })}
@@ -634,7 +656,15 @@ export function App() {
           </button>
         </div>
       )}
-      {space === "practice" && status.sample && (
+      {example && (
+        <div className="practice-banner example-banner" data-testid="example-banner">
+          {tx("<b>Example:</b> a fictional research, not yours. Look around and change anything — your real record and your practice are not touched.", { b: (x) => <b>{x}</b> })}
+          <button className="link small" onClick={() => switchSpace("real")}>
+            {t("Back to My research")}
+          </button>
+        </div>
+      )}
+      {example && status.sample && (
         <SampleTour key={status.installation ?? ""} sample={status.sample} onAction={tourStop}
           start={tourStart} onStarted={() => setTourStart(0)} />
       )}
@@ -659,7 +689,7 @@ export function App() {
               onAdd={openForm}
               onBackup={() => setDialog("backup")}
               space={space}
-              onSample={() => resetPractice(true)}
+              onSample={() => void seeExample()}
             />
           ) : view === "steps" && graph ? (
             <Steps graph={graph} rows={timeline} selected={selected} onSelect={setSelected} keyOnly={milestonesOnly}
@@ -766,21 +796,7 @@ export function App() {
       )}
       {dialog === "export" && (
         <ExportDialog rows={timeline} defaultTitle={project?.title ?? t("evidence")} onClose={() => setDialog(null)}
-          practice={practice} projectId={projectId} />
-      )}
-      {dialog === "example-confirm" && (
-        <div className="modal-backdrop" role="dialog" aria-modal="true" aria-label={t("See the example")}>
-          <div className="modal" data-testid="example-confirm">
-            <h2>{t("See the example")}</h2>
-            <p>{t("This replaces what is in the practice space. Your real record is not touched.")}</p>
-            <div className="actions">
-              <button className="secondary" onClick={() => setDialog(null)}>{t("Cancel")}</button>
-              <button className="primary" onClick={() => void openExample(false)} data-testid="example-confirm-yes">
-                {t("Replace practice and show the example")}
-              </button>
-            </div>
-          </div>
-        </div>
+          practice={practice} example={example} projectId={projectId} />
       )}
       {dialog === "practice-reset" && (
         <div className="modal-backdrop" role="dialog" aria-modal="true" aria-label={t("Start practice over")}>
@@ -793,7 +809,7 @@ export function App() {
               <button className="secondary" onClick={() => setDialog(null)}>
                 {t("Cancel")}
               </button>
-              <button className="primary" onClick={() => resetPractice(false)}>
+              <button className="primary" onClick={() => void resetPractice()}>
                 {t("Start over")}
               </button>
             </div>

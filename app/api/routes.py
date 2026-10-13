@@ -16,7 +16,7 @@ from app.config import MAX_UPLOAD_BYTES
 from app.i18n import tr, tr_message
 from app.services.context import AppContext
 from app.services.ledger import EntryInput, LedgerError, NotInitialized, UploadedFile
-from app.services.spaces import PRACTICE, REAL, SPACE_HEADER
+from app.services.spaces import EXAMPLE, PRACTICE, REAL, SPACE_HEADER
 from app.services.verification import report_json, result_json, verify_database
 from app.services.views import Snapshot, diff_view, graph_view, record_detail, timeline_view
 from provenance_core.records import NODE_TYPES, RELATION_TYPES
@@ -96,8 +96,9 @@ def status(request: Request):
         "keychain_denied": c.keystore.denied or real(request).keystore.denied,
         "data_dir_warning": _data_dir_warning(real(request)),
         "practice_dir": str(request.app.state.spaces.practice_dir),
-        # The practice space holds the FSF sample: its language and the ids of its steps (D-059).
-        "sample": request.app.state.spaces.sample_info() if space_name(request) == PRACTICE else None,
+        "example_dir": str(request.app.state.spaces.example_dir),
+        # The example holds the FSF sample: its language and the ids of its steps (D-059, D-064).
+        "sample": request.app.state.spaces.sample_info() if space_name(request) == EXAMPLE else None,
     }
 
 
@@ -124,28 +125,39 @@ def _data_dir_warning(c: AppContext) -> str | None:
     return data_dir_warning(c.settings.data_dir)
 
 
-class PracticeResetIn(BaseModel):
-    sample: bool = False  # fill the fresh practice space with the fictional FSF sample (D-059)
+class ExampleIn(BaseModel):
     lang: str = "en"  # the sample's language: the interface's
 
 
-@router.get("/practice/state")
-def practice_state(request: Request):
-    """For "See the example" (D-062): does practice hold the sample, or steps of the author's own?"""
-    return request.app.state.spaces.practice_state()
-
-
 @router.post("/practice/reset")
-def practice_reset(body: PracticeResetIn, request: Request):
-    """Start the practice space over. There is no such operation for the real record."""
+def practice_reset(request: Request):
+    """Start the practice space over, empty. There is no such operation for the real record."""
     from app.services.spaces import PracticeResetError
 
-    spaces = request.app.state.spaces
     try:
-        c = spaces.reset_practice(with_sample=body.sample, lang=body.lang)
+        c = request.app.state.spaces.reset_practice()
     except PracticeResetError as exc:
         raise HTTPException(409, str(exc)) from None
     return {"space": PRACTICE, "record_count": c.ledger.record_count()}
+
+
+@router.post("/example/open")
+def example_open(body: ExampleIn, request: Request):
+    """The example (D-064), loaded in the interface's language if this is its first opening."""
+    c = request.app.state.spaces.example(body.lang)
+    return {"space": EXAMPLE, "record_count": c.ledger.record_count()}
+
+
+@router.post("/example/reset")
+def example_reset(body: ExampleIn, request: Request):
+    """Load the example afresh, in the interface's language."""
+    from app.services.spaces import PracticeResetError
+
+    try:
+        c = request.app.state.spaces.reset_example(body.lang)
+    except PracticeResetError as exc:
+        raise HTTPException(409, str(exc)) from None
+    return {"space": EXAMPLE, "record_count": c.ledger.record_count()}
 
 
 class IdentityIn(BaseModel):

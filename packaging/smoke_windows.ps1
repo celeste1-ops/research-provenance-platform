@@ -49,11 +49,11 @@ try {
   if ($LASTEXITCODE -ne 0) { throw "verify.py rejected the bundle" }
   Write-Host "verify.py accepted the bundle"
 
-  # The sample research is in the app (D-059): practice fills with it, in Chinese here.
-  Invoke-RestMethod -Method Post "$base/api/practice/reset" -Headers $h -ContentType "application/json" -Body '{"sample":true,"lang":"zh"}' | Out-Null
-  $practice = Invoke-RestMethod "$base/api/status" -Headers @{ "X-RPROV-Space" = "practice" }
-  if ($practice.entry_count -ne 32) { throw "sample research missing: $($practice.entry_count) steps in practice" }
-  Write-Host "Sample research: $($practice.entry_count) steps in practice"
+  # The sample research is in the app (D-059): the example space opens with it, in Chinese here (D-064).
+  Invoke-RestMethod -Method Post "$base/api/example/open" -Headers $h -ContentType "application/json" -Body '{"lang":"zh"}' | Out-Null
+  $example = Invoke-RestMethod "$base/api/status" -Headers @{ "X-RPROV-Space" = "example" }
+  if ($example.entry_count -ne 32) { throw "sample research missing: $($example.entry_count) steps in the example" }
+  Write-Host "Sample research: $($example.entry_count) steps in the example"
 
   # Anthropic's SDK is in the app (D-061): a made-up key is refused by the service, or the service
   # cannot be reached; either way the app answers 400, not an internal error.

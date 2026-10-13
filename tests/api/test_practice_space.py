@@ -88,21 +88,77 @@ def test_start_practice_over(api, client, ctx):
     assert ctx.keystore.load(old) is None  # the old practice key is gone
     assert ctx.ledger.record_count() == real_count and ctx.keystore.load(ctx.ledger.installation) is not None
 
-    r = client.post("/api/practice/reset", json={"sample": True})
-    assert r.status_code == 200
-    st = client.get("/api/status", headers=P).json()
-    assert st["entry_count"] == 32 and "fictional" in st["author_label"]
-    assert ctx.ledger.record_count() == real_count
-    # The practice space remembers it holds the sample, for the tour (D-059); the real record does not.
+    assert client.get("/api/status", headers=P).json()["sample"] is None  # practice never holds the sample
+
+
+E = {"X-RPROV-Space": "example"}
+
+
+def test_the_example_is_a_space_of_its_own(api, client, ctx):
+    """D-064: the FSF sample in a third installation, loaded when first opened; practice and the real
+    record are never touched by it."""
+    api.init(author="Ada")
+    api.entry("Real step")
+    real = [r.id for r in ctx.ledger.records()]
+    practice_step = _practice_entry(client, "My own try")
+    assert not (ctx.settings.data_dir / "example").exists()
+
+    r = client.post("/api/example/open", json={"lang": "en"})
+    assert r.status_code == 200 and r.json() == {"space": "example", "record_count": r.json()["record_count"]}
+    st = client.get("/api/status", headers=E).json()
+    assert st["space"] == "example" and st["entry_count"] == 32 and "fictional" in st["author_label"]
+    assert st["data_dir"] == str(ctx.settings.data_dir / "example") == client.get("/api/status").json()["example_dir"]
+    installations = {st["installation"], client.get("/api/status", headers=P).json()["installation"],
+                     ctx.ledger.installation}
+    assert len(installations) == 3  # three keys, three installations
+    # The example remembers it holds the sample, for the tour (D-059); the other spaces do not.
     assert st["sample"]["lang"] == "en" and set(st["sample"]["projects"]) == {"main", "side"}
     assert client.get("/api/status").json()["sample"] is None
-    r = client.post("/api/practice/reset", json={"sample": True, "lang": "zh"})
-    st = client.get("/api/status", headers=P).json()
-    assert st["sample"]["lang"] == "zh" and st["author_label"] == "示例作者（虚构）"
-    titles = [p["title"] for p in client.get("/api/projects", headers=P).json()]
+    assert client.get("/api/status", headers=P).json()["sample"] is None
+    # Opening it again changes nothing; reloading it starts it afresh, in the language asked for.
+    first = st["installation"]
+    client.post("/api/example/open", json={"lang": "zh"})
+    assert client.get("/api/status", headers=E).json()["installation"] == first
+    client.post("/api/example/reset", json={"lang": "zh"})
+    st = client.get("/api/status", headers=E).json()
+    assert st["installation"] != first and st["sample"]["lang"] == "zh" and st["author_label"] == "示例作者（虚构）"
+    titles = [p["title"] for p in client.get("/api/projects", headers=E).json()]
     assert sorted(titles) == sorted(["FSF（示例）", "流道装置（示例）"])
-    client.post("/api/practice/reset", json={})
-    assert client.get("/api/status", headers=P).json()["sample"] is None  # empty practice: no tour
+    assert ctx.keystore.load(first) is None  # the old example key is gone
+
+    assert [r.id for r in ctx.ledger.records()] == real
+    assert client.get(f"/api/records/{practice_step}", headers=P).status_code == 200
+    assert [n["title"] for n in client.get("/api/graph", headers=P).json()["nodes"]] == ["My own try"]
+    spaces = client.app.state.spaces
+    assert len(spaces.anchor_services()) == 3  # stamps are checked in every space
+
+
+def test_a_practice_space_holding_the_old_sample_becomes_the_example(tmp_path):
+    """Up to v0.6.1 the sample was loaded into practice (D-059, D-062): on the first start of the new
+    version that practice space becomes the example, and practice starts empty."""
+    from app.services.spaces import Spaces
+    from tests.conftest import make_ctx
+
+    ctx = make_ctx(tmp_path)
+    ctx.ledger.init_identity("Ada")
+    old = Spaces(ctx)
+    old_practice = old.practice(auto_init=False)
+    from app.demo import load_sample
+
+    info = load_sample(old_practice, "en")
+    (old.practice_dir / "sample.json").write_text(__import__("json").dumps(info), encoding="utf-8")
+    installation = old_practice.ledger.installation
+    old.close()
+
+    new = Spaces(ctx)
+    assert not (ctx.settings.data_dir / "practice").exists()
+    example = new.example()
+    assert example.ledger.installation == installation and new.sample_info()["lang"] == "en"
+    assert sum(1 for r in example.ledger.records() if r.kind == "entry") == 32
+    practice = new.practice()
+    assert sum(1 for r in practice.ledger.records() if r.kind == "entry") == 0
+    new.close()
+    ctx.close()
 
 
 def test_reset_needs_the_session_token(client):
@@ -115,7 +171,7 @@ def test_stamp_checks_cover_both_spaces(api, client, ctx, force):
     api.init()
     _practice_entry(client)
     spaces = client.app.state.spaces
-    assert len(spaces.anchor_services()) == 2
+    assert len(spaces.anchor_services()) == 2  # the real record and practice: no example opened yet
     stats = spaces.refresh(force=force)
     assert set(stats) >= {"submitted", "upgraded", "still_pending"}
 
@@ -129,19 +185,3 @@ def test_start_over_reports_a_folder_it_cannot_delete(api, client, ctx, monkeypa
     monkeypatch.setattr(spaces_mod.time, "sleep", lambda s: None)
     r = client.post("/api/practice/reset", json={})
     assert r.status_code == 409 and "still in use" in r.text
-
-
-def test_what_see_the_example_needs_to_know(api, client, ctx):
-    """D-062: whether practice holds the sample or steps of the author's own — asked from the real
-    record, which it never changes, and without making a practice space that was not there."""
-    api.init(author="Ada")
-    api.entry("Real step")
-    real = [r.id for r in ctx.ledger.records()]
-    assert client.get("/api/practice/state").json() == {"sample": False, "own_steps": 0}
-    assert not (ctx.settings.data_dir / "practice").exists()
-    _practice_entry(client)
-    _practice_entry(client, "A second try")
-    assert client.get("/api/practice/state").json() == {"sample": False, "own_steps": 2}
-    client.post("/api/practice/reset", json={"sample": True})
-    assert client.get("/api/practice/state").json() == {"sample": True, "own_steps": 0}
-    assert [r.id for r in ctx.ledger.records()] == real

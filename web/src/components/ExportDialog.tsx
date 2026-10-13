@@ -66,10 +66,11 @@ interface Props {
   defaultTitle: string;
   onClose: () => void;
   practice?: boolean;
+  example?: boolean;
   projectId?: string;
 }
 
-export function ExportDialog({ rows, defaultTitle, onClose, practice = false, projectId = "" }: Props) {
+export function ExportDialog({ rows, defaultTitle, onClose, practice = false, example = false, projectId = "" }: Props) {
   const entries = rows.filter((r) => r.kind === "entry");
   const [title, setTitle] = useState(defaultTitle);
   const [levels, setLevels] = useState<Record<string, Level>>(() =>
@@ -158,6 +159,11 @@ export function ExportDialog({ rows, defaultTitle, onClose, practice = false, pr
         {practice && (
           <p className="warning">
             {t("This is practice: the package is signed with the practice key and is not part of your real record.")}
+          </p>
+        )}
+        {example && (
+          <p className="warning">
+            {t("This is the fictional example: the package is signed with the example's key and is not part of your real record.")}
           </p>
         )}
         <p className="note">

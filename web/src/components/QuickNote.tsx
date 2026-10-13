@@ -70,7 +70,7 @@ export function QuickNote({ projects, projectId, onClose, onSaved }: {
         <p className="note">
           {getSpace() === "real"
             ? t("Saved as a note in My research, with its date stamps. It can't be changed or deleted afterwards — later you can add to it.")
-            : t("Saved as a note in the practice space.")}
+            : getSpace() === "example" ? t("Saved as a note in the example.") : t("Saved as a note in the practice space.")}
         </p>
         <div className="actions">
           <button className="secondary" onClick={onClose}>{t("Cancel")}</button>

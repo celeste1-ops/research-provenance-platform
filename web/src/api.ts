@@ -35,7 +35,7 @@ function sessionToken(): string {
 
 // Which space this page works in (DECISIONS D-038). Every request says so explicitly, so a
 // tab always saves where it shows it saves, whatever another tab does.
-export type Space = "real" | "practice";
+export type Space = "real" | "practice" | "example";
 let currentSpace: Space = "real";
 
 export function setSpace(space: Space) {
@@ -49,15 +49,19 @@ export function getSpace(): Space {
 // Every request names the space and the interface language (texts the server writes, D-046).
 function spaceHeaders(): Record<string, string> {
   const h: Record<string, string> = { "X-RPROV-Lang": lang() };
-  if (currentSpace === "practice") h["X-RPROV-Space"] = "practice";
+  if (currentSpace !== "real") h["X-RPROV-Space"] = currentSpace;
   return h;
 }
 
 type ExportBody = { title: string; records: Record<string, string>; default: string; language?: string };
 
 /** Every step of a project as a table (CSV) — a plain link, so the download is the browser's own. */
+function spaceQuery(): string {
+  return currentSpace === "real" ? "" : `&space=${currentSpace}`;
+}
+
 export function tableUrl(projectId: string): string {
-  const space = currentSpace === "practice" ? "&space=practice" : "";
+  const space = spaceQuery();
   return `/api/export/table?project=${encodeURIComponent(projectId)}&lang=${lang()}${space}`;
 }
 
@@ -67,13 +71,13 @@ export function tableTemplateUrl(): string {
 
 // For plain links (attachments), which cannot carry a header.
 export function contentUrl(id: string, file: string): string {
-  const space = currentSpace === "practice" ? "&space=practice" : "";
+  const space = spaceQuery();
   return `/api/records/${id}/content?file=${encodeURIComponent(file)}${space}`;
 }
 
 /** An attached image, or the start of a text file, as the app may show it (D-057). */
 export function previewUrl(id: string, file: string): string {
-  const space = currentSpace === "practice" ? "&space=practice" : "";
+  const space = spaceQuery();
   return `/api/records/${id}/preview?file=${encodeURIComponent(file)}${space}`;
 }
 
@@ -280,9 +284,10 @@ export const api = {
   },
   exportBundle: (body: { title: string; records: Record<string, string>; default: string; language?: string }) =>
     request<Blob>("POST", "/api/export", body),
-  practiceReset: (sample: boolean, lang?: string) =>
-    request<{ space: string; record_count: number }>("POST", "/api/practice/reset", { sample, lang }),
-  practiceState: () => request<{ sample: boolean; own_steps: number }>("GET", "/api/practice/state"),
+  practiceReset: () => request<{ space: string; record_count: number }>("POST", "/api/practice/reset", {}),
+  // The example (D-064): the FSF sample in a space of its own, loaded when first opened.
+  exampleOpen: (lang: string) => request<{ space: string; record_count: number }>("POST", "/api/example/open", { lang }),
+  exampleReset: (lang: string) => request<{ space: string; record_count: number }>("POST", "/api/example/reset", { lang }),
 };
 
 export async function downloadRequest(path: string, body: unknown) {

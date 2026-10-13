@@ -1044,3 +1044,35 @@ verification rules or what leaves the machine for time proofs.
      the cost is that someone who already holds the very same file could confirm to the stamping
      service that it existed. Changing it would mean a different check for those files in
      VERIFY.md and verify.py; for this version it stays as D-049 decided.
+
+- **D-064 · Three spaces: My research, Practice and the Example.** Asked for after v0.6.1: with the
+  sample research in the practice space, its author could no longer tell their own FSF steps from
+  the sample's, nor whether looking at the example would undo their practice. So the sample has a
+  space of its own. This replaces D-062 2–4 and the sample part of D-059's practice space.
+  1. *Three spaces, side by side in the switch.* My research (正式记录) is the real record.
+     Practice (练习区) holds only what the author tries out, and starts empty. The Example (示例)
+     holds the fictional FSF sample research and nothing else. Each is its own installation in its
+     own folder (`<data folder>/practice`, `<data folder>/example`) with its own database, files
+     and signing key; the real record is never written by the other two, and neither of them is
+     ever backed up.
+  2. *Told apart at a glance.* The example has its own colour (purple; practice keeps its orange)
+     and a banner: "Example: a fictional research, not yours. Look around and change anything —
+     your real record and your practice are not touched", with a way back to My research. Forms
+     and notes in it say "Add a step to the example", "Save in the example".
+  3. *Getting there.* "See a finished example first" on the first screen, the links on an empty
+     record or empty practice, Settings → "See the example" and the switch itself all just switch
+     to the example. The first time, the sample is put there in the interface's language
+     (`POST /api/example/open`); after that it is shown as it is, and the tour starts from its
+     first stop, even if it was put away before. Nothing is ever asked: nothing of the author's can
+     be replaced.
+  4. *Starting over.* Practice: "Start practice over…" empties it, as before; "Fill practice with
+     sample research" is gone. Example: "Load the example afresh" puts the sample back as it was at
+     the start (`POST /api/example/reset`, a new installation), without asking — whatever was
+     changed there was the author trying the example out. `GET /api/practice/state` is gone.
+  5. *Coming from an older version.* A practice space that held the sample (it has a
+     `sample.json`) becomes the example on first start, folder and all; practice then starts
+     empty. Practice of the author's own stays practice, and the real record is not touched.
+  6. *No accounts.* As before, there is no account and nothing to sign out of: the app keeps one
+     author's records on this computer, under this computer's user account, with one signing key.
+     Someone else on the same computer uses their own computer user account, which has its own
+     data folder and keychain.
