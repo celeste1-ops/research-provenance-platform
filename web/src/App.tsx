@@ -27,7 +27,7 @@ import { LangSwitch } from "./components/LangSwitch";
 import { GearIcon, ListIcon, LogoMark, MapIcon, NoteIcon, PlusIcon, ShareIcon, StoryIcon } from "./components/Icons";
 
 type Dialog = null | "form" | "export" | "backup" | "key" | "where" | "tech" | "services" | "practice-reset" | "new-project" | "git"
-  | "quick" | "folders" | "inbox" | "import";
+  | "quick" | "folders" | "inbox" | "import" | "example-confirm";
 const QUICK_NOTE_HASH = "#quick-note"; // the menu bar / tray icon opens the page with it (D-047)
 const SPACE_KEY = "rprov-space";
 const TIPS_KEY = "rprov-tips-hidden"; // the person clicked "Got it" on the how-to line
@@ -87,6 +87,7 @@ export function App() {
   const [stepsTable, setStepsTable] = useState(false);
   const [milestonesOnly, setMilestonesOnly] = useState(false);
   const [notice, setNotice] = useState<Notice | null>(null);
+  const [tourStart, setTourStart] = useState(0); // "See the example" asked for the tour (D-062)
   const [menuOpen, setMenuOpen] = useState(false);
   const [uiLang, setUiLang] = useState<Lang>(lang);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -204,6 +205,34 @@ export function App() {
       await reload();
     } catch (e) {
       setNotice({ text: (e as Error).message, kind: "error" });
+    }
+  }
+
+  // "See the example" (D-062), from either space: the sample in practice, with its tour from the
+  // first stop. Only the practice space is ever changed — and a practice space holding steps of the
+  // author's own is replaced only after they say so.
+  async function seeExample() {
+    setMenuOpen(false);
+    setDialog(null);
+    try {
+      const state = await api.practiceState();
+      if (!state.sample && state.own_steps > 0) {
+        setDialog("example-confirm");
+        return;
+      }
+      await openExample(state.sample);
+    } catch (e) {
+      setNotice({ text: (e as Error).message, kind: "error" });
+    }
+  }
+
+  async function openExample(alreadyThere: boolean) {
+    setDialog(null);
+    setTourStart((n) => n + 1);
+    if (!alreadyThere) {
+      await resetPractice(true);
+    } else if (space !== "practice") {
+      switchSpace("practice", false);
     }
   }
 
@@ -404,6 +433,16 @@ export function App() {
       });
     } else if (b?.state === "ok") {
       setNotice({ text: t("Saved. It gets its date stamp in a few seconds and goes into the next automatic backup.") });
+    } else if (b?.state === "same-disk" && b.where?.kind === "same-disk") {
+      setNotice({
+        text: t("Saved. It goes into the next automatic backup — but the backup folder is on this {device} only, so it won't help if the {device} is lost.", { device: dev() }),
+        action: { label: t("Review backup"), onClick: () => setDialog("backup") },
+      });
+    } else if (b?.configured) {
+      setNotice({
+        text: t("Saved. Automatic backup needs a look — open Backup to see why."),
+        action: { label: t("Review backup"), onClick: () => setDialog("backup") },
+      });
     } else {
       setNotice({
         text: t("Saved. Automatic backup is not set up yet — if this {device} is lost, this step would be lost too.", { device: dev() }),
@@ -485,6 +524,7 @@ export function App() {
                 </>
               )}
               <div className="menu-section" role="presentation">{t("About")}</div>
+              <button role="menuitem" onClick={() => void seeExample()} data-testid="menu-example">{t("See the example")}</button>
               <button role="menuitem" onClick={() => openMenuItem("tech")}>{t("Technical details")}</button>
             </div>
           )}
@@ -594,7 +634,10 @@ export function App() {
           </button>
         </div>
       )}
-      {space === "practice" && status.sample && <SampleTour key={status.installation ?? ""} sample={status.sample} onAction={tourStop} />}
+      {space === "practice" && status.sample && (
+        <SampleTour key={status.installation ?? ""} sample={status.sample} onAction={tourStop}
+          start={tourStart} onStarted={() => setTourStart(0)} />
+      )}
       <main className={`main ${selected ? "with-detail" : ""}`}>
         <section className="canvas">
           {!empty && !tipsHidden && (
@@ -724,6 +767,20 @@ export function App() {
       {dialog === "export" && (
         <ExportDialog rows={timeline} defaultTitle={project?.title ?? t("evidence")} onClose={() => setDialog(null)}
           practice={practice} projectId={projectId} />
+      )}
+      {dialog === "example-confirm" && (
+        <div className="modal-backdrop" role="dialog" aria-modal="true" aria-label={t("See the example")}>
+          <div className="modal" data-testid="example-confirm">
+            <h2>{t("See the example")}</h2>
+            <p>{t("This replaces what is in the practice space. Your real record is not touched.")}</p>
+            <div className="actions">
+              <button className="secondary" onClick={() => setDialog(null)}>{t("Cancel")}</button>
+              <button className="primary" onClick={() => void openExample(false)} data-testid="example-confirm-yes">
+                {t("Replace practice and show the example")}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
       {dialog === "practice-reset" && (
         <div className="modal-backdrop" role="dialog" aria-modal="true" aria-label={t("Start practice over")}>

@@ -129,6 +129,12 @@ class PracticeResetIn(BaseModel):
     lang: str = "en"  # the sample's language: the interface's
 
 
+@router.get("/practice/state")
+def practice_state(request: Request):
+    """For "See the example" (D-062): does practice hold the sample, or steps of the author's own?"""
+    return request.app.state.spaces.practice_state()
+
+
 @router.post("/practice/reset")
 def practice_reset(body: PracticeResetIn, request: Request):
     """Start the practice space over. There is no such operation for the real record."""

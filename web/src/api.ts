@@ -282,6 +282,7 @@ export const api = {
     request<Blob>("POST", "/api/export", body),
   practiceReset: (sample: boolean, lang?: string) =>
     request<{ space: string; record_count: number }>("POST", "/api/practice/reset", { sample, lang }),
+  practiceState: () => request<{ sample: boolean; own_steps: number }>("GET", "/api/practice/state"),
 };
 
 export async function downloadRequest(path: string, body: unknown) {

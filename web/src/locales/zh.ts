@@ -722,4 +722,10 @@ export const ZH: Record<string, string> = {
   "Only those fingerprints — unless you click for more: downloading a repository you named, putting a bundle into a repository or onto Zenodo, or sending the story's sentences to an online AI service after you have seen them. Every send to an AI service is listed under <b>What was sent</b> in the AI summary.": "只有上面说的指纹——除非你点了别的：下载你指定的仓库、把证据包放进仓库或 Zenodo，或者在看过之后把研究经过的句子发给在线 AI 服务。每一次发给 AI 服务的内容，都列在 AI 总结里的<b>发送记录</b>中。",
   "First look at what would be sent (nothing is sent)…": "先看看会发送哪些内容（不会发送）…",
   "This is what would be sent — {n} characters. Nothing has been sent; connect a service above to send it.": "下面就是会发送的内容，共 {n} 个字符。现在什么都没有发出去；要发送，请先在上面连接一个服务。",
+  // the example from Settings, and backup notices (D-062)
+  "Saved. It goes into the next automatic backup — but the backup folder is on this {device} only, so it won't help if the {device} is lost.": "已保存，会进入下一次自动备份——但备份文件夹也在这台{device}上，{device}丢了或坏了时帮不上忙。",
+  "Saved. Automatic backup needs a look — open Backup to see why.": "已保存。自动备份需要你看一下——打开「备份」看看原因。",
+  "See the example": "看示例",
+  "This replaces what is in the practice space. Your real record is not touched.": "这会替换练习区里的内容。你「正式记录」里的内容不会受影响。",
+  "Replace practice and show the example": "替换练习区，打开示例",
 };

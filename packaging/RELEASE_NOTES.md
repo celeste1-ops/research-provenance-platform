@@ -1,4 +1,12 @@
-## What's in this version (v0.6.0)
+## What's in this version (v0.6.1)
+
+**New in v0.6.1**
+- **See the example, any time.** Settings → **See the example** opens the fictional FSF sample research with its tour from the first stop, from My research or from practice. If practice holds steps of your own, it asks before replacing them. Your real record is never touched.
+
+**Fixed in v0.6.1**
+- A line of the app's own source code ("// Files can be dropped anywhere on the form…") no longer shows on top of the "Add a step" form and under the save confirmation.
+- Putting an evidence bundle into a repository the app is recording no longer adds that commit as a permanent step.
+- After saving a step, the note now says when the backup folder is only on this computer, instead of "automatic backup is not set up".
 
 **New in v0.6.0**
 - **An online AI can write the summary, if you want.** In the Story tab, the AI summary now has two tabs: "On this computer" (as before, the default) and "Online AI service" — Claude (Anthropic), ChatGPT (OpenAI), Gemini (Google), DeepSeek, Qwen (Alibaba Cloud), or another service with the common chat API. (In mainland China, DeepSeek and Qwen are usually the ones that can be reached.) Connect once with an API key of your own from the service's website; it stays in your system keychain and goes only to that service, which charges the summaries to your account.

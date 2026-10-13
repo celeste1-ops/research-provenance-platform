@@ -129,3 +129,19 @@ def test_start_over_reports_a_folder_it_cannot_delete(api, client, ctx, monkeypa
     monkeypatch.setattr(spaces_mod.time, "sleep", lambda s: None)
     r = client.post("/api/practice/reset", json={})
     assert r.status_code == 409 and "still in use" in r.text
+
+
+def test_what_see_the_example_needs_to_know(api, client, ctx):
+    """D-062: whether practice holds the sample or steps of the author's own — asked from the real
+    record, which it never changes, and without making a practice space that was not there."""
+    api.init(author="Ada")
+    api.entry("Real step")
+    real = [r.id for r in ctx.ledger.records()]
+    assert client.get("/api/practice/state").json() == {"sample": False, "own_steps": 0}
+    assert not (ctx.settings.data_dir / "practice").exists()
+    _practice_entry(client)
+    _practice_entry(client, "A second try")
+    assert client.get("/api/practice/state").json() == {"sample": False, "own_steps": 2}
+    client.post("/api/practice/reset", json={"sample": True})
+    assert client.get("/api/practice/state").json() == {"sample": True, "own_steps": 0}
+    assert [r.id for r in ctx.ledger.records()] == real

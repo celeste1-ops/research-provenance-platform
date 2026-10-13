@@ -42,6 +42,7 @@ from app.services.gitrepo import (
     strip_credentials,
 )
 from app.services.ledger import EntryInput, LedgerError, UploadedFile
+from app.services.publish import is_bundle_commit
 from provenance_core.jcs import parse_json_strict
 
 log = logging.getLogger("rprov.git")
@@ -327,8 +328,11 @@ class GitSources:
                 head = repo.head(source["branch"])
                 if head is None:
                     raise GitError("this branch has no commits yet")
-                commits = repo.commits(head)
-                if not history:  # start from where the code stands now
+                commits = [c for c in repo.commits(head) if not is_bundle_commit(c.subject, c.body)]
+                if not commits:  # only evidence bundles the app put there itself
+                    self._update(source_id, last_commit=head)
+                    batches = []
+                elif not history:  # start from where the code stands now
                     self._busy[source_id] = {"done": 0, "total": 1}
                     self._record_commit(source, repo, commits[-1], milestone=commits[-1].sha in repo.tags())
                     batches = []
@@ -401,6 +405,12 @@ class GitSources:
         except GitError:  # the last recorded commit no longer exists (history was rewritten)
             new = repo.commits(head)[-1:]
         if not new:  # the branch moved back to an older commit
+            self._update(source["id"], last_commit=head)
+            return 0
+        # An evidence bundle the app committed itself (Share → into a repository, D-060) is not a
+        # step of the research: recording it would add a permanent step nobody made.
+        new = [c for c in new if not is_bundle_commit(c.subject, c.body)]
+        if not new:
             self._update(source["id"], last_commit=head)
             return 0
         done = self._already_recorded(source)

@@ -110,6 +110,18 @@ class Spaces:
             return None
         return data if isinstance(data, dict) else None
 
+    def practice_state(self) -> dict:
+        """What "See the example" needs to know (D-062): whether practice holds the sample, and how
+        many steps it holds otherwise — the author's own, which loading the sample would replace.
+        Only the practice space is looked at; a practice space that does not exist is not made."""
+        if self.sample_info() is not None:
+            return {"sample": True, "own_steps": 0}
+        if not self.practice_dir.exists():
+            return {"sample": False, "own_steps": 0}
+        ledger = self.practice(auto_init=False).ledger
+        steps = sum(1 for r in ledger.records() if r.kind == "entry") if ledger.initialized() else 0
+        return {"sample": False, "own_steps": steps}
+
     def reset_practice(self, *, with_sample: bool = False, lang: str = "en") -> AppContext:
         """Throw the practice space away and start a fresh one (optionally with the sample, in
         the interface's language)."""
