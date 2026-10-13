@@ -156,11 +156,16 @@ class Spaces:
         sample in that language, loaded the first time it is opened."""
         name = self._example(lang or i18n.current())
         with self._lock:
+            if self.folder(name).exists() and not (self.folder(name) / SAMPLE_FILE).is_file():
+                # A load that never finished (the app was quit meanwhile): start it again.
+                log.info("the example in %s was not loaded completely: loading it again", name)
+                self._throw_away(name)
             ctx = self._context(name)
             if not ctx.ledger.initialized():
                 from app.demo import load_sample
 
-                info = load_sample(ctx, name.rsplit("/", 1)[1])
+                with ctx.anchors.deferred():  # its stamps are asked for afterwards (submit_queued)
+                    info = load_sample(ctx, name.rsplit("/", 1)[1])
                 (self.folder(name) / SAMPLE_FILE).write_text(json.dumps(info, indent=1), encoding="utf-8")
             return ctx
 
@@ -235,6 +240,10 @@ class Spaces:
             if c.inbox.has_folders() or c.inbox.count():
                 found += c.inbox.scan()
         return found
+
+    def submit_queued(self) -> int:
+        """Every minute: the stamps a space only queued (the example's, loaded in one go)."""
+        return sum(c.anchors.submit_queued() for c in self._contexts())
 
     def refresh(self, force: bool = False) -> dict[str, int]:
         """Hourly job: check stamps in every space."""

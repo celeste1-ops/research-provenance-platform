@@ -1,11 +1,11 @@
 import { useEffect, useState } from "react";
 import { api, contentUrl, previewText, previewUrl, type Space } from "../api";
-import type { GraphNode, PreviewKind, RecordDetail } from "../types";
+import type { GraphNode, PreviewKind, RecordDetail, Translation as TranslationResult } from "../types";
 import { Changes } from "./Changes";
 import { LaterActions, WithdrawRelation } from "./LaterActions";
 import { Markdown } from "./Markdown";
 import { referenceHref, stampName } from "../labels";
-import { t, tx } from "../i18n";
+import { lang, t, tx } from "../i18n";
 import { ProofLine } from "./ProofBadge";
 
 interface Props {
@@ -58,6 +58,69 @@ function FilePreview({ id, name, kind }: { id: string; name: string; kind: Previ
     );
   }
   return <span className="muted"> · {t("open it with the program it belongs to")}</span>;
+}
+
+// Is the text mostly in the other language than the interface's? (A Chinese character stands for
+// about as much as a short word, a few Latin letters.)
+function inOtherLanguage(text: string, uiLang: string): boolean {
+  const cjk = (text.match(/[\u3400-\u9fff]/g) ?? []).length;
+  const latin = (text.match(/[A-Za-z]/g) ?? []).length;
+  if (cjk + latin === 0) return false;
+  const chinese = cjk * 3 >= latin;
+  return uiLang === "zh" ? !chinese : chinese;
+}
+
+/** A translation by the model on this computer, beside the original (D-066). It is never saved: the
+ * original alone is the record, signed and stamped as written. */
+function Translation({ id, original }: { id: string; original: string }) {
+  const [busy, setBusy] = useState(false);
+  const [result, setResult] = useState<TranslationResult | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const into = lang();
+  if (!inOtherLanguage(original, into)) return null;
+
+  async function run() {
+    setBusy(true);
+    setError(null);
+    try {
+      setResult(await api.translate(id, into));
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (!result)
+    return (
+      <div className="translate-row" data-testid="translate">
+        <button className="secondary small" onClick={() => void run()} disabled={busy} data-testid="translate-run">
+          {busy ? t("Translating on this computer…") : into === "zh" ? t("Translate into Chinese") : t("Translate into English")}
+        </button>
+        {busy && <span className="muted small">{t("A local model can take a minute.")}</span>}
+        {error && (
+          <p className="error small" data-testid="translate-error">
+            {error} {t("A translation needs an AI model running on this computer, as the AI summary in the Story tab does.")}
+          </p>
+        )}
+      </div>
+    );
+  return (
+    <section className="translation" data-testid="translation">
+      <h3 className="src-tag">{t("Translation — not part of the record")}</h3>
+      <h4>{result.title}</h4>
+      {result.text && (
+        <div className="body-view">
+          <Markdown text={result.text} />
+        </div>
+      )}
+      {result.shortened && <p className="muted small">{t("Only the beginning of this long text was translated.")}</p>}
+      <p className="muted small">
+        {t("Translated by {model} on this computer, now. Only the original is signed and stamped; this translation is not saved.", { model: result.model })}
+      </p>
+      <button className="link small" onClick={() => setResult(null)}>{t("Hide translation")}</button>
+    </section>
+  );
 }
 
 function Lightbox({ src, name, onClose }: { src: string; name: string; onClose: () => void }) {
@@ -120,6 +183,10 @@ export function Detail({ id, version, onClose, onSelect, entries, relationTypes,
           ✕
         </button>
       </header>
+
+      {detail.kind === "entry" && (
+        <Translation key={`${detail.id}-${lang()}`} id={detail.id} original={`${v.title ?? ""}\n${body ?? ""}`} />
+      )}
 
       <section className="src src-verified" data-source="verified" data-testid="section-verified">
         <h3 className="src-tag">{t("Verified record")}</h3>

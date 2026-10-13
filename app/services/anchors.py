@@ -10,6 +10,7 @@ from __future__ import annotations
 import logging
 import threading
 import time
+from contextlib import contextmanager
 from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import select
@@ -48,6 +49,7 @@ class AnchorService:
         self.providers = providers  # {"tsa": provider|None, "btc": provider|None}
         self._lock = threading.Lock()
         self._unreachable_at: dict[str, float] = {}  # kind -> time.monotonic() of the last failure
+        self._deferred = False  # see deferred()
 
     def recently_unreachable(self, kind: str) -> bool:
         at = self._unreachable_at.get(kind)
@@ -57,6 +59,37 @@ class AnchorService:
         return {k: p for k, p in self.providers.items() if p is not None}
 
     # ------------------------------------------------------------------ submit
+
+    @contextmanager
+    def deferred(self):
+        """Records made inside only queue their proofs. For many records made at once (the sample
+        research, D-065): nobody waits for a stamping service once per record, which over a slow
+        connection took minutes; ``submit_queued`` asks for them afterwards."""
+        self._deferred = True
+        try:
+            yield
+        finally:
+            self._deferred = False
+
+    def submit_queued(self) -> int:
+        """Ask for the proofs that were only queued, one at a time, so that a step saved meanwhile
+        does not wait for all of them. Returns how many were asked for."""
+        with self.sessions() as s:
+            rows = [(r.record_id, r.provider) for r in s.scalars(
+                select(AnchorRow).where(AnchorRow.status == "pending", AnchorRow.attempts == 0))]
+        asked = 0
+        for record_id, kind in rows:
+            if kind not in self.enabled() or self.recently_unreachable(kind):
+                continue
+            with self._lock:
+                with self.sessions() as s:
+                    row = s.scalar(select(AnchorRow).where(AnchorRow.record_id == record_id, AnchorRow.provider == kind))
+                    if row is None or row.attempts:  # asked for meanwhile (a refresh)
+                        continue
+                    manifest = s.get(RecordRow, record_id).manifest_bytes
+                self._attempt(record_id, kind, manifest)
+            asked += 1
+        return asked
 
     def submit_for(self, record_id: str) -> None:
         """Request every enabled kind of proof for a freshly committed record."""
@@ -77,6 +110,8 @@ class AnchorService:
                             updated_local=_iso(_now()),
                         )
                         s.add(row)
+            if self._deferred:
+                return  # queued: submit_queued or the next refresh asks for it
             for kind in self.enabled():
                 if self.recently_unreachable(kind):
                     log.info("%s service unreachable a moment ago: not waiting for it; it is retried later", kind)

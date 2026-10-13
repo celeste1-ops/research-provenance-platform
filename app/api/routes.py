@@ -449,6 +449,32 @@ def _rfc5987(name: str) -> str:
     return quote(name, safe="")
 
 
+class TranslateIn(BaseModel):
+    lang: str = "en"
+    url: str = ""
+    model: str = ""
+
+
+@router.post("/records/{record_id}/translation")
+def record_translation(record_id: str, body: TranslateIn, request: Request):
+    """A step's title and text translated by the model on this computer (D-066): shown beside the
+    original, marked as a translation, never saved."""
+    from app import preferences
+    from app.i18n import normalize
+    from app.services import translate
+    from provenance_core.providers.local_ai import DEFAULT_URL, LocalAIError
+
+    found = translate.source(ctx(request).ledger, record_id)
+    if found is None:
+        raise HTTPException(404, "no such record")
+    prefs = preferences.load(real(request).settings.data_dir)
+    try:
+        return translate.translate(body.url or prefs.get("ai_url") or DEFAULT_URL, body.model or prefs.get("ai_model") or "",
+                                   *found, normalize(body.lang))
+    except LocalAIError as exc:
+        raise HTTPException(400, str(exc)) from None
+
+
 @router.get("/records/{record_id}/diff")
 def get_diff(record_id: str, against: str, request: Request):
     c = ctx(request)

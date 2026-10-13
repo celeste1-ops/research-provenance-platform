@@ -252,3 +252,52 @@ def test_start_over_reports_a_folder_it_cannot_delete(api, client, ctx, monkeypa
     monkeypatch.setattr(spaces_mod.time, "sleep", lambda s: None)
     r = client.post("/api/practice/reset", json={})
     assert r.status_code == 409 and "still in use" in r.text
+
+
+def test_the_example_opens_without_waiting_for_stamping_services(tmp_path):
+    """D-065: loading the sample asked a stamping service once per step and waited for it — over a
+    slow connection the example then took minutes to open (the window showed "Loading…"). Its
+    stamps are now only queued, and asked for afterwards, one at a time."""
+    from app.services.spaces import Spaces
+    from provenance_core.providers.mock import MockProvider
+    from tests.conftest import make_ctx
+
+    class Slow(MockProvider):
+        calls = 0
+
+        def submit(self, record_id, manifest):
+            Slow.calls += 1
+            return super().submit(record_id, manifest)
+
+    ctx = make_ctx(tmp_path, tsa=Slow("tsa"), btc=Slow("btc"))
+    spaces = Spaces(ctx)
+    example = spaces.example("zh")
+    assert Slow.calls == 0  # nothing waited for
+    records = example.ledger.record_count()
+    assert spaces.submit_queued() == 2 * records and Slow.calls == 2 * records  # every record, both stamps
+    assert spaces.submit_queued() == 0  # asked for once
+    spaces.close()
+    ctx.close()
+
+
+def test_an_example_left_half_loaded_is_loaded_again(tmp_path):
+    """The app quit while a copy of the sample was being loaded: that copy has some of its steps and
+    no sample.json. It is loaded again, whole, instead of staying half there without its tour."""
+    from app.services.spaces import Spaces
+    from tests.conftest import make_ctx
+
+    ctx = make_ctx(tmp_path)
+    spaces = Spaces(ctx)
+    half = spaces._context("example/en")
+    half.ledger.init_identity("Sample author (fictional)")
+    half.ledger.create_project("FSF (sample)")
+    first = half.ledger.installation
+    spaces.close()
+
+    spaces = Spaces(ctx)
+    example = spaces.example("en")
+    assert example.ledger.installation != first and spaces.sample_info("en")["lang"] == "en"
+    assert sum(1 for r in example.ledger.records() if r.kind == "entry") == 32
+    assert ctx.keystore.load(first) is None
+    spaces.close()
+    ctx.close()

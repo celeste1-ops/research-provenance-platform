@@ -22,6 +22,7 @@ import type {
   Status,
   TablePreview,
   TimelineRow,
+  Translation,
   ZenodoDraft,
   ZenodoStatus,
 } from "./types";
@@ -179,6 +180,9 @@ export const api = {
   timeline: (project?: string) =>
     request<TimelineRow[]>("GET", `/api/timeline${project ? `?project=${encodeURIComponent(project)}` : ""}`),
   record: (id: string) => request<RecordDetail>("GET", `/api/records/${id}`),
+  // A step translated by the model on this computer, never saved (D-066).
+  translate: (id: string, lang: string) =>
+    request<Translation>("POST", `/api/records/${id}/translation`, { lang }),
   aiSettings: () => request<{ url: string; model: string; cloud: CloudStatus }>("GET", "/api/ai"),
   cloudConnect: (provider: CloudProvider, key: string, url: string) =>
     request<CloudStatus & { models: string[] }>("POST", "/api/ai/cloud", { provider, key, url }),

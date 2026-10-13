@@ -393,3 +393,14 @@ export type CloudLogEntry = {
   system: string;
   user: string;
 };
+
+/** A step's title and text translated by the model on this computer (DECISIONS D-066): shown beside
+ * the original, never saved, never a record. */
+export interface Translation {
+  title: string;
+  text: string;
+  model: string;
+  url: string;
+  lang: string;
+  shortened: boolean;
+}

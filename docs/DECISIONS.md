@@ -1104,3 +1104,33 @@ verification rules or what leaves the machine for time proofs.
   4. *Moving from older layouts.* A practice space holding the sample (up to v0.6.1) becomes the
      example in the sample's language; the single `example` folder of the v0.7.0 trial build moves
      into its language's folder.
+  5. *Opening it does not wait for the stamping services.* A trial on a Mac stayed on "Loading…":
+     the window had been left in the example, and loading a copy of the sample asked the stamping
+     services for each of its ~40 records in turn and waited for each answer — over a slow
+     connection, minutes. Records made while the sample is loaded now only queue their stamps
+     (`AnchorService.deferred`); every minute the background job asks for queued stamps, one at a
+     time (`submit_queued`), as does the hourly check. Loading a copy takes a few seconds. The
+     loading screen says "Opening the example…" there, and if the first answer fails it says what
+     went wrong, with Try again and a way back to My research; after twelve seconds it mentions the
+     system's keychain question, which an app without a developer signature gets after an upgrade.
+     A copy whose loading never finished (the app was quit meanwhile: it has no `sample.json`) is
+     thrown away and loaded again when next opened, instead of staying half there without its tour.
+
+- **D-066 · A translation beside the original, by the model on this computer.** Asked for with
+  D-065: the author's words are never translated in place, but a reader may want to know what a
+  step in the other language says.
+  1. *Where.* In a step's panel, when its title and text are mostly in the other language than the
+     interface's, a button "Translate into Chinese" / "Translate into English". The translation
+     appears under the title, in a box of its own marked "Translation — not part of the record",
+     with the model that made it and "Only the original is signed and stamped; this translation is
+     not saved". "Hide translation" closes it.
+  2. *Only on this computer.* The model is the local one of the AI summary (D-050), at the address
+     and with the model chosen there; with none chosen yet, the first model of the local server
+     that writes text. Nothing goes to an online service: those are never given a step's text
+     (D-061). Without a local model the panel says so and points to the AI summary.
+  3. *Never saved, never a record.* The translation lives in the page until it is closed or the page
+     moves on; it is not written to the database, the backup, a bundle or the report. Its words are
+     not covered by the stamps, so it is never shown in place of the original.
+  4. *What is sent to the model.* The step's title and text (the first 8,000 characters, said when
+     shortened), with the instruction to translate faithfully and keep numbers, formulas, code,
+     names, links and Markdown as they are. Attached files are not translated.

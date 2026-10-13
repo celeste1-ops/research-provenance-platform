@@ -209,3 +209,30 @@ def test_switching_the_language_switches_the_example(tmp_path, browser):
         page.get_by_test_id("space-real").click()
         expect(page.get_by_test_id("project-select").locator("option:checked")).to_have_text("My study, in English")
         page.close()
+
+
+def test_the_loading_screen_says_what_went_wrong(tmp_path, browser):
+    """A first answer that fails no longer leaves "Loading…" on screen for good: it says what went
+    wrong, with Try again and (outside My research) a way back to it."""
+    with LiveServer(tmp_path) as srv:
+        srv.ctx.ledger.init_identity("Author")
+        srv.ctx.ledger.create_project("My study")
+        page = browser.new_page(viewport={"width": 1400, "height": 900})
+        page.add_init_script("localStorage.setItem('rprov-space', 'example')")  # left in the example last time
+
+        def status(route):
+            if route.request.headers.get("x-rprov-space") == "example":
+                route.fulfill(status=500, content_type="application/json", body='{"detail": "something broke"}')
+            else:
+                route.continue_()
+
+        page.route("**/api/status", status)
+        page.goto(srv.url)
+        loading = page.get_by_test_id("loading")
+        expect(loading).to_contain_text("Opening the example…")
+        expect(loading).to_contain_text("something broke")
+        expect(loading.get_by_role("button", name="Try again")).to_be_visible()
+        loading.get_by_test_id("loading-real").click()
+        expect(page.get_by_test_id("empty-state")).to_be_visible()  # My research, as it was
+        expect(page.get_by_test_id("space-real")).to_have_attribute("aria-pressed", "true")
+        page.close()

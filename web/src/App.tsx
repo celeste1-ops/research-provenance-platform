@@ -89,7 +89,10 @@ export function App() {
   const [stepsTable, setStepsTable] = useState(false);
   const [milestonesOnly, setMilestonesOnly] = useState(false);
   const [notice, setNotice] = useState<Notice | null>(null);
-  const [tourStart, setTourStart] = useState(0); // "See the example" asked for the tour (D-062, D-064)
+  const [tourStart, setTourStart] = useState(0);
+  // The first answer failed, or is long in coming: said on the loading screen, with a way out.
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [slowStart, setSlowStart] = useState(false); // "See the example" asked for the tour (D-062, D-064)
   const [menuOpen, setMenuOpen] = useState(false);
   const [uiLang, setUiLang] = useState<Lang>(lang);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -108,6 +111,7 @@ export function App() {
       if (stale()) return;
       setDevice(s.device, s.keychain_name);
       setStatus(s);
+      setLoadError(null);
       if (!s.initialized) return;
       const ps = await api.projects();
       if (stale()) return;
@@ -126,7 +130,9 @@ export function App() {
       if (stale()) return;
       setTimeline(rows);
     } catch (e) {
-      if (!stale()) setNotice({ text: (e as Error).message, kind: "error" });
+      if (stale()) return;
+      setNotice({ text: (e as Error).message, kind: "error" });
+      setLoadError((e as Error).message);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projectId, space]);
@@ -138,6 +144,15 @@ export function App() {
     }
     reload();
   }, [reload]);
+
+  // Still nothing after a while: say what may be holding it up.
+  const waiting = status === null;
+  useEffect(() => {
+    setSlowStart(false);
+    if (!waiting) return;
+    const timer = window.setTimeout(() => setSlowStart(true), 12000);
+    return () => window.clearTimeout(timer);
+  }, [waiting, space]);
 
   // An answer said the keychain refused access: show the banner now, not at the next refresh.
   useEffect(() => {
@@ -402,7 +417,25 @@ export function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [canDropHere]);
 
-  if (!status) return <div className="loading">{t("Loading…")}</div>;
+  if (!status)
+    return (
+      <div className="loading" data-testid="loading">
+        <p>{space === "example" ? t("Opening the example…") : t("Loading…")}</p>
+        {(loadError || slowStart) && (
+          <div className="loading-help">
+            <p className={loadError ? "error" : ""}>
+              {loadError ?? t("This is taking longer than usual. If a window of your system asks to use the keychain, allow it.")}
+            </p>
+            <button className="secondary" onClick={() => { setLoadError(null); void reload(); }}>{t("Try again")}</button>
+            {space !== "real" && (
+              <button className="link" onClick={() => switchSpace("real")} data-testid="loading-real">
+                {t("Back to My research")}
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+    );
   if (!status.initialized)
     return <Setup key={uiLang} onDone={reload} onPractice={() => switchSpace("practice")}
       onSample={() => void seeExample()} onLang={changeLang} />;

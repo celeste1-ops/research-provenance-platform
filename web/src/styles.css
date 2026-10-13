@@ -50,6 +50,7 @@ button.link, .link { background: none; border: 0; padding: 0; color: var(--accen
 .center { text-align: center; }
 .unverified { color: #8a909c; }
 .loading, .empty { padding: 40px; color: var(--muted); text-align: center; }
+.loading-help { display: flex; flex-direction: column; align-items: center; gap: 10px; max-width: 440px; margin: 16px auto 0; }
 
 .app { display: flex; flex-direction: column; height: 100vh; }
 /* Row 1 — where am I. */
@@ -506,3 +507,8 @@ pre.file-text { max-height: 260px; overflow: auto; margin: 6px 0 8px; padding: 8
 .actions .spacer { flex: 1; }
 .table-link { align-self: center; }
 .import-list { max-height: 320px; overflow: auto; margin: 8px 0; }
+
+/* A translation beside the original (D-066): never mistaken for the record. */
+.translate-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 8px 0 4px; }
+.translation { margin: 10px 0; padding: 10px 12px; border: 1px dashed var(--line); border-radius: 8px; background: #fafafa; }
+.translation h4 { margin: 4px 0 6px; }
