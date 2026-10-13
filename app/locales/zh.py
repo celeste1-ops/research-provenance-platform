@@ -302,6 +302,26 @@ TEXTS: dict[str, str] = {
     "{n} of them are marked as key steps; each part ends with one.": "其中 {n} 步标为关键一步；每一部分都在一个关键步结束。",
     "A ✓ marks a date from a date stamp; other dates are the computer's own clock. Highlighted sentences are the author's statements: reasons, notes, claimed dates and the links between steps.":
         "带 ✓ 的日期来自日期章，其他日期是电脑自己的时钟。标出颜色的句子是作者陈述：原因、说明、声称的日期，以及步骤之间的关系。",
+    # importing and the steps table (D-060)
+    "Step": "步骤编号",
+    "Date": "日期",
+    "Date stamp": "日期章",
+    "Earlier date (the author's statement)": "更早的日期（作者陈述）",
+    "Type": "类型",
+    "Title": "标题",
+    "Text": "内容",
+    "Builds on": "用到",
+    "Key step": "关键步骤",
+    "Withdrawn": "已撤回",
+    "Reference": "引用",
+    "Files": "文件",
+    "Imported from the notes folder {folder}: {file}": "从笔记文件夹 {folder} 导入：{file}",
+    "no title: this row is left out": "没有标题：这一行不导入",
+    "unknown type “{kind}”: recorded as a note": "不认识的类型“{kind}”：按笔记记录",
+    "this date could not be read: left out": "读不懂这个日期：这一行照常导入，但不带日期",
+    "builds on row {ref}, which is not an earlier row: left out": "“基于”第 {ref} 行，但那一行不在它前面：这个关系不导入",
+    "Evidence bundle made with Research History. It holds report.html (open it in a browser), VERIFY.md and verify.py, with which anyone can check the records: that they existed by their date stamps and have not changed since. What the records do not show is written in report.html.":
+        "用 Research History 做的证据包。里面有 report.html（用浏览器打开）、VERIFY.md 和 verify.py，任何人都能用它们核对这些记录：它们在日期章的时间已经存在，而且之后没有改动。记录不能说明什么，写在 report.html 里。",
 }
 # Messages written in English where they arise (errors, stamp service checks) and translated where
 # they leave the server (``tr_message``); only these are matched as patterns.
@@ -439,6 +459,38 @@ MESSAGES: dict[str, str] = {
     "the branch is gone or has no commits": "这个分支不见了，或者没有提交",
     "could not delete {path}: some file in it is still in use. Close other programs that may be using it and try again.":
         "删不掉 {path}：里面有文件还在被使用。请关掉可能在用它的其他程序，再试一次。",
+    # a repository from its address, and putting a bundle into a repository (D-060)
+    "git took too long (the repository may be very large, or the connection slow)": "git 太久没有完成（可能仓库很大，或者网速慢）",
+    "this repository has no branches yet": "这个仓库还没有分支",
+    "nothing changed: this evidence bundle is already in the repository": "没有变化：这个证据包已经在仓库里了",
+    "could not get in: check the address; for a private repository, sign in once on this computer (GitHub Desktop, or git clone in a terminal), then try again":
+        "进不去：请检查地址；如果是私有仓库，请先在这台电脑上登录一次（用 GitHub Desktop，或者在终端里 git clone），再试一次",
+    "could not reach the server: check the internet connection, then try again": "连不上服务器：请检查网络，再试一次",
+    "git does not know your name and e-mail yet: set them once (git config --global user.name / user.email)":
+        "git 还不知道你的名字和邮箱：请先设置一次（git config --global user.name / user.email）",
+    "this branch is not connected to GitHub yet: push it once yourself, then the app can push too":
+        "这个分支还没有连到 GitHub：请先自己推送一次，之后程序也能推送",
+    "GitHub has newer commits than this computer: pull them first, then push again": "GitHub 上有这台电脑还没有的提交：请先拉取（pull），再推送",
+    "git failed": "git 出错了",
+    "choose the folder of a git repository on this computer": "请选这台电脑上一个 git 仓库的文件夹",
+    "{rel} already exists and is not an evidence bundle; give the bundle another title": "{rel} 已经存在，而且不是证据包；请给证据包换个名字",
+    # Zenodo (D-060)
+    "connect Zenodo first: choose Zenodo under “Where should it go?” and paste a token": "请先连接 Zenodo：在“放到哪里？”下面选 Zenodo，粘贴令牌",
+    "no Zenodo token": "没有 Zenodo 令牌",
+    "could not reach Zenodo ({value})": "连不上 Zenodo（{value}）",
+    "Zenodo answered with an address on another server; nothing was sent there": "Zenodo 回了一个别的服务器的地址；没有往那里发送任何内容",
+    "Zenodo did not accept the token (it needs the deposit:write scope)": "Zenodo 不接受这个令牌（它需要 deposit:write 权限）",
+    "Zenodo said: {detail} (HTTP {value})": "Zenodo 回答：{detail}（HTTP {value}）",
+    "Zenodo did not say where to put the file": "Zenodo 没有说文件该传到哪里",
+    # importing notes and tables (D-060)
+    "there are no Markdown notes (.md) in that folder": "这个文件夹里没有 Markdown 笔记（.md）",
+    "that folder holds more than {MAX_NOTES} notes; choose one of its subfolders": "这个文件夹里的笔记超过 {MAX_NOTES} 篇；请选其中一个子文件夹",
+    "unknown step type": "未知的步骤类型",
+    "the table is too large": "表格太大",
+    "the table is empty": "表格是空的",
+    "the table is not in a text encoding the app can read; save it as CSV UTF-8": "读不懂这个表格的文字编码；请另存为 CSV UTF-8",
+    "the table needs a column called title (标题)": "表格需要有一列叫“标题”（title）",
+    "the table has more than {MAX_ROWS} rows; split it": "表格超过 {MAX_ROWS} 行；请拆成几个表格",
 }
 
 ZH: dict[str, str] = {**TEXTS, **MESSAGES}

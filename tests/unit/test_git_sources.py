@@ -220,3 +220,80 @@ def test_tagged_history_steps_are_key_steps(ctx, project, repo):
     by_title = {e.title: e for e in ctx.ledger.state().entries.values()}
     assert by_title["fsf-code · v0.1"].milestone
     assert not by_title["fsf-code · 2025-02"].milestone
+
+
+# ---------------------------------------------------------------- recorded from its address (D-060)
+
+
+@pytest.fixture
+def served(monkeypatch, repo):
+    """The test repository as if it were on GitHub: a file:// address, allowed here only."""
+    from app.services import gitrepo, gitsources
+
+    monkeypatch.setattr(gitrepo, "ALLOWED_PROTOCOLS", "file:https:ssh")
+    real = gitrepo.normalize_remote
+    monkeypatch.setattr(gitsources, "normalize_remote", lambda t: t if t.startswith("file://") else real(t))
+    return repo.path.as_uri()
+
+
+def test_a_repository_recorded_from_its_address(ctx, project, repo, served, monkeypatch):
+    from app.services import gitsources
+
+    first = repo.commit("Initial model", date="2024-05-01T09:00:00+00:00")
+    info = ctx.git.inspect(served)
+    assert info["remote"] and info["branches"] == ["main"] and info["branch"] == "main"
+    assert info["name"] == "fsf-code" and info["commits"] is None  # not downloaded yet
+    ctx.git.add(served, "main", project, history=False, keep_code=True, background=False)
+    [step] = entries(ctx)
+    assert step["external"] == {"repo_url": served, "commit": first}
+    assert ctx.ledger.record_files(step["id"])[-1].name.endswith(".zip")  # the code copy, from the downloaded copy
+    [source] = ctx.git.sources()
+    mirror = Path(source["path"])
+    assert mirror.parent == Path(ctx.settings.data_dir) / "git-mirrors" and (mirror / "HEAD").is_file()
+    assert source["remote"] == served and source["fetched"]
+
+    second = repo.commit("Smaller step size")
+    assert ctx.git.check()["recorded"] == 0  # downloaded a moment ago: looks again in ten minutes
+    monkeypatch.setattr(gitsources, "FETCH_EVERY_SECONDS", 0)
+    assert ctx.git.check()["recorded"] == 1
+    assert entries(ctx)[-1]["external"]["commit"] == second
+
+    with pytest.raises(GitError, match="already being recorded"):
+        ctx.git.add(served, "main", project, history=False, keep_code=False, background=False)
+    ctx.git.remove(source["id"])
+    assert not mirror.exists()  # only a copy; the steps stay
+    assert len(entries(ctx)) == 2
+
+
+def test_a_download_that_fails_says_why_and_is_tried_again(ctx, project, tmp_path, served, monkeypatch):
+    from app.services import gitsources
+
+    missing = (tmp_path / "gone").as_uri()
+    ctx.git.add(missing, "main", project, history=False, keep_code=False, background=False)
+    [source] = ctx.git.sources()
+    assert source["error"] and entries(ctx) == []
+    monkeypatch.setattr(gitsources, "clone_mirror", lambda url, target: (_ for _ in ()).throw(GitError("offline")))
+    ctx.git.check()
+    assert ctx.git.sources()[0]["error"] == "offline"
+
+
+def test_only_https_and_ssh_addresses_are_used(tmp_path, repo):
+    from app.services.gitrepo import clone_mirror, normalize_remote
+
+    repo.commit("x")
+    assert normalize_remote("github.com/owner/repo/tree/main") == "https://github.com/owner/repo"
+    assert normalize_remote("git@github.com:owner/repo.git") == "git@github.com:owner/repo.git"
+    for bad in ("file:///etc", "/Users/me/code", "ext::sh -c touch% /tmp/x", "-uhelp", "http://example.org/x.git"):
+        assert normalize_remote(bad) is None
+    with pytest.raises(GitError):  # git itself refuses other transports too
+        clone_mirror(repo.path.as_uri(), tmp_path / "copy.git")
+    assert not (tmp_path / "copy.git" / "HEAD").exists()
+
+
+def test_what_git_says_becomes_what_to_do():
+    from app.services.gitrepo import _friendly
+
+    assert "sign in once" in _friendly("remote: Repository not found.\nfatal: Authentication failed")
+    assert "internet connection" in _friendly("fatal: unable to access 'https://x/': Could not resolve host: x")
+    assert "user.name" in _friendly("Please tell me who you are.")
+    assert "pull them first" in _friendly("! [rejected] main -> main (fetch first)")

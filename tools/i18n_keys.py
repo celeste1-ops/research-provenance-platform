@@ -54,12 +54,13 @@ if __name__ == "__main__":
 
 # ---------------------------------------------------------------- server texts (app/locales/zh.py)
 
-SERVER_DIRS = ("app", "core/provenance_core/providers/diagnostics.py", "core/provenance_core/providers/local_ai.py")
+SERVER_DIRS = ("app", "core/provenance_core/providers/diagnostics.py", "core/provenance_core/providers/local_ai.py",
+               "core/provenance_core/providers/zenodo.py")
 TEMPLATES = "app/report/templates"
 # t("…") / th("…") in the report templates, with either kind of quotes.
 TEMPLATE_CALL = re.compile(r"""\b(?:t|th)\(\s*(?:"((?:[^"\\]|\\.)*)"|'((?:[^'\\]|\\.)*)')""")
 _ERROR_CLASSES = {"LedgerError", "BackupError", "PracticeResetError", "HTTPException", "ValueError", "KeyStoreError",
-                  "GitError", "InboxError", "LocalAIError"}
+                  "GitError", "InboxError", "LocalAIError", "ImportProblem", "PublishError", "ZenodoError"}
 
 
 def _literal(node) -> str | None:

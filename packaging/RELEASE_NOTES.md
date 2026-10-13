@@ -1,4 +1,12 @@
-## What's in this version (v0.4.1)
+## What's in this version (v0.5.0)
+
+**New in v0.5.0**
+- **Record a repository from its GitHub address.** In Settings → Record from git…, paste an address such as `github.com/you/project` instead of choosing a folder. The app keeps a copy in its own data folder and looks for new commits every ten minutes. This only downloads; a private repository works once your computer is signed in to GitHub (GitHub Desktop, or git in a terminal).
+- **Put an evidence bundle on GitHub.** At the bottom of Share, choose **Into a git repository on this computer**: the bundle goes into the folder `provenance/<name>/` of that repository and is committed on its own, without touching your other changes. Tick **Also push it** to send it to GitHub, where VERIFY.md reads as a page.
+- **Or make a Zenodo draft.** Choose **Zenodo, as a draft** and connect once with a personal token from Zenodo. The app makes a private draft with the bundle, title, author and a reserved DOI; you look at it on zenodo.org and publish it there yourself. Zenodo's test site can be tried first.
+- **Import earlier notes and tables.** Settings → **Import notes or a table…** brings in a folder of Markdown notes (an Obsidian vault, for example: links between notes and pictures come along) or a CSV table from Excel, one step per note or row. You see the list first. Dates in them are kept as your own statement, marked "not verified"; the date stamp shows the day you imported them.
+- **The steps as a table.** Share → **Download the steps as a table (CSV)** opens in Excel or Numbers, for reading and counting.
+- **What leaves your computer** is still only the fingerprints for the stamps — plus, only when you click for it, the download of a repository you named, the bundle you put into a repository or onto Zenodo, with what you chose to disclose.
 
 **New in v0.4.1**
 - **A finished example comes with the app.** The first screen now offers "See a finished example first": a fictional research project, FSF, with 32 steps in two projects that use everything the app does — a hypothesis revised after an experiment, a side idea withdrawn, code recorded from git, pictures, data and drafts shown in place, older material, later corrections, key steps and the story. It opens in the practice space (in Chinese or English, as the app is set), so nothing goes into your real record.

@@ -253,7 +253,8 @@ export type GitSource = {
   recorded: number;
   checked: string | null;
   error: string | null;
-  busy: { done: number; total: number | null } | null;
+  busy: { done: number; total: number | null; phase?: "download" } | null;
+  remote?: string;  // recorded from this address: a downloaded copy is kept up to date (D-060)
 };
 
 export type GitStatus = { git: boolean; sources: GitSource[] };
@@ -264,13 +265,35 @@ export type GitInspect = {
   branches: string[];
   branch: string | null;
   remote_url: string | null;
-  commits: number;
+  remote?: boolean;  // an address: branches only, the repository is downloaded when recording starts
+  commits: number | null;
   tags: number;
   first_date: string | null;
   last_date: string | null;
-  history_steps: number;
+  history_steps: number | null;
   already: boolean;
 };
+
+// Bringing material in, and sending an evidence bundle out (DECISIONS D-060).
+export type NotesPreview = {
+  folder: string;
+  name: string;
+  count: number;
+  dated: number;
+  notes: { rel: string; title: string; date: string | null; date_source: "front matter" | "file date";
+    links: number; images: number }[];
+};
+
+export type TablePreview = {
+  count: number;
+  rows: { number: number; title: string; type: string; date: string | null; builds_on: number[]; key: boolean;
+    problems: string[] }[];
+};
+
+export type RepoExport = { folder: string; commit: string | null; pushed: boolean; remote_url: string | null;
+  error?: string };
+export type ZenodoStatus = { connected: boolean; sandbox: boolean };
+export type ZenodoDraft = { id: number; html: string | null; doi: string | null; sandbox: boolean };
 
 // The research told in sentences from fixed templates (DECISIONS D-048).
 export type NarrativeSentence = {

@@ -5,23 +5,26 @@ import { t, tn, tx } from "../i18n";
 import type { GitInspect, GitSource, GitStatus, Project } from "../types";
 import { timeAgo } from "../util";
 
-// Recording a git repository (DECISIONS D-047): every new commit on one branch becomes a code
-// step. Only the repository on this computer is read; nothing is fetched or pushed.
+// Recording a git repository (DECISIONS D-047, D-060): every new commit on one branch becomes a
+// code step. A folder on this computer is only read; a repository given by its address (GitHub and
+// the like) is downloaded once and brought up to date every ten minutes — only downloaded.
 
 function SourceRow({ s, onRemove }: { s: GitSource; onRemove: (s: GitSource) => void }) {
   return (
     <tr data-testid={`git-source-${s.name}`}>
       <td>
         <b>{s.name}</b> <span className="muted">({s.branch})</span>
-        <div className="muted small mono">{s.path}</div>
+        <div className="muted small mono">{s.remote ? s.repo_url : s.path}</div>
       </td>
       <td>{s.project_title}</td>
       <td>
         {s.busy ? (
           <span data-testid="git-busy">
-            {s.busy.total
-              ? t("Recording… {done} of {total}", { done: s.busy.done, total: s.busy.total })
-              : t("Starting…")}
+            {s.busy.phase === "download"
+              ? t("Downloading a copy…")
+              : s.busy.total
+                ? t("Recording… {done} of {total}", { done: s.busy.done, total: s.busy.total })
+                : t("Starting…")}
           </span>
         ) : (
           <span data-testid="git-recorded">{tn(s.recorded, "{n} step recorded", "{n} steps recorded")}</span>
@@ -90,24 +93,34 @@ function AddForm({ projects, projectId, onAdded }: {
       <h3>{t("Record a repository")}</h3>
       <form onSubmit={look} className="row">
         <input value={path} onChange={(e) => { setPath(e.target.value); setInfo(null); }}
-          placeholder={isWindows() ? "C:\\Users\\you\\code\\my-project" : "/Users/you/code/my-project"}
-          aria-label={t("Repository folder")} data-testid="git-path" />
+          placeholder={isWindows() ? "C:\\Users\\you\\code\\my-project  ·  https://github.com/you/my-project"
+            : "/Users/you/code/my-project  ·  https://github.com/you/my-project"}
+          aria-label={t("Repository folder or address")} data-testid="git-path" />
         <button className="secondary" disabled={busy || !path.trim()} data-testid="git-look">
           {t("Look")}
         </button>
       </form>
-      <p className="note">{t("The folder of a git repository on this {device} (the one that contains .git).", { device: dev() })}</p>
+      <p className="note">
+        {t("The folder of a git repository on this {device} (the one that contains .git), or its address on GitHub, GitLab or Gitee.", { device: dev() })}
+      </p>
       {error && <p className="error">{error}</p>}
       {info && (
         <div className="status-box" data-testid="git-info">
           <p>
             <b>{info.name}</b>{" "}
-            {info.commits > 0 && info.first_date
-              ? t("— {n} commits from {first} to {last}", { n: info.commits, first: info.first_date, last: info.last_date ?? "" })
-              : t("— no commits yet")}
+            {info.remote
+              ? t("— on a server: a copy is downloaded when recording starts")
+              : info.commits && info.first_date
+                ? t("— {n} commits from {first} to {last}", { n: info.commits, first: info.first_date, last: info.last_date ?? "" })
+                : t("— no commits yet")}
             {info.tags > 0 && t(", {n} tagged", { n: info.tags })}
           </p>
           {info.remote_url && <p className="muted small mono">{info.remote_url}</p>}
+          {info.remote && (
+            <p className="note" data-testid="git-remote-note">
+              {t("The app keeps a copy of this repository in its data folder and looks for new commits on the server every ten minutes. This only downloads: nothing of your records is sent. A private repository needs this computer to be signed in to GitHub already (GitHub Desktop, or git in a terminal).")}
+            </p>
+          )}
           <label>
             {t("Branch")}
             <select value={branch} onChange={(e) => setBranch(e.target.value)} data-testid="git-branch">
@@ -127,8 +140,10 @@ function AddForm({ projects, projectId, onAdded }: {
             </label>
             <label className="check">
               <input type="radio" checked={history} onChange={() => setHistory(true)} data-testid="git-history" />
-              {tn(info.history_steps, "Also add the history so far as {n} step (one per tag or month)",
-                "Also add the history so far as {n} steps (one per tag or month)")}
+              {info.history_steps === null
+                ? t("Also add the history so far (one step per tag or month)")
+                : tn(info.history_steps, "Also add the history so far as {n} step (one per tag or month)",
+                  "Also add the history so far as {n} steps (one per tag or month)")}
             </label>
             {history && (
               <p className="note">
@@ -228,7 +243,7 @@ export function GitDialog({ projects, projectId, onClose, onChanged }: {
           {t("Every new commit on the branch you choose becomes a code step, with its date stamps — you don't have to add it by hand. The app looks once a minute while it is running, and catches up when it starts again.")}
         </p>
         <p className="note">
-          {tx("Only the repository on this {device} is read; nothing is fetched, pushed or sent anywhere (only the fingerprints for the stamps, as for every step). <b>Dates that git shows are your own statement</b>: they can be changed, so they are never shown as verified times.", { b: (s) => <b>{s}</b> }, { device: dev() })}
+          {tx("A folder on this {device} is only read. A repository given by its address is only downloaded. Nothing of your records is sent anywhere (only the fingerprints for the stamps, as for every step). <b>Dates that git shows are your own statement</b>: they can be changed, so they are never shown as verified times.", { b: (s) => <b>{s}</b> }, { device: dev() })}
         </p>
         {error && <p className="error">{error}</p>}
         {status && !status.git && (

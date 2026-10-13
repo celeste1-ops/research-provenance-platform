@@ -14,6 +14,7 @@ sys.path.insert(0, str(ROOT / "tools"))
 
 from i18n_keys import interface_keys, server_keys, zh_catalog  # noqa: E402
 
+from app.api import routes  # noqa: E402
 from app.i18n import language, tr, tr_message  # noqa: E402
 from app.locales.zh import ZH as SERVER_ZH  # noqa: E402
 from app.report import render, svg  # noqa: E402
@@ -49,7 +50,7 @@ def test_every_server_text_has_a_chinese_version():
                 # the exported report
                 *render.PROVES, *render.DOES_NOT_PROVE, render.SOURCE_NOTE, *render.WORDS, *render.LATER_LABELS,
                 *render.TYPE_LABELS.values(), *svg.TYPE_LABELS.values(), *STATUS_LABELS.values(), "not enabled",
-                export.HASH_WARNING,
+                export.HASH_WARNING, routes.ZENODO_DESCRIPTION,
                 # the story (D-048)
                 *narrative.KIND_PHRASES.values(), narrative.OTHER_KIND, *narrative.RELATION_SENTENCES.values(),
                 narrative.OTHER_RELATION, *narrative.ADDED_LINKS.values(), narrative.OTHER_ADDED_LINK,

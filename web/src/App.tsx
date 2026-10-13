@@ -10,6 +10,7 @@ import { Help } from "./components/Help";
 import { Legend, TechnicalDetails, WhereIsMyData } from "./components/InfoPanels";
 import { KeyBackupDialog } from "./components/KeyBackupDialog";
 import { GitDialog } from "./components/GitDialog";
+import { ImportDialog } from "./components/ImportDialog";
 import { FolderDialog, InboxDialog } from "./components/InboxDialogs";
 import { NewProject } from "./components/NewProject";
 import { QuickNote } from "./components/QuickNote";
@@ -26,7 +27,7 @@ import { LangSwitch } from "./components/LangSwitch";
 import { GearIcon, ListIcon, LogoMark, MapIcon, NoteIcon, PlusIcon, ShareIcon, StoryIcon } from "./components/Icons";
 
 type Dialog = null | "form" | "export" | "backup" | "key" | "where" | "tech" | "services" | "practice-reset" | "new-project" | "git"
-  | "quick" | "folders" | "inbox";
+  | "quick" | "folders" | "inbox" | "import";
 const QUICK_NOTE_HASH = "#quick-note"; // the menu bar / tray icon opens the page with it (D-047)
 const SPACE_KEY = "rprov-space";
 const TIPS_KEY = "rprov-tips-hidden"; // the person clicked "Got it" on the how-to line
@@ -463,6 +464,10 @@ export function App() {
               <button role="menuitem" onClick={() => openMenuItem("folders")} data-testid="menu-folders">
                 {t("Watch a folder…")}
               </button>
+              <div className="menu-section" role="presentation">{t("Earlier material")}</div>
+              <button role="menuitem" onClick={() => openMenuItem("import")} data-testid="menu-import">
+                {t("Import notes or a table…")}
+              </button>
               <div className="menu-section" role="presentation">{t("Stamps")}</div>
               <button role="menuitem" onClick={checkProofs}>{t("Check stamps now")}</button>
               <button role="menuitem" onClick={() => openMenuItem("services")}>{t("Check stamp services…")}</button>
@@ -694,6 +699,10 @@ export function App() {
         <TechnicalDetails status={status} onClose={() => setDialog(null)} onKeyBackup={() => setDialog("key")} />
       )}
       {dialog === "services" && <ServiceCheckDialog onClose={() => setDialog(null)} />}
+      {dialog === "import" && (
+        <ImportDialog projects={projects} projectId={projectId} onClose={() => setDialog(null)} onImported={reload}
+          onGit={() => setDialog("git")} />
+      )}
       {dialog === "git" && (
         <GitDialog projects={projects} projectId={projectId} onClose={() => setDialog(null)} onChanged={reload} />
       )}
@@ -714,7 +723,7 @@ export function App() {
       )}
       {dialog === "export" && (
         <ExportDialog rows={timeline} defaultTitle={project?.title ?? t("evidence")} onClose={() => setDialog(null)}
-          practice={practice} />
+          practice={practice} projectId={projectId} />
       )}
       {dialog === "practice-reset" && (
         <div className="modal-backdrop" role="dialog" aria-modal="true" aria-label={t("Start practice over")}>
